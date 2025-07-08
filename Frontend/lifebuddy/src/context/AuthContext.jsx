@@ -319,7 +319,10 @@ export const AuthProvider = ({ children }) => {
         console.log('Token in localStorage after setToken:', localStorage.getItem('token'));
       }, 500);
       toast.success('Welcome to LifeBuddy!');
-      navigate('/dashboard');
+      // Wait for token to be saved in localStorage before navigating
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 150);
     } catch (error) {
       console.error('Google login backend error:', error);
       toast.error('Failed to complete Google login');
