@@ -13,6 +13,7 @@ import DailyTools from './pages/DailyTools';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
               <Route path="/tools" element={<DailyTools />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/profile/:identifier" element={<PublicProfile />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
           </Routes>
