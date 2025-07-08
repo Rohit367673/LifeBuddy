@@ -131,6 +131,56 @@ const PublicProfile = () => {
   // Badges
   const earnedBadges = (profile.badges || []).filter(Boolean);
 
+  // Calculate completion rate if available
+  const completionRate = profile.totalTasks > 0 ? Math.round((profile.completedTasks / profile.totalTasks) * 100) : 0;
+  // Achievement stats if available
+  const achievementStats = profile.achievementStats || {};
+  // Activity calendar if loginHistory is available
+  function getLastNDaysLoginData(loginHistory, n = 35) {
+    const today = new Date();
+    const days = [];
+    const loginSet = new Set(
+      (loginHistory || []).map(date => {
+        const d = new Date(date);
+        return d.getUTCFullYear() + '-' +
+          String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+          String(d.getUTCDate()).padStart(2, '0');
+      })
+    );
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = d.getUTCFullYear() + '-' +
+        String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getUTCDate()).padStart(2, '0');
+      days.push({
+        date: dateStr,
+        loggedIn: loginSet.has(dateStr),
+      });
+    }
+    return days;
+  }
+  function chunkIntoWeeks(days) {
+    const weeks = [];
+    let week = [];
+    const firstDay = new Date(days[0].date).getDay();
+    for (let i = 0; i < firstDay; i++) week.push(null);
+    for (const day of days) {
+      week.push(day);
+      if (week.length === 7) {
+        weeks.push(week);
+        week = [];
+      }
+    }
+    if (week.length) {
+      while (week.length < 7) week.push(null);
+      weeks.push(week);
+    }
+    return weeks;
+  }
+  const loginDays = profile.loginHistory ? getLastNDaysLoginData(profile.loginHistory, 35) : [];
+  const weeks = loginDays.length ? chunkIntoWeeks(loginDays) : [];
+
   return (
     <div className="space-y-6 mt-8 bg-white">
       {/* Header */}
@@ -150,8 +200,12 @@ const PublicProfile = () => {
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="text-center">
-              <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-12 h-12 text-white" />
+              <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                {profile.avatar ? (
+                  <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <UserIcon className="w-12 h-12 text-white" />
+                )}
               </div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
@@ -177,85 +231,133 @@ const PublicProfile = () => {
               </div>
               <div className="mt-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">{profile.completedTasks}</div>
-                  <div className="text-sm text-gray-600">Tasks Done</div>
+                  <div className="text-2xl font-bold text-green-500">{completionRate}%</div>
+                  <div className="text-sm text-gray-600">Completion Rate</div>
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-500">{profile.totalTasks}</div>
-                  <div className="text-sm text-gray-600">Total Tasks</div>
+              {/* Achievement Stats if available */}
+              {achievementStats && (
+                <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600">{achievementStats.totalAchievements || 0}</div>
+                      <div className="text-sm text-blue-600">Total</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">{achievementStats.completedAchievements || 0}</div>
+                      <div className="text-sm text-green-600">Completed</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-purple-600">{achievementStats.completionRate || 0}%</div>
+                      <div className="text-sm text-purple-600">Completion</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="mt-6 text-xs text-gray-400">Joined: {new Date(profile.joinedAt).toLocaleDateString()}</div>
             </div>
           </div>
         </div>
-
-        {/* Badges Section */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrophyIcon className="w-5 h-5" />
-              Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(badgeDefinitions).map(([badgeId, badge]) => {
-                const isEarned = earnedBadges.includes(badgeId);
-                return (
-                  <div
-                    key={badgeId}
-                    className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
-                      isEarned
-                        ? 'border-yellow-300 bg-white scale-105'
-                        : 'border-gray-100 bg-gray-50 opacity-50'
-                    }`}
-                  >
-                    <div className="text-center">
-                      <div
-                        className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-                        style={{
-                          padding: '8px',
-                          boxShadow: isEarned
-                            ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}`
-                            : undefined
-                        }}
-                      >
-                        <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
-                        <img
-                          src={badge.image}
-                          alt={badge.name}
-                          className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
-                          style={{ background: 'transparent' }}
-                        />
+        {/* Activity Calendar (if available) */}
+        {weeks.length > 0 && (
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5" />
+                Activity Calendar
+              </h3>
+              <div className="mt-6">
+                <div className="font-semibold mb-2 text-sm text-gray-700">Activity Calendar</div>
+                <div className="overflow-x-auto">
+                  <div className="flex gap-1">
+                    {weeks.map((week, wi) => (
+                      <div key={wi} className="flex flex-col gap-1">
+                        {week.map((day, di) => (
+                          <div
+                            key={di}
+                            className={`w-4 h-4 rounded-sm border border-gray-200 transition-colors duration-200
+                              ${!day ? 'bg-transparent' :
+                                day.loggedIn ? 'bg-green-500' :
+                                'bg-gray-200'}
+                            `}
+                            title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : ''}` : ''}
+                            style={{ minWidth: 16, minHeight: 16 }}
+                          />
+                        ))}
                       </div>
-                      <h4
-                        className={`font-medium text-sm ${
-                          isEarned ? 'text-gray-900' : 'text-gray-500'
-                        }`}
-                      >
-                        {badge.name}
-                      </h4>
-                      <p
-                        className={`text-xs mt-1 ${
-                          isEarned ? 'text-gray-600' : 'text-gray-400'
-                        }`}
-                      >
-                        {badge.description}
-                      </p>
-                      {isEarned && (
-                        <div className="mt-2">
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            Earned
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                );
-              })}
+                  <div className="flex justify-between mt-1 text-xs text-gray-400">
+                    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Badges Section */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <TrophyIcon className="w-5 h-5" />
+          Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Object.entries(badgeDefinitions).map(([badgeId, badge]) => {
+            const isEarned = earnedBadges.includes(badgeId);
+            return (
+              <div
+                key={badgeId}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
+                  isEarned
+                    ? 'border-yellow-300 bg-white scale-105'
+                    : 'border-gray-100 bg-gray-50 opacity-50'
+                }`}
+              >
+                <div className="text-center">
+                  <div
+                    className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
+                    style={{
+                      padding: '8px',
+                      boxShadow: isEarned
+                        ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}`
+                        : undefined
+                    }}
+                  >
+                    <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+                    <img
+                      src={badge.image}
+                      alt={badge.name}
+                      className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+                      style={{ background: 'transparent' }}
+                    />
+                  </div>
+                  <h4
+                    className={`font-medium text-sm ${
+                      isEarned ? 'text-gray-900' : 'text-gray-500'
+                    }`}
+                  >
+                    {badge.name}
+                  </h4>
+                  <p
+                    className={`text-xs mt-1 ${
+                      isEarned ? 'text-gray-600' : 'text-gray-400'
+                    }`}
+                  >
+                    {badge.description}
+                  </p>
+                  {isEarned && (
+                    <div className="mt-2">
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        Earned
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
