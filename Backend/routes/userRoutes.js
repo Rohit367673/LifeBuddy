@@ -352,8 +352,4 @@ router.get('/profile/login-history', authenticateUser, async (req, res) => {
   }
 });
 
-router.get('/profile/login-history', (req, res) => {
-  res.json([]);
-});
-
 module.exports = router; 
