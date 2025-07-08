@@ -67,16 +67,18 @@ router.put('/profile', authenticateUser, async (req, res) => {
 router.get('/profile/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    
     let user;
     if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
       // It's an ObjectId
       user = await User.findById(identifier);
     } else {
-      // It's a username
+      // Try username first
       user = await User.findOne({ username: identifier });
+      // If not found, try firebaseUid
+      if (!user) {
+        user = await User.findOne({ firebaseUid: identifier });
+      }
     }
-    
     if (!user) {
       return res.status(404).json({ message: 'Profile not found' });
     }
