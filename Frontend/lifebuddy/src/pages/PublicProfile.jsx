@@ -82,60 +82,56 @@ const PublicProfile = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [achievements, setAchievements] = useState([]);
+  const [achievementStats, setAchievementStats] = useState({});
   const [loginHistory, setLoginHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    document.body.classList.remove('dark'); // Force light mode
-    const fetchProfile = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Fetch public profile data
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}`);
-        if (!response.ok) {
-          if (response.status === 403) setError('This profile is private.');
-          else if (response.status === 404) setError('Profile not found.');
-          else setError('Failed to load profile.');
-          setLoading(false);
-          return;
-        }
-        const data = await response.json();
-        setProfile(data);
-        // Fetch achievements (for recent achievements section)
-        const achRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements?user=${identifier}`);
-        if (achRes.ok) {
-          const achData = await achRes.json();
-          setAchievements(achData);
-        }
-        // Fetch login history for activity calendar
-        // (If you want to show this, you need a public endpoint or add it to the public profile API)
-        setLoading(false);
-      } catch (err) {
-        setError('Network error.');
-        setLoading(false);
-      }
-    };
+    document.body.classList.remove('dark'); // Always light mode for public profile
     fetchProfile();
-    // eslint-disable-next-line
+    fetchAchievements();
+    fetchLoginHistory();
   }, [identifier]);
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen bg-white"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div></div>;
-  }
-  if (error) {
-    return <div className="flex items-center justify-center min-h-screen bg-white"><div className="text-red-500 text-lg font-semibold">{error}</div></div>;
-  }
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}`);
+      if (response.status === 403) setError('This profile is private.');
+      else if (response.status === 404) setError('Profile not found.');
+      else if (!response.ok) setError('Failed to load profile.');
+      else {
+        const data = await response.json();
+        setProfile(data);
+      }
+    } catch (err) {
+      setError('Failed to load profile.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  // Badges
-  const earnedBadges = (profile.badges || []).filter(Boolean);
+  const fetchAchievements = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/public/${identifier}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAchievements(data.achievements || []);
+        setAchievementStats(data.stats || {});
+      }
+    } catch (err) {}
+  };
 
-  // Calculate completion rate if available
-  const completionRate = profile.totalTasks > 0 ? Math.round((profile.completedTasks / profile.totalTasks) * 100) : 0;
-  // Achievement stats if available
-  const achievementStats = profile.achievementStats || {};
-  // Activity calendar if loginHistory is available
+  const fetchLoginHistory = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}/login-history`);
+      if (response.ok) {
+        const data = await response.json();
+        setLoginHistory(data.loginHistory || []);
+      }
+    } catch (err) {}
+  };
+
   function getLastNDaysLoginData(loginHistory, n = 35) {
     const today = new Date();
     const days = [];
@@ -160,6 +156,7 @@ const PublicProfile = () => {
     }
     return days;
   }
+
   function chunkIntoWeeks(days) {
     const weeks = [];
     let week = [];
@@ -178,20 +175,39 @@ const PublicProfile = () => {
     }
     return weeks;
   }
-  const loginDays = profile.loginHistory ? getLastNDaysLoginData(profile.loginHistory, 35) : [];
-  const weeks = loginDays.length ? chunkIntoWeeks(loginDays) : [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-white p-8 rounded-xl shadow text-center">
+          <h2 className="text-2xl font-bold mb-4 text-red-500">{error}</h2>
+        </div>
+      </div>
+    );
+  }
+
+  const loginDays = getLastNDaysLoginData(loginHistory, 35);
+  const weeks = chunkIntoWeeks(loginDays);
+  const earnedBadges = (profile.badges || []).filter(Boolean);
+  const currentStreak = profile.currentStreak || 0;
+  const longestStreak = profile.longestStreak || 0;
+  const totalTasks = profile.totalTasks || 0;
+  const completedTasks = profile.completedTasks || 0;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="space-y-6 mt-8 bg-white">
+    <div className="space-y-6 mt-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">{profile.displayName}&apos;s Profile</h1>
-        <button
-          onClick={() => navigate('/')}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          Go to Home
-        </button>
       </div>
 
       {/* Profile Overview */}
@@ -204,14 +220,14 @@ const PublicProfile = () => {
                 {profile.avatar ? (
                   <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
                 ) : (
-                  <UserIcon className="w-12 h-12 text-white" />
+                  <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
                 )}
               </div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
               </h2>
               <p className="text-gray-600 text-sm">
-                @{profile.username}
+                @{profile.username || 'lifebuddy_user'}
               </p>
               {profile.personalQuote && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -221,11 +237,11 @@ const PublicProfile = () => {
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">{profile.currentStreak}</div>
+                  <div className="text-2xl font-bold text-blue-500">{currentStreak}</div>
                   <div className="text-sm text-gray-600">Current Streak</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-500">{profile.longestStreak}</div>
+                  <div className="text-2xl font-bold text-purple-500">{longestStreak}</div>
                   <div className="text-sm text-gray-600">Longest Streak</div>
                 </div>
               </div>
@@ -235,68 +251,62 @@ const PublicProfile = () => {
                   <div className="text-sm text-gray-600">Completion Rate</div>
                 </div>
               </div>
-              {/* Achievement Stats if available */}
-              {achievementStats && (
-                <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-600">{achievementStats.totalAchievements || 0}</div>
-                      <div className="text-sm text-blue-600">Total</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-600">{achievementStats.completedAchievements || 0}</div>
-                      <div className="text-sm text-green-600">Completed</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-purple-600">{achievementStats.completionRate || 0}%</div>
-                      <div className="text-sm text-purple-600">Completion</div>
-                    </div>
+              {/* Achievement Stats */}
+              <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600">{achievementStats.totalAchievements || 0}</div>
+                    <div className="text-sm text-blue-600">Total</div>
                   </div>
-                </div>
-              )}
-              <div className="mt-6 text-xs text-gray-400">Joined: {new Date(profile.joinedAt).toLocaleDateString()}</div>
-            </div>
-          </div>
-        </div>
-        {/* Activity Calendar (if available) */}
-        {weeks.length > 0 && (
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5" />
-                Activity Calendar
-              </h3>
-              <div className="mt-6">
-                <div className="font-semibold mb-2 text-sm text-gray-700">Activity Calendar</div>
-                <div className="overflow-x-auto">
-                  <div className="flex gap-1">
-                    {weeks.map((week, wi) => (
-                      <div key={wi} className="flex flex-col gap-1">
-                        {week.map((day, di) => (
-                          <div
-                            key={di}
-                            className={`w-4 h-4 rounded-sm border border-gray-200 transition-colors duration-200
-                              ${!day ? 'bg-transparent' :
-                                day.loggedIn ? 'bg-green-500' :
-                                'bg-gray-200'}
-                            `}
-                            title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : ''}` : ''}
-                            style={{ minWidth: 16, minHeight: 16 }}
-                          />
-                        ))}
-                      </div>
-                    ))}
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">{achievementStats.completedAchievements || 0}</div>
+                    <div className="text-sm text-green-600">Completed</div>
                   </div>
-                  <div className="flex justify-between mt-1 text-xs text-gray-400">
-                    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-600">{achievementStats.completionRate || 0}%</div>
+                    <div className="text-sm text-purple-600">Completion</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
+        {/* Activity Calendar */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5" />
+              Activity Calendar
+            </h3>
+            <div className="mt-6">
+              <div className="font-semibold mb-2 text-sm text-gray-700">Activity Calendar</div>
+              <div className="overflow-x-auto">
+                <div className="flex gap-1">
+                  {weeks.map((week, wi) => (
+                    <div key={wi} className="flex flex-col gap-1">
+                      {week.map((day, di) => (
+                        <div
+                          key={di}
+                          className={`w-4 h-4 rounded-sm border border-gray-200 transition-colors duration-200
+                            ${!day ? 'bg-transparent' :
+                              day.loggedIn ? 'bg-green-500' :
+                              'bg-gray-200'}
+                          `}
+                          title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : ''}` : ''}
+                          style={{ minWidth: 16, minHeight: 16 }}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1 text-xs text-gray-400">
+                  <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-
       {/* Badges Section */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -318,11 +328,9 @@ const PublicProfile = () => {
                 <div className="text-center">
                   <div
                     className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-                    style={{
+                    style={{ 
                       padding: '8px',
-                      boxShadow: isEarned
-                        ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}`
-                        : undefined
+                      boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
                     }}
                   >
                     <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
@@ -360,8 +368,7 @@ const PublicProfile = () => {
           })}
         </div>
       </div>
-
-      {/* Recent Achievements (if available) */}
+      {/* Recent Achievements */}
       {achievements.filter(a => a.isEarned).length > 0 && (
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
