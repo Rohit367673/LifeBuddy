@@ -25,6 +25,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/profile/:identifier" element={<PublicProfile />} />
             
             {/* Protected routes */}
             <Route element={<MainLayout />}>
@@ -36,7 +37,6 @@ function App() {
               <Route path="/tools" element={<DailyTools />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/profile/:identifier" element={<PublicProfile />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
           </Routes>
