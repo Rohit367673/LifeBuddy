@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { UserIcon, TrophyIcon } from '@heroicons/react/24/outline';
+import { UserIcon } from '@heroicons/react/24/outline';
 
 const PublicProfile = () => {
   const { identifier } = useParams();
@@ -34,70 +34,45 @@ const PublicProfile = () => {
   }, [identifier]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div></div>;
   }
-
   if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow text-center">
-          <p className="text-lg text-red-500 font-semibold">{error}</p>
-        </div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><div className="text-red-500 text-lg font-semibold">{error}</div></div>;
   }
-
   return (
-    <div className="space-y-6 mt-8 max-w-xl mx-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center">
-        <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+    <div className="max-w-xl mx-auto mt-10 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+      <div className="flex flex-col items-center">
+        <div className="w-24 h-24 mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
           <UserIcon className="w-12 h-12 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{profile.displayName}</h2>
-        <p className="text-gray-600 dark:text-gray-400 text-sm">@{profile.username}</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{profile.displayName}</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">@{profile.username}</p>
         {profile.personalQuote && (
-          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <p className="text-gray-700 dark:text-gray-300 italic">"{profile.personalQuote}"</p>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-4 mt-6">
+        <div className="mt-4 grid grid-cols-2 gap-4 w-full">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-500">{profile.currentStreak}</div>
+            <div className="text-xl font-bold text-blue-500">{profile.currentStreak}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Current Streak</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-500">{profile.longestStreak}</div>
+            <div className="text-xl font-bold text-purple-500">{profile.longestStreak}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Longest Streak</div>
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 grid grid-cols-2 gap-4 w-full">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-500">{profile.completedTasks}/{profile.totalTasks}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Tasks Completed</div>
+            <div className="text-xl font-bold text-green-500">{profile.completedTasks}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Tasks Done</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-yellow-500">{profile.totalTasks}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</div>
           </div>
         </div>
-      </div>
-      {/* Badges Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2 justify-center">
-          <TrophyIcon className="w-5 h-5" />
-          Badges & Achievements
-        </h3>
-        {profile.badges && profile.badges.length > 0 ? (
-          <div className="flex flex-wrap gap-2 justify-center">
-            {profile.badges.map((badge, idx) => (
-              <span key={idx} className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">
-                {badge}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-sm text-center">No badges yet.</p>
-        )}
+        <div className="mt-6 text-xs text-gray-400">Joined: {new Date(profile.joinedAt).toLocaleDateString()}</div>
       </div>
     </div>
   );
