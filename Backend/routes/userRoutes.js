@@ -94,16 +94,19 @@ router.get('/profile/:identifier', async (req, res) => {
     const earnedBadges = achievements.map(achievement => achievement.badgeType).filter(Boolean);
     const streak = await User.getUserStreak(user._id);
     
+    const isOwner = user.email === 'rohit367673@gmail.com' && (user.username === 'rohit' || (user.displayName && user.displayName.toLowerCase() === 'rohit'));
     res.json({
       displayName: user.displayName,
       username: user.username,
+      avatar: user.avatar,
       personalQuote: user.personalQuote,
       currentStreak: streak.currentStreak || 0,
       longestStreak: streak.longestStreak || 0,
       totalTasks: stats.totalTasks || 0,
       completedTasks: stats.completedTasks || 0,
       badges: earnedBadges,
-      joinedAt: user.createdAt
+      joinedAt: user.createdAt,
+      ...(isOwner ? { owner: true, ownerEmail: user.email } : {})
     });
   } catch (error) {
     console.error('Error fetching public profile:', error);
