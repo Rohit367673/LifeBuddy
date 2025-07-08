@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UserIcon, TrophyIcon, CalendarIcon, StarIcon } from '@heroicons/react/24/outline';
+import { UserIcon, ShareIcon, TrophyIcon, CalendarIcon, StarIcon } from '@heroicons/react/24/outline';
 import badge2 from '../assets/svg/badge-2.svg';
 import badge3 from '../assets/svg/badge-3.svg';
 import badge4 from '../assets/svg/badge-4.svg';
@@ -81,49 +81,61 @@ const PublicProfile = () => {
   const { identifier } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  const [achievements, setAchievements] = useState([]);
+  const [loginHistory, setLoginHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    document.body.classList.remove('dark'); // Force light mode
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
       try {
+        // Fetch public profile data
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}`);
-        if (response.ok) {
-          const data = await response.json();
-          setProfile(data);
-        } else if (response.status === 403) {
-          setError('This profile is private.');
-        } else if (response.status === 404) {
-          setError('Profile not found.');
-        } else {
-          setError('Failed to load profile.');
+        if (!response.ok) {
+          if (response.status === 403) setError('This profile is private.');
+          else if (response.status === 404) setError('Profile not found.');
+          else setError('Failed to load profile.');
+          setLoading(false);
+          return;
         }
+        const data = await response.json();
+        setProfile(data);
+        // Fetch achievements (for recent achievements section)
+        const achRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements?user=${identifier}`);
+        if (achRes.ok) {
+          const achData = await achRes.json();
+          setAchievements(achData);
+        }
+        // Fetch login history for activity calendar
+        // (If you want to show this, you need a public endpoint or add it to the public profile API)
+        setLoading(false);
       } catch (err) {
         setError('Network error.');
-      } finally {
         setLoading(false);
       }
     };
     fetchProfile();
+    // eslint-disable-next-line
   }, [identifier]);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div></div>;
+    return <div className="flex items-center justify-center min-h-screen bg-white"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div></div>;
   }
   if (error) {
-    return <div className="flex items-center justify-center min-h-screen"><div className="text-red-500 text-lg font-semibold">{error}</div></div>;
+    return <div className="flex items-center justify-center min-h-screen bg-white"><div className="text-red-500 text-lg font-semibold">{error}</div></div>;
   }
 
   // Badges
   const earnedBadges = (profile.badges || []).filter(Boolean);
 
   return (
-    <div className="space-y-6 mt-8">
+    <div className="space-y-6 mt-8 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{profile.displayName}&apos;s Profile</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{profile.displayName}&apos;s Profile</h1>
         <button
           onClick={() => navigate('/')}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -136,43 +148,43 @@ const PublicProfile = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Card */}
         <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="text-center">
               <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                 <UserIcon className="w-12 h-12 text-white" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
+              <p className="text-gray-600 text-sm">
                 @{profile.username}
               </p>
               {profile.personalQuote && (
-                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <p className="text-gray-700 dark:text-gray-300 italic">"{profile.personalQuote}"</p>
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-gray-700 italic">"{profile.personalQuote}"</p>
                 </div>
               )}
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">{profile.currentStreak}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Current Streak</div>
+                  <div className="text-sm text-gray-600">Current Streak</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-500">{profile.longestStreak}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Longest Streak</div>
+                  <div className="text-sm text-gray-600">Longest Streak</div>
                 </div>
               </div>
               <div className="mt-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-500">{profile.completedTasks}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Tasks Done</div>
+                  <div className="text-sm text-gray-600">Tasks Done</div>
                 </div>
               </div>
               <div className="mt-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-yellow-500">{profile.totalTasks}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</div>
+                  <div className="text-sm text-gray-600">Total Tasks</div>
                 </div>
               </div>
               <div className="mt-6 text-xs text-gray-400">Joined: {new Date(profile.joinedAt).toLocaleDateString()}</div>
@@ -182,8 +194,8 @@ const PublicProfile = () => {
 
         {/* Badges Section */}
         <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <TrophyIcon className="w-5 h-5" />
               Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
             </h3>
@@ -195,8 +207,8 @@ const PublicProfile = () => {
                     key={badgeId}
                     className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
                       isEarned
-                        ? 'border-yellow-300 bg-white dark:bg-gray-700 scale-105'
-                        : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-50'
+                        ? 'border-yellow-300 bg-white scale-105'
+                        : 'border-gray-100 bg-gray-50 opacity-50'
                     }`}
                   >
                     <div className="text-center">
@@ -219,21 +231,21 @@ const PublicProfile = () => {
                       </div>
                       <h4
                         className={`font-medium text-sm ${
-                          isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
+                          isEarned ? 'text-gray-900' : 'text-gray-500'
                         }`}
                       >
                         {badge.name}
                       </h4>
                       <p
                         className={`text-xs mt-1 ${
-                          isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
+                          isEarned ? 'text-gray-600' : 'text-gray-400'
                         }`}
                       >
                         {badge.description}
                       </p>
                       {isEarned && (
                         <div className="mt-2">
-                          <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full">
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                             Earned
                           </span>
                         </div>
@@ -248,7 +260,41 @@ const PublicProfile = () => {
       </div>
 
       {/* Recent Achievements (if available) */}
-      {/* You can add more sections here if you want to show more public info */}
+      {achievements.filter(a => a.isEarned).length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <StarIcon className="w-5 h-5" />
+            Recent Achievements
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {achievements
+              .filter(a => a.isEarned)
+              .slice(0, 6)
+              .map((achievement) => (
+                <div key={achievement._id} className="p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                      <TrophyIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">
+                        {achievement.name}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {achievement.description}
+                      </p>
+                      {achievement.earnedAt && (
+                        <p className="text-xs text-gray-500">
+                          Earned {new Date(achievement.earnedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
