@@ -26,7 +26,7 @@ import badge9 from '../assets/svg/badge-9.svg';
 import badge10 from '../assets/svg/badge-10.svg';
 
 const Profile = () => {
-  const { user, getFirebaseToken } = useAuth();
+  const { user, getFirebaseToken, firebaseUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [achievements, setAchievements] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -296,11 +296,21 @@ const Profile = () => {
   function getLastNDaysLoginData(loginHistory, n = 35) {
     const today = new Date();
     const days = [];
-    const loginSet = new Set((loginHistory || []).map(date => new Date(date).toISOString().slice(0, 10)));
+    // Use UTC date string for comparison
+    const loginSet = new Set(
+      (loginHistory || []).map(date => {
+        const d = new Date(date);
+        return d.getUTCFullYear() + '-' +
+          String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+          String(d.getUTCDate()).padStart(2, '0');
+      })
+    );
     for (let i = n - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = d.getUTCFullYear() + '-' +
+        String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getUTCDate()).padStart(2, '0');
       days.push({
         date: dateStr,
         loggedIn: loginSet.has(dateStr),
@@ -376,8 +386,12 @@ const Profile = () => {
         <div className="lg:col-span-1">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
             <div className="text-center">
-              <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-12 h-12 text-white" />
+              <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                {user?.avatar || firebaseUser?.photoURL ? (
+                  <img src={user?.avatar || firebaseUser?.photoURL} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
+                )}
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
                 {user?.displayName || user?.email}
