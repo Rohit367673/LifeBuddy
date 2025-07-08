@@ -25,10 +25,10 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
+          'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
+    'https://life-buddy.vercel.app'
       'http://localhost:5173',
-      'http://localhost:5174', 
-      'http://localhost:5175',
-      'http://localhost:5176',
+    
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
