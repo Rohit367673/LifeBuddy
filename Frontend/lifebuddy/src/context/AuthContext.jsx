@@ -153,6 +153,8 @@ export const AuthProvider = ({ children }) => {
       setToken(data.token);
       setFirebaseUser(firebaseUser);
       setUser(data.user);
+      console.log('AuthContext: user set after login/register:', data.user);
+      console.log('AuthContext: firebaseUser set after login/register:', firebaseUser);
       
       toast.success('Account created successfully!');
       return data;
@@ -196,6 +198,8 @@ export const AuthProvider = ({ children }) => {
       setToken(data.token);
       setFirebaseUser(firebaseUser);
       setUser(data.user);
+      console.log('AuthContext: user set after login/register:', data.user);
+      console.log('AuthContext: firebaseUser set after login/register:', firebaseUser);
       
       toast.success('Welcome back!');
       return data;
@@ -381,9 +385,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // After login or signup, fetch the latest user profile
+  const fetchUserProfile = async (token) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user profile after login:', err);
+    }
+  };
+
+  // In your login and signup handlers, after saving the token:
+  // Example for Google login:
+  const handleGoogleLogin = async (user) => {
+    // ... existing code ...
+    localStorage.setItem('token', token);
+    setToken(token);
+    fetchUserProfile(token); // <-- fetch latest user info
+    // ... existing code ...
+  };
+
+  // Example for email/password login/signup:
+  const handleEmailLogin = async (user) => {
+    // ... existing code ...
+    localStorage.setItem('token', token);
+    setToken(token);
+    fetchUserProfile(token); // <-- fetch latest user info
+    // ... existing code ...
+  };
+
   // Check for stored token on app load
   useEffect(() => {
     const initializeAuth = async () => {
+      let userSet = false;
       try {
         // Check for stored token
         const storedToken = localStorage.getItem('token');
@@ -393,9 +432,13 @@ export const AuthProvider = ({ children }) => {
           console.log('Token valid?', isValid);
           if (isValid) {
             setToken(storedToken);
+            userSet = true;
           } else {
             localStorage.removeItem('token');
+            setUser(null);
           }
+        } else {
+          setUser(null);
         }
 
         // Handle Firebase redirect result
@@ -405,6 +448,7 @@ export const AuthProvider = ({ children }) => {
             if (result) {
               console.log('Redirect result received:', result.user.email);
               await handleSuccessfulGoogleLogin(result.user);
+              userSet = true;
             }
           } catch (error) {
             console.error('Error handling redirect result:', error);
@@ -414,8 +458,9 @@ export const AuthProvider = ({ children }) => {
         await handleRedirectResult();
       } catch (error) {
         console.error('Auth initialization error:', error);
+        setUser(null);
       } finally {
-        setLoading(false);
+        setLoading(false); // Only after all checks and setUser calls
       }
     };
 
