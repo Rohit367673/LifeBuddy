@@ -2,6 +2,8 @@ const express = require('express');
 const Event = require('../models/Event');
 const Task = require('../models/Task');
 const { authenticateUser, checkOwnership } = require('../middlewares/authMiddleware');
+const Achievement = require('../models/Achievement');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -109,7 +111,8 @@ router.post('/', authenticateUser, async (req, res) => {
       budget,
       priority,
       tags,
-      location
+      location,
+      checklist
     } = req.body;
 
     // Validate required fields
@@ -129,24 +132,30 @@ router.post('/', authenticateUser, async (req, res) => {
       budget,
       priority,
       tags,
-      location
+      location,
+      checklist
     });
 
     await event.save();
 
-    // Update user stats
-    const User = require('../models/User');
-    await User.findByIdAndUpdate(req.user._id, {
-      $inc: { 'stats.totalEvents': 1 },
-      $set: { 'stats.lastActive': new Date() }
+    // Update user stats using enhanced method
+    const user = await User.findById(req.user._id);
+    await user.addEvent({
+      type: event.type,
+      checklist: event.checklist
     });
+
+    // Check for achievements after event creation
+    const userStats = await User.getUserStats(req.user._id);
+    const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
 
     // Populate user info
     await event.populate('user', 'displayName firstName lastName');
 
     res.status(201).json({
       message: 'Event created successfully.',
-      event
+      event,
+      newAchievements: newAchievements.length > 0 ? newAchievements : null
     });
 
   } catch (error) {
@@ -163,6 +172,7 @@ router.put('/:id', checkOwnership(Event), async (req, res) => {
   try {
     const event = req.resource;
     const updateData = req.body;
+    const previousStatus = event.status;
 
     // Remove fields that shouldn't be updated
     delete updateData.user;
@@ -173,6 +183,24 @@ router.put('/:id', checkOwnership(Event), async (req, res) => {
     // Update event
     Object.assign(event, updateData);
     await event.save();
+
+    // Check for achievements if event was completed
+    if (event.status === 'completed' && previousStatus !== 'completed') {
+      const user = await User.findById(req.user._id);
+      await user.completeEvent();
+      
+      const userStats = await User.getUserStats(req.user._id);
+      const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
+      
+      // Populate user info
+      await event.populate('user', 'displayName firstName lastName');
+
+      return res.json({
+        message: 'Event updated successfully.',
+        event,
+        newAchievements: newAchievements.length > 0 ? newAchievements : null
+      });
+    }
 
     // Populate user info
     await event.populate('user', 'displayName firstName lastName');

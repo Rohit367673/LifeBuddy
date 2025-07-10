@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Task = require('../models/Task');
 const { authenticateUser } = require('../middlewares/authMiddleware');
+const Achievement = require('../models/Achievement');
+const User = require('../models/User');
 
 // Get all tasks for a user
 router.get('/', authenticateUser, async (req, res) => {
@@ -92,10 +94,24 @@ router.post('/', authenticateUser, async (req, res) => {
     
     await task.save();
     
+    // Update user stats
+    await User.findByIdAndUpdate(req.user._id, {
+      $inc: { 'stats.totalTasks': 1 },
+      $set: { 'stats.lastActive': new Date() }
+    });
+    
+    // Check for achievements after task creation
+    const user = await User.findById(req.user._id);
+    const userStats = await User.getUserStats(req.user._id);
+    const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
+    
     // Populate event details
     await task.populate('event', 'title');
     
-    res.status(201).json(task);
+    res.status(201).json({
+      task,
+      newAchievements: newAchievements.length > 0 ? newAchievements : null
+    });
   } catch (error) {
     console.error('Error creating task:', error);
     if (error.name === 'ValidationError') {
@@ -115,7 +131,8 @@ router.put('/:id', authenticateUser, async (req, res) => {
       status,
       dueDate,
       event,
-      tags
+      tags,
+      category
     } = req.body;
     
     const updateData = {};
@@ -131,6 +148,7 @@ router.put('/:id', authenticateUser, async (req, res) => {
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
     if (event !== undefined) updateData.event = event;
     if (tags !== undefined) updateData.tags = tags;
+    if (category !== undefined) updateData.category = category;
     
     const task = await Task.findOneAndUpdate(
       {
@@ -147,10 +165,20 @@ router.put('/:id', authenticateUser, async (req, res) => {
 
     // Update user stats if task was completed
     if (status === 'completed') {
-      const User = require('../models/User');
-      await User.findByIdAndUpdate(req.user._id, {
-        $inc: { 'stats.completedTasks': 1 },
-        $set: { 'stats.lastActive': new Date() }
+      const user = await User.findById(req.user._id);
+      await user.incrementCompletedTasks({
+        category: task.category,
+        priority: task.priority,
+        tags: task.tags
+      });
+      
+      // Check for achievements after task completion
+      const userStats = await User.getUserStats(req.user._id);
+      const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
+      
+      return res.json({
+        task,
+        newAchievements: newAchievements.length > 0 ? newAchievements : null
       });
     }
     

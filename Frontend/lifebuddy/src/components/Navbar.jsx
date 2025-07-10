@@ -104,13 +104,11 @@ const Navbar = ({ onMenuClick }) => {
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img
                     className="h-8 w-8 rounded-full"
-                    src={user?.avatar || firebaseUser?.photoURL}
+                    src={user?.avatar || firebaseUser?.photoURL || '/default-profile.png'}
                     alt={user?.displayName || firebaseUser?.displayName || 'User'}
                   />
                 ) : (
-                  <UserCircleIcon className={`h-8 w-8 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-400'
-                  }`} />
+                  <img className="h-8 w-8 rounded-full" src="/default-profile.png" alt="Default Profile" />
                 )}
                 <span className="hidden sm:block text-left">
                   <span className={`block text-sm font-medium ${
