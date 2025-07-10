@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { usePremium } from '../context/PremiumContext';
+import UsageLimitBanner from '../components/UsageLimitBanner';
 import { 
   PlusIcon, 
   CheckCircleIcon, 
@@ -13,6 +16,8 @@ import {
 
 const DailyTools = () => {
   const { user, getFirebaseToken } = useAuth();
+  const { isDarkMode } = useTheme();
+  const { checkUsageLimit, showUpgradePrompt } = usePremium();
   const [activeTab, setActiveTab] = useState('todo');
   const [tasks, setTasks] = useState([]);
   const [moodEntries, setMoodEntries] = useState([]);
@@ -135,6 +140,14 @@ const DailyTools = () => {
 
   const addTask = async (e) => {
     e.preventDefault();
+    
+    // Check usage limit before adding task
+    const taskLimit = checkUsageLimit('dailyTasks');
+    if (taskLimit.isLimited) {
+      showUpgradePrompt('dailyTasks', 'You\'ve reached your daily task limit. Upgrade for unlimited tasks!');
+      return;
+    }
+    
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tasks`, {
         method: 'POST',
@@ -200,6 +213,14 @@ const DailyTools = () => {
 
   const saveMood = async (e) => {
     e.preventDefault();
+    
+    // Check usage limit before adding mood entry
+    const moodLimit = checkUsageLimit('moodEntries');
+    if (moodLimit.isLimited) {
+      showUpgradePrompt('moodEntries', 'You\'ve reached your mood history limit. Upgrade for full history!');
+      return;
+    }
+    
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/mood`, {
         method: 'POST',
@@ -274,6 +295,13 @@ const DailyTools = () => {
 
   return (
     <div className="space-y-6 mt-8">
+      {/* Usage Limit Banner */}
+      <UsageLimitBanner 
+        limitType="dailyTasks"
+        current={checkUsageLimit('dailyTasks').current}
+        limit={checkUsageLimit('dailyTasks').limit}
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -732,6 +760,9 @@ const DailyTools = () => {
           </div>
         </div>
       )}
+
+      {/* Usage Limit Banner */}
+      {/* Removed duplicate usage limit banner - already shown at top */}
     </div>
   );
 };
