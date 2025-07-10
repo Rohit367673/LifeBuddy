@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { usePremium } from '../context/PremiumContext';
+import UsageLimitBanner from '../components/UsageLimitBanner';
 import { 
   PlusIcon, 
   CalendarIcon, 
@@ -20,6 +22,7 @@ import {
 const Events = () => {
   const { user, getFirebaseToken } = useAuth();
   const { isDarkMode } = useTheme();
+  const { checkUsageLimit, showUpgradePrompt } = usePremium();
   const [events, setEvents] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -294,6 +297,13 @@ const Events = () => {
   };
 
   const startPredefinedEvent = (predefinedEvent) => {
+    // Check usage limit before allowing new event creation
+    const eventLimit = checkUsageLimit('activeEvents');
+    if (eventLimit.isLimited) {
+      showUpgradePrompt('activeEvents', 'You\'ve reached your event limit. Upgrade to create unlimited events!');
+      return;
+    }
+    
     setEventForm({
       title: predefinedEvent.title,
       type: predefinedEvent.type,
@@ -337,6 +347,13 @@ const Events = () => {
 
   return (
     <div className="space-y-6 mt-8">
+      {/* Usage Limit Banner */}
+      <UsageLimitBanner 
+        limitType="activeEvents"
+        current={checkUsageLimit('activeEvents').current}
+        limit={checkUsageLimit('activeEvents').limit}
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -344,7 +361,14 @@ const Events = () => {
           <p className="text-gray-600">Plan and manage your life events</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            const eventLimit = checkUsageLimit('activeEvents');
+            if (eventLimit.isLimited) {
+              showUpgradePrompt('activeEvents', 'You\'ve reached your event limit. Upgrade to create unlimited events!');
+              return;
+            }
+            setShowCreateModal(true);
+          }}
           className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
           <PlusIcon className="h-5 w-5" />

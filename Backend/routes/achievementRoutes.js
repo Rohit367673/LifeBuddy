@@ -3,6 +3,9 @@ const router = express.Router();
 const Achievement = require('../models/Achievement');
 const User = require('../models/User');
 const { authenticateUser } = require('../middlewares/authMiddleware');
+const Task = require('../models/Task');
+const Mood = require('../models/Mood');
+const Event = require('../models/Event');
 
 // Get all achievements for a user
 router.get('/', authenticateUser, async (req, res) => {
@@ -195,6 +198,178 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Error fetching achievement progress:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Test badge unlock system
+router.post('/test-badge-system', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    // Simulate different activities to test badge unlocking
+    const testResults = {
+      tasks: [],
+      events: [],
+      moods: [],
+      achievements: [],
+      stats: {}
+    };
+
+    // Test 1: First Task Badge
+    console.log('Testing first task badge...');
+    const firstTask = new Task({
+      user: user._id,
+      title: 'Test Task 1',
+      description: 'This is the first task',
+      priority: 'medium',
+      status: 'completed',
+      category: 'general',
+      completedAt: new Date()
+    });
+    await firstTask.save();
+    testResults.tasks.push(firstTask);
+
+    await user.incrementCompletedTasks({
+      category: firstTask.category,
+      priority: firstTask.priority
+    });
+
+    // Test 2: Fitness Task Badge
+    const fitnessTask = new Task({
+      user: user._id,
+      title: 'Workout',
+      description: 'Go to the gym',
+      priority: 'high',
+      status: 'completed',
+      category: 'fitness',
+      completedAt: new Date()
+    });
+    await fitnessTask.save();
+    testResults.tasks.push(fitnessTask);
+
+    await user.incrementCompletedTasks({
+      category: fitnessTask.category,
+      priority: fitnessTask.priority
+    });
+
+    // Test 3: Learning Task Badge
+    const learningTask = new Task({
+      user: user._id,
+      title: 'Study JavaScript',
+      description: 'Learn React hooks',
+      priority: 'medium',
+      status: 'completed',
+      category: 'learning',
+      completedAt: new Date()
+    });
+    await learningTask.save();
+    testResults.tasks.push(learningTask);
+
+    await user.incrementCompletedTasks({
+      category: learningTask.category,
+      priority: learningTask.priority
+    });
+
+    // Test 4: Mood Entry Badge
+    const moodEntry = new Mood({
+      user: user._id,
+      mood: { emoji: '😊', rating: 7, label: 'good' },
+      notes: 'Feeling great today!',
+      activities: ['work', 'exercise'],
+      weather: 'sunny',
+      sleepHours: 8,
+      energyLevel: 8,
+      stressLevel: 2,
+      tags: ['productive']
+    });
+    await moodEntry.save();
+    testResults.moods.push(moodEntry);
+
+    await user.addMoodEntry({
+      stressLevel: moodEntry.stressLevel,
+      energyLevel: moodEntry.energyLevel,
+      activities: moodEntry.activities
+    });
+
+    // Test 5: Event Creation Badge
+    const firstEvent = new Event({
+      user: user._id,
+      title: 'Career Change',
+      type: 'career',
+      description: 'Transition to new role',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      priority: 'high',
+      status: 'planning',
+      checklist: [
+        'Update resume',
+        'Network with professionals',
+        'Apply to positions',
+        'Prepare for interviews'
+      ]
+    });
+    await firstEvent.save();
+    testResults.events.push(firstEvent);
+
+    await user.addEvent({
+      type: firstEvent.type,
+      checklist: firstEvent.checklist
+    });
+
+    // Test 6: Social Event Badge
+    const socialEvent = new Event({
+      user: user._id,
+      title: 'Team Party',
+      type: 'social',
+      description: 'Company team building',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      priority: 'medium',
+      status: 'planning'
+    });
+    await socialEvent.save();
+    testResults.events.push(socialEvent);
+
+    await user.addEvent({
+      type: socialEvent.type,
+      checklist: socialEvent.checklist
+    });
+
+    // Check for achievements
+    const userStats = await User.getUserStats(user._id);
+    const newAchievements = await Achievement.checkAchievements(user._id, userStats);
+    testResults.achievements = newAchievements;
+
+    // Get final stats
+    const finalUser = await User.findById(user._id);
+    testResults.stats = {
+      totalTasks: finalUser.stats.totalTasks,
+      completedTasks: finalUser.stats.completedTasks,
+      totalEvents: finalUser.stats.totalEvents,
+      moodEntries: finalUser.stats.moodEntries,
+      taskStreak: finalUser.stats.taskStreak,
+      moodStreak: finalUser.stats.moodStreak,
+      fitnessTasks: finalUser.stats.fitnessTasks,
+      learningTasks: finalUser.stats.learningTasks,
+      socialEvents: finalUser.stats.socialEvents,
+      earlyBirdDays: finalUser.stats.earlyBirdDays,
+      nightOwlDays: finalUser.stats.nightOwlDays,
+      completionRate: finalUser.stats.totalTasks > 0 
+        ? Math.round((finalUser.stats.completedTasks / finalUser.stats.totalTasks) * 100)
+        : 0
+    };
+
+    res.json({
+      message: 'Badge unlock system test completed successfully!',
+      testResults
+    });
+
+  } catch (error) {
+    console.error('Error testing badge system:', error);
+    res.status(500).json({ 
+      message: 'Error testing badge system',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 

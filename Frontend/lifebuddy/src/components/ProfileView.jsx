@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { UserIcon, ShareIcon, TrophyIcon, CalendarIcon, StarIcon } from '@heroicons/react/24/outline';
+import {
+  TrophyIcon,
+  CalendarIcon,
+  StarIcon,
+  CogIcon
+} from '@heroicons/react/24/outline';
 import badge2 from '../assets/svg/badge-2.svg';
 import badge3 from '../assets/svg/badge-3.svg';
 import badge4 from '../assets/svg/badge-4.svg';
@@ -77,123 +80,51 @@ const badgeDefinitions = {
   },
 };
 
-const PublicProfile = () => {
-  const { identifier } = useParams();
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
-  const [achievements, setAchievements] = useState([]);
-  const [achievementStats, setAchievementStats] = useState({});
-  const [loginHistory, setLoginHistory] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    document.body.classList.remove('dark'); // Always light mode for public profile
-    fetchProfile();
-    fetchAchievements();
-    fetchLoginHistory();
-  }, [identifier]);
-
-  const fetchProfile = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}`);
-      if (response.status === 403) setError('This profile is private.');
-      else if (response.status === 404) setError('Profile not found.');
-      else if (!response.ok) setError('Failed to load profile.');
-      else {
-        const data = await response.json();
-        setProfile(data);
-      }
-    } catch (err) {
-      setError('Failed to load profile.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchAchievements = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/public/${identifier}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAchievements(data.achievements || []);
-        setAchievementStats(data.stats || {});
-      }
-    } catch (err) {}
-  };
-
-  const fetchLoginHistory = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile/${identifier}/login-history`);
-      if (response.ok) {
-        const data = await response.json();
-        setLoginHistory(data.loginHistory || []);
-      }
-    } catch (err) {}
-  };
-
-  function getLastNDaysLoginData(loginHistory, n = 35) {
-    const today = new Date();
-    const days = [];
-    const loginSet = new Set(
-      (loginHistory || []).map(date => {
-        const d = new Date(date);
-        return d.getUTCFullYear() + '-' +
-          String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
-          String(d.getUTCDate()).padStart(2, '0');
-      })
-    );
-    for (let i = n - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - i);
-      const dateStr = d.getUTCFullYear() + '-' +
+function getLastNDaysLoginData(loginHistory, n = 35) {
+  const today = new Date();
+  const days = [];
+  const loginSet = new Set(
+    (loginHistory || []).map(date => {
+      const d = new Date(date);
+      return d.getUTCFullYear() + '-' +
         String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
         String(d.getUTCDate()).padStart(2, '0');
-      days.push({
-        date: dateStr,
-        loggedIn: loginSet.has(dateStr),
-      });
-    }
-    return days;
+    })
+  );
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const dateStr = d.getUTCFullYear() + '-' +
+      String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getUTCDate()).padStart(2, '0');
+    days.push({
+      date: dateStr,
+      loggedIn: loginSet.has(dateStr),
+    });
   }
+  return days;
+}
 
-  function chunkIntoWeeks(days) {
-    const weeks = [];
-    let week = [];
-    const firstDay = new Date(days[0].date).getDay();
-    for (let i = 0; i < firstDay; i++) week.push(null);
-    for (const day of days) {
-      week.push(day);
-      if (week.length === 7) {
-        weeks.push(week);
-        week = [];
-      }
-    }
-    if (week.length) {
-      while (week.length < 7) week.push(null);
+function chunkIntoWeeks(days) {
+  const weeks = [];
+  let week = [];
+  const firstDay = new Date(days[0].date).getDay();
+  for (let i = 0; i < firstDay; i++) week.push(null);
+  for (const day of days) {
+    week.push(day);
+    if (week.length === 7) {
       weeks.push(week);
+      week = [];
     }
-    return weeks;
   }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    );
+  if (week.length) {
+    while (week.length < 7) week.push(null);
+    weeks.push(week);
   }
+  return weeks;
+}
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-white p-8 rounded-xl shadow text-center">
-          <h2 className="text-2xl font-bold mb-4 text-red-500">{error}</h2>
-        </div>
-      </div>
-    );
-  }
-
+const ProfileView = ({ profile, achievements = [], achievementStats = {}, loginHistory = [], readOnly = false, onEdit, onSave, personalQuote, setPersonalQuote, profileVisibility, setProfileVisibility, onUpdateSettings }) => {
   const loginDays = getLastNDaysLoginData(loginHistory, 35);
   const weeks = chunkIntoWeeks(loginDays);
   const earnedBadges = (profile.badges || []).filter(Boolean);
@@ -208,6 +139,14 @@ const PublicProfile = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">{profile.displayName}&apos;s Profile</h1>
+        {!readOnly && (
+          <button
+            onClick={onEdit}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Edit Profile
+          </button>
+        )}
       </div>
 
       {/* Profile Overview */}
@@ -225,10 +164,19 @@ const PublicProfile = () => {
               </div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
+                {profile.owner && (
+                  <span className="flex items-center gap-1 ml-2">
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                    <span className="text-xs font-semibold text-blue-500">Owner</span>
+                  </span>
+                )}
               </h2>
               <p className="text-gray-600 text-sm">
                 @{profile.username || 'lifebuddy_user'}
               </p>
+              {profile.owner && profile.ownerEmail && (
+                <p className="text-xs text-blue-500 font-semibold mt-1">Owner Email: {profile.ownerEmail}</p>
+              )}
               {profile.personalQuote && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <p className="text-gray-700 italic">"{profile.personalQuote}"</p>
@@ -236,7 +184,6 @@ const PublicProfile = () => {
               )}
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mt-6">
-                
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">{currentStreak}</div>
                   <div className="text-sm text-gray-600">Current Streak</div>
@@ -405,8 +352,51 @@ const PublicProfile = () => {
           </div>
         </div>
       )}
+      {/* Profile Settings (only if not readOnly) */}
+      {!readOnly && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <CogIcon className="w-5 h-5" />
+            Profile Settings
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Personal Quote/Motto
+              </label>
+              <textarea
+                value={personalQuote}
+                onChange={e => setPersonalQuote(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Share your personal motto or favorite quote..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Profile Visibility
+              </label>
+              <select
+                value={profileVisibility}
+                onChange={e => setProfileVisibility(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="public">Public - Anyone can view</option>
+                <option value="friends">Friends Only - Only friends can view</option>
+                <option value="private">Private - Only you can view</option>
+              </select>
+            </div>
+            <button
+              onClick={onSave}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Save Settings
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default PublicProfile; 
+export default ProfileView; 

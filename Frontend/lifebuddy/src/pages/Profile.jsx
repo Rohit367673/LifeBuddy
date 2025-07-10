@@ -106,11 +106,14 @@ const Profile = () => {
   };
 
   useEffect(() => {
-    loadProfileData();
+    // Only fetch profile data when token is available
+    getFirebaseToken().then(token => {
+      if (token) loadProfileData();
+    });
     loadAchievements();
     loadProductivityData();
     loadLoginHistory();
-  }, []);
+  }, [user, firebaseUser]);
 
   // Show toast if a new badge is earned after login
   useEffect(() => {
@@ -124,8 +127,12 @@ const Profile = () => {
   }, [achievements]);
 
   const loadProfileData = async () => {
+    const token = await getFirebaseToken();
+    if (!token) {
+      toast.error('Not authenticated');
+      return;
+    }
     try {
-      const token = await getFirebaseToken();
       console.log('Token for profile request:', token ? 'Present' : 'Missing');
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
@@ -388,7 +395,7 @@ const Profile = () => {
             <div className="text-center">
               <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatar || firebaseUser?.photoURL ? (
-                  <img src={user?.avatar || firebaseUser?.photoURL} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                  <img src={user?.avatar || firebaseUser?.photoURL || '/default-profile.png'} alt="Profile" className="w-full h-full object-cover rounded-full" />
                 ) : (
                   <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
                 )}

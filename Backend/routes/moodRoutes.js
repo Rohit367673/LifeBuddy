@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Mood = require('../models/Mood');
 const { authenticateUser } = require('../middlewares/authMiddleware');
+const Achievement = require('../models/Achievement');
+const User = require('../models/User');
 
 // Get all mood entries for a user
 router.get('/', authenticateUser, async (req, res) => {
@@ -107,14 +109,22 @@ router.post('/', authenticateUser, async (req, res) => {
     
     await moodEntry.save();
     
-    // Update user stats
-    const User = require('../models/User');
-    await User.findByIdAndUpdate(req.user.id, {
-      $inc: { 'stats.moodEntries': 1 },
-      $set: { 'stats.lastActive': new Date() }
+    // Update user stats using enhanced method
+    const user = await User.findById(req.user.id);
+    await user.addMoodEntry({
+      stressLevel: moodEntry.stressLevel,
+      energyLevel: moodEntry.energyLevel,
+      activities: moodEntry.activities
     });
     
-    res.status(201).json(moodEntry);
+    // Check for achievements after mood entry creation
+    const userStats = await User.getUserStats(req.user.id);
+    const newAchievements = await Achievement.checkAchievements(req.user.id, userStats);
+    
+    res.status(201).json({
+      moodEntry,
+      newAchievements: newAchievements.length > 0 ? newAchievements : null
+    });
   } catch (error) {
     console.error('Error creating mood entry:', error);
     if (error.name === 'ValidationError') {

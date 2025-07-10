@@ -201,6 +201,156 @@ achievementSchema.statics.getAvailableAchievements = function() {
       points: 5,
       category: 'login',
       criteria: { logins: 1 }
+    },
+    {
+      type: 'early_bird',
+      title: 'Early Bird',
+      description: 'Completed tasks before 9 AM for 5 days',
+      icon: '🌅',
+      badge: 'silver',
+      points: 30,
+      category: 'streaks',
+      criteria: { earlyBirdDays: 5 }
+    },
+    {
+      type: 'night_owl',
+      title: 'Night Owl',
+      description: 'Completed tasks after 10 PM for 5 days',
+      icon: '🦉',
+      badge: 'silver',
+      points: 30,
+      category: 'streaks',
+      criteria: { nightOwlDays: 5 }
+    },
+    {
+      type: 'social_butterfly',
+      title: 'Social Butterfly',
+      description: 'Created 5 events with social activities',
+      icon: '🦋',
+      badge: 'gold',
+      points: 75,
+      category: 'events',
+      criteria: { socialEvents: 5 }
+    },
+    {
+      type: 'homebody',
+      title: 'Homebody',
+      description: 'Created 5 events related to home improvement',
+      icon: '🏠',
+      badge: 'gold',
+      points: 75,
+      category: 'events',
+      criteria: { homeEvents: 5 }
+    },
+    {
+      type: 'fitness_freak',
+      title: 'Fitness Freak',
+      description: 'Completed 20 fitness-related tasks',
+      icon: '💪',
+      badge: 'gold',
+      points: 100,
+      category: 'tasks',
+      criteria: { fitnessTasks: 20 }
+    },
+    {
+      type: 'bookworm',
+      title: 'Bookworm',
+      description: 'Completed 10 learning-related tasks',
+      icon: '📚',
+      badge: 'silver',
+      points: 50,
+      category: 'tasks',
+      criteria: { learningTasks: 10 }
+    },
+    {
+      type: 'creative_soul',
+      title: 'Creative Soul',
+      description: 'Completed 15 creative tasks',
+      icon: '🎨',
+      badge: 'gold',
+      points: 75,
+      category: 'tasks',
+      criteria: { creativeTasks: 15 }
+    },
+    {
+      type: 'organizer',
+      title: 'Organizer',
+      description: 'Created 10 events with detailed checklists',
+      icon: '📋',
+      badge: 'silver',
+      points: 50,
+      category: 'events',
+      criteria: { organizedEvents: 10 }
+    },
+    {
+      type: 'goal_setter',
+      title: 'Goal Setter',
+      description: 'Set and completed 5 major life goals',
+      icon: '🎯',
+      badge: 'platinum',
+      points: 150,
+      category: 'milestones',
+      criteria: { completedGoals: 5 }
+    },
+    {
+      type: 'consistency_king',
+      title: 'Consistency King',
+      description: 'Maintained a 100-day streak of daily activity',
+      icon: '👑',
+      badge: 'diamond',
+      points: 500,
+      category: 'streaks',
+      criteria: { consistencyStreak: 100 }
+    },
+    {
+      type: 'stress_manager',
+      title: 'Stress Manager',
+      description: 'Logged mood for 50 days with stress management',
+      icon: '🧘‍♀️',
+      badge: 'gold',
+      points: 100,
+      category: 'mood',
+      criteria: { stressManagedDays: 50 }
+    },
+    {
+      type: 'productivity_master',
+      title: 'Productivity Master',
+      description: 'Completed 100 tasks',
+      icon: '⚡',
+      badge: 'platinum',
+      points: 200,
+      category: 'tasks',
+      criteria: { tasksCompleted: 100 }
+    },
+    {
+      type: 'mood_explorer',
+      title: 'Mood Explorer',
+      description: 'Logged 50 different mood entries',
+      icon: '🌈',
+      badge: 'gold',
+      points: 100,
+      category: 'mood',
+      criteria: { moodEntries: 50 }
+    },
+    {
+      type: 'event_planner',
+      title: 'Event Planner',
+      description: 'Created 20 events',
+      icon: '📅',
+      badge: 'platinum',
+      points: 200,
+      category: 'events',
+      criteria: { eventsCreated: 20 }
+    },
+    {
+      type: 'streak_master',
+      title: 'Streak Master',
+      description: 'Maintained a 30-day task completion streak',
+      icon: '🔥',
+      badge: 'diamond',
+      points: 300,
+      category: 'streaks',
+      criteria: { taskStreak: 30 }
     }
   ];
 };

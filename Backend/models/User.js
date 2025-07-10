@@ -123,6 +123,77 @@ const userSchema = new mongoose.Schema({
     logins: {
       type: Number,
       default: 0
+    },
+    // Enhanced stats for badge unlock logic
+    taskStreak: {
+      type: Number,
+      default: 0
+    },
+    moodStreak: {
+      type: Number,
+      default: 0
+    },
+    earlyBirdDays: {
+      type: Number,
+      default: 0
+    },
+    nightOwlDays: {
+      type: Number,
+      default: 0
+    },
+    socialEvents: {
+      type: Number,
+      default: 0
+    },
+    homeEvents: {
+      type: Number,
+      default: 0
+    },
+    fitnessTasks: {
+      type: Number,
+      default: 0
+    },
+    learningTasks: {
+      type: Number,
+      default: 0
+    },
+    creativeTasks: {
+      type: Number,
+      default: 0
+    },
+    organizedEvents: {
+      type: Number,
+      default: 0
+    },
+    completedGoals: {
+      type: Number,
+      default: 0
+    },
+    consistencyStreak: {
+      type: Number,
+      default: 0
+    },
+    stressManagedDays: {
+      type: Number,
+      default: 0
+    },
+    perfectWeeks: {
+      type: Number,
+      default: 0
+    },
+    lastTaskCompletion: {
+      type: Date
+    },
+    lastMoodEntry: {
+      type: Date
+    },
+    taskCompletionHistory: {
+      type: [Date],
+      default: []
+    },
+    moodEntryHistory: {
+      type: [Date],
+      default: []
     }
   },
   isActive: {
@@ -132,6 +203,120 @@ const userSchema = new mongoose.Schema({
   loginHistory: {
     type: [Date],
     default: []
+  },
+  // Premium subscription fields
+  subscription: {
+    plan: {
+      type: String,
+      enum: ['free', 'monthly', 'yearly'],
+      default: 'free'
+    },
+    status: {
+      type: String,
+      enum: ['active', 'canceled', 'expired', 'trial'],
+      default: 'active'
+    },
+    startDate: {
+      type: Date,
+      default: Date.now
+    },
+    endDate: {
+      type: Date
+    },
+    trialEndDate: {
+      type: Date
+    },
+    stripeCustomerId: {
+      type: String
+    },
+    stripeSubscriptionId: {
+      type: String
+    }
+  },
+  // Usage tracking for freemium limits
+  usage: {
+    activeEvents: {
+      type: Number,
+      default: 0
+    },
+    dailyTasks: {
+      type: Number,
+      default: 0
+    },
+    moodEntries: {
+      type: Number,
+      default: 0
+    },
+    lastTaskReset: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  // Feature flags
+  features: {
+    unlimitedEvents: {
+      type: Boolean,
+      default: false
+    },
+    advancedBudgetTracking: {
+      type: Boolean,
+      default: false
+    },
+    fullMoodHistory: {
+      type: Boolean,
+      default: false
+    },
+    customChecklists: {
+      type: Boolean,
+      default: false
+    },
+    premiumMotivationalMessages: {
+      type: Boolean,
+      default: false
+    },
+    profileInsights: {
+      type: Boolean,
+      default: false
+    },
+    fullCalendarSync: {
+      type: Boolean,
+      default: false
+    },
+    adFree: {
+      type: Boolean,
+      default: false
+    },
+    exportablePDFs: {
+      type: Boolean,
+      default: false
+    }
+  },
+  // Purchased items
+  purchases: {
+    eventPacks: [{
+      packId: String,
+      name: String,
+      purchasedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    checklistTemplates: [{
+      templateId: String,
+      name: String,
+      purchasedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    profileThemes: [{
+      themeId: String,
+      name: String,
+      purchasedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
   }
 }, {
   timestamps: true
@@ -167,9 +352,205 @@ userSchema.methods.updateLastActive = function() {
   return this.save();
 };
 
-// Method to increment completed tasks
-userSchema.methods.incrementCompletedTasks = function() {
+// Method to increment completed tasks and update streaks
+userSchema.methods.incrementCompletedTasks = async function(taskData = {}) {
   this.stats.completedTasks += 1;
+  this.stats.lastTaskCompletion = new Date();
+  
+  // Add to task completion history
+  this.stats.taskCompletionHistory.push(new Date());
+  
+  // Update task streak
+  await this.updateTaskStreak();
+  
+  // Check for early bird/night owl achievements
+  const hour = new Date().getHours();
+  if (hour < 9) {
+    this.stats.earlyBirdDays += 1;
+  } else if (hour >= 22) {
+    this.stats.nightOwlDays += 1;
+  }
+  
+  // Categorize task for specific achievements
+  if (taskData.category) {
+    switch (taskData.category.toLowerCase()) {
+      case 'fitness':
+      case 'exercise':
+      case 'workout':
+        this.stats.fitnessTasks += 1;
+        break;
+      case 'learning':
+      case 'study':
+      case 'education':
+        this.stats.learningTasks += 1;
+        break;
+      case 'creative':
+      case 'art':
+      case 'design':
+      case 'writing':
+        this.stats.creativeTasks += 1;
+        break;
+    }
+  }
+  
+  return this.save();
+};
+
+// Method to update task streak
+userSchema.methods.updateTaskStreak = async function() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Get recent task completions
+  const recentCompletions = this.stats.taskCompletionHistory
+    .filter(date => date >= new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000))
+    .sort((a, b) => b - a);
+  
+  let currentStreak = 0;
+  let checkDate = today;
+  
+  for (let i = 0; i < 30; i++) {
+    const hasCompletion = recentCompletions.some(date => {
+      const completionDate = new Date(date);
+      completionDate.setHours(0, 0, 0, 0);
+      return completionDate.getTime() === checkDate.getTime();
+    });
+    
+    if (hasCompletion) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  this.stats.taskStreak = currentStreak;
+  if (currentStreak > this.stats.longestStreak) {
+    this.stats.longestStreak = currentStreak;
+  }
+  
+  // Update consistency streak (any daily activity)
+  await this.updateConsistencyStreak();
+};
+
+// Method to update mood streak
+userSchema.methods.updateMoodStreak = async function() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Get recent mood entries
+  const recentEntries = this.stats.moodEntryHistory
+    .filter(date => date >= new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000))
+    .sort((a, b) => b - a);
+  
+  let currentStreak = 0;
+  let checkDate = today;
+  
+  for (let i = 0; i < 60; i++) {
+    const hasEntry = recentEntries.some(date => {
+      const entryDate = new Date(date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === checkDate.getTime();
+    });
+    
+    if (hasEntry) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  this.stats.moodStreak = currentStreak;
+};
+
+// Method to update consistency streak (any daily activity)
+userSchema.methods.updateConsistencyStreak = async function() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Combine task completions and mood entries
+  const allActivities = [
+    ...this.stats.taskCompletionHistory,
+    ...this.stats.moodEntryHistory
+  ].sort((a, b) => b - a);
+  
+  let currentStreak = 0;
+  let checkDate = today;
+  
+  for (let i = 0; i < 100; i++) {
+    const hasActivity = allActivities.some(date => {
+      const activityDate = new Date(date);
+      activityDate.setHours(0, 0, 0, 0);
+      return activityDate.getTime() === checkDate.getTime();
+    });
+    
+    if (hasActivity) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  this.stats.consistencyStreak = currentStreak;
+};
+
+// Method to add mood entry and update streaks
+userSchema.methods.addMoodEntry = async function(moodData = {}) {
+  this.stats.moodEntries += 1;
+  this.stats.lastMoodEntry = new Date();
+  
+  // Add to mood entry history
+  this.stats.moodEntryHistory.push(new Date());
+  
+  // Update mood streak
+  await this.updateMoodStreak();
+  
+  // Check for stress management achievement
+  if (moodData.stressLevel && moodData.stressLevel <= 3) {
+    this.stats.stressManagedDays += 1;
+  }
+  
+  // Update consistency streak
+  await this.updateConsistencyStreak();
+  
+  return this.save();
+};
+
+// Method to add event and categorize it
+userSchema.methods.addEvent = async function(eventData = {}) {
+  this.stats.totalEvents += 1;
+  
+  // Categorize event for specific achievements
+  if (eventData.type) {
+    switch (eventData.type.toLowerCase()) {
+      case 'social':
+      case 'party':
+      case 'meeting':
+      case 'gathering':
+        this.stats.socialEvents += 1;
+        break;
+      case 'home':
+      case 'renovation':
+      case 'maintenance':
+      case 'improvement':
+        this.stats.homeEvents += 1;
+        break;
+    }
+  }
+  
+  // Check if event has detailed checklist
+  if (eventData.checklist && eventData.checklist.length > 5) {
+    this.stats.organizedEvents += 1;
+  }
+  
+  return this.save();
+};
+
+// Method to complete event
+userSchema.methods.completeEvent = async function() {
+  this.stats.completedEvents += 1;
   return this.save();
 };
 

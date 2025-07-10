@@ -13,9 +13,11 @@ const moodRoutes = require('./routes/moodRoutes');
 const achievementRoutes = require('./routes/achievementRoutes');
 const motivationalRoutes = require('./routes/motivationalRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const storeRoutes = require('./routes/storeRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security middleware
 app.use(helmet());
@@ -28,7 +30,7 @@ app.use(cors({
           'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
     'https://life-buddy.vercel.app',
       'http://localhost:5173',
-    
+ 
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -63,6 +65,8 @@ app.use('/api/mood', moodRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/motivational', motivationalRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/store', storeRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

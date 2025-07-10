@@ -17,16 +17,24 @@ import {
   HeartIcon,
   MapPinIcon,
   GlobeAltIcon,
-  UserIcon
+  UserIcon,
+  WrenchScrewdriverIcon,
+  StarIcon,
+  ShoppingBagIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Events', href: '/events', icon: CalendarIcon },
-  { name: 'Daily Tools', href: '/tools', icon: ClipboardDocumentListIcon },
+  { name: 'Daily Tools', href: '/daily-tools', icon: WrenchScrewdriverIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+];
+
+const premiumNavigation = [
+  { name: 'Upgrade', href: '/premium', icon: StarIcon },
+  { name: 'Store', href: '/store', icon: ShoppingBagIcon },
 ];
 
 const eventTypes = [
@@ -158,6 +166,35 @@ const Sidebar = ({ open, onClose }) => {
                           ))}
                         </ul>
                       </li>
+                      
+                      <li>
+                        <div className={`text-xs font-semibold leading-6 ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                        }`}>Premium</div>
+                        <ul role="list" className="-mx-2 mt-2 space-y-1">
+                          {premiumNavigation.map((item) => (
+                            <li key={item.name}>
+                              <Link
+                                to={item.href}
+                                className={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors ${
+                                  isDarkMode
+                                    ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                                    : 'text-gray-700 hover:text-purple-600 hover:bg-gray-50'
+                                }`}
+                                onClick={onClose}
+                              >
+                                <item.icon
+                                  className={`h-5 w-5 shrink-0 ${
+                                    isDarkMode ? 'text-purple-400' : 'text-purple-600'
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                                {item.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
                     </ul>
                   </nav>
                 </div>
@@ -231,6 +268,34 @@ const Sidebar = ({ open, onClose }) => {
                       >
                         <item.icon
                           className={`h-5 w-5 shrink-0 ${item.color}`}
+                          aria-hidden="true"
+                        />
+                        {item.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+              
+              <li>
+                <div className={`text-xs font-semibold leading-6 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                }`}>Premium</div>
+                <ul role="list" className="-mx-2 mt-2 space-y-1">
+                  {premiumNavigation.map((item) => (
+                    <li key={item.name}>
+                      <Link
+                        to={item.href}
+                        className={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors ${
+                          isDarkMode
+                            ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                            : 'text-gray-700 hover:text-purple-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <item.icon
+                          className={`h-5 w-5 shrink-0 ${
+                            isDarkMode ? 'text-purple-400' : 'text-purple-600'
+                          }`}
                           aria-hidden="true"
                         />
                         {item.name}
