@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema({
   },
   avatar: {
     type: String,
-    default: null
+    default: '/default-profile.png'
   },
   personalQuote: {
     type: String,
@@ -200,6 +200,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   loginHistory: {
     type: [Date],
     default: []
@@ -537,6 +541,34 @@ userSchema.methods.addEvent = async function(eventData = {}) {
       case 'improvement':
         this.stats.homeEvents += 1;
         break;
+      case 'wedding':
+      case 'wedding planning':
+        this.stats.socialEvents += 1;
+        break;
+      case 'moving':
+      case 'relocation':
+        this.stats.homeEvents += 1;
+        break;
+      case 'career':
+      case 'job change':
+        this.stats.completedGoals += 1;
+        break;
+      case 'education':
+      case 'graduation':
+        this.stats.completedGoals += 1;
+        break;
+      case 'business':
+      case 'startup':
+        this.stats.completedGoals += 1;
+        break;
+      case 'health':
+      case 'fitness':
+        this.stats.fitnessTasks += 1;
+        break;
+      case 'travel':
+      case 'vacation':
+        this.stats.socialEvents += 1;
+        break;
     }
   }
   
@@ -545,12 +577,21 @@ userSchema.methods.addEvent = async function(eventData = {}) {
     this.stats.organizedEvents += 1;
   }
   
+  // Update usage tracking
+  this.usage.activeEvents += 1;
+  
   return this.save();
 };
 
 // Method to complete event
 userSchema.methods.completeEvent = async function() {
   this.stats.completedEvents += 1;
+  
+  // Update usage tracking
+  if (this.usage.activeEvents > 0) {
+    this.usage.activeEvents -= 1;
+  }
+  
   return this.save();
 };
 

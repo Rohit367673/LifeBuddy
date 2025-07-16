@@ -69,12 +69,9 @@ router.get('/profile/:identifier', async (req, res) => {
     const { identifier } = req.params;
     let user;
     if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
-      // It's an ObjectId
       user = await User.findById(identifier);
     } else {
-      // Try username first
       user = await User.findOne({ username: identifier });
-      // If not found, try firebaseUid
       if (!user) {
         user = await User.findOne({ firebaseUid: identifier });
       }
@@ -82,24 +79,22 @@ router.get('/profile/:identifier', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Profile not found' });
     }
-    
     // Check visibility
     if (user.profileVisibility === 'private') {
       return res.status(403).json({ message: 'This profile is private' });
     }
-    
     // Get public profile data
     const stats = await User.getUserStats(user._id);
     const achievements = await Achievement.find({ user: user._id }).sort({ createdAt: -1 });
     const earnedBadges = achievements.map(achievement => achievement.badgeType).filter(Boolean);
     const streak = await User.getUserStreak(user._id);
-    
     const isOwner = user.email === 'rohit367673@gmail.com' && (user.username === 'rohit' || (user.displayName && user.displayName.toLowerCase() === 'rohit'));
+    // Ensure all required fields are present
     res.json({
-      displayName: user.displayName,
-      username: user.username,
-      avatar: user.avatar,
-      personalQuote: user.personalQuote,
+      displayName: user.displayName || '',
+      username: user.username || '',
+      avatar: user.avatar || '',
+      personalQuote: user.personalQuote || '',
       currentStreak: streak.currentStreak || 0,
       longestStreak: streak.longestStreak || 0,
       totalTasks: stats.totalTasks || 0,
@@ -109,8 +104,8 @@ router.get('/profile/:identifier', async (req, res) => {
       ...(isOwner ? { owner: true, ownerEmail: user.email } : {})
     });
   } catch (error) {
-    console.error('Error fetching public profile:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error fetching public profile:', error, error.stack);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
 
@@ -351,6 +346,82 @@ router.get('/profile/login-history', authenticateUser, async (req, res) => {
     res.json({ loginHistory: user.loginHistory || [] });
   } catch (error) {
     console.error('Error fetching login history:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Set or update username
+router.post('/set-username', authenticateUser, async (req, res) => {
+  const { username } = req.body;
+  if (!username || !username.match(/^[a-zA-Z0-9_]{3,30}$/)) {
+    return res.status(400).json({ message: 'Invalid username. Use 3-30 letters, numbers, or underscores.' });
+  }
+  try {
+    // Check if username is taken
+    const existing = await User.findOne({ username: username.toLowerCase() });
+    if (existing && existing._id.toString() !== req.user._id.toString()) {
+      return res.status(409).json({ message: 'Username already taken.' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { username: username.toLowerCase() },
+      { new: true, runValidators: true }
+    ).select('-password');
+    res.json({ message: 'Username set successfully.', user });
+  } catch (error) {
+    console.error('Set username error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Search users by username (partial match)
+router.get('/search', authenticateUser, async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) {
+    return res.status(400).json({ message: 'Query too short.' });
+  }
+  try {
+    const users = await User.find({
+      username: { $regex: q, $options: 'i' }
+    })
+      .select('username displayName avatar') // Ensure these fields are selected
+      .limit(10);
+    res.json(users);
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Send friend request
+router.post('/friend-request/:username', authenticateUser, async (req, res) => {
+  const { username } = req.params;
+  if (!username) return res.status(400).json({ message: 'Username required.' });
+  try {
+    const friend = await User.findOne({ username: username.toLowerCase() });
+    if (!friend) return res.status(404).json({ message: 'User not found.' });
+    if (friend._id.equals(req.user._id)) return res.status(400).json({ message: 'Cannot add yourself.' });
+    // For simplicity, auto-accept friend requests (bi-directional)
+    const user = await User.findById(req.user._id);
+    if (user.friends.includes(friend._id)) return res.status(409).json({ message: 'Already friends.' });
+    user.friends.push(friend._id);
+    friend.friends.push(user._id);
+    await user.save();
+    await friend.save();
+    res.json({ message: 'Friend added successfully.' });
+  } catch (error) {
+    console.error('Friend request error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// List friends
+router.get('/friends', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('friends', 'username displayName avatar');
+    res.json(user.friends || []);
+  } catch (error) {
+    console.error('List friends error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

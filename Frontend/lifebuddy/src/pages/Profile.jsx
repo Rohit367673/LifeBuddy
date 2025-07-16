@@ -12,7 +12,8 @@ import {
   HeartIcon,
   AcademicCapIcon,
   LightBulbIcon,
-  SparklesIcon
+  SparklesIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import badge2 from '../assets/svg/badge-2.svg';
@@ -36,6 +37,14 @@ const Profile = () => {
   const [achievementStats, setAchievementStats] = useState({});
   const [productivityData, setProductivityData] = useState([]);
   const [loginHistory, setLoginHistory] = useState([]);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isSettingUsername, setIsSettingUsername] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [friends, setFriends] = useState([]);
 
   // Badge definitions with images
   const badgeDefinitions = {
@@ -347,6 +356,99 @@ const Profile = () => {
     return weeks;
   }
 
+  // Username prompt logic
+  const handleSetUsername = async (e) => {
+    e.preventDefault();
+    setUsernameError('');
+    setIsSettingUsername(true);
+    setFriendMessage('');
+    try {
+      const token = await getFirebaseToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/set-username`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ username: usernameInput })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUsernameError(data.message || 'Failed to set username');
+      } else {
+        toast.success('Username set successfully!');
+        setUsernameInput('');
+        setUsernameError('');
+        await loadProfileData();
+      }
+    } catch (err) {
+      setUsernameError('Failed to set username');
+    } finally {
+      setIsSettingUsername(false);
+    }
+  };
+
+  // User ID search logic (exact match)
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    setSearchLoading(true);
+    setSearchResult(null);
+    setSearchError('');
+    try {
+      let q = searchQuery.trim();
+      if (q.startsWith('@')) q = q.slice(1);
+      if (!q) {
+        setSearchError('Please enter a user ID');
+        setSearchLoading(false);
+        return;
+      }
+      const token = await getFirebaseToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/search?q=${encodeURIComponent(q)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        // Find exact match (case-insensitive)
+        const found = data.find(u => u.username && u.username.toLowerCase() === q.toLowerCase());
+        if (found) {
+          if (found._id === user._id) {
+            setSearchError('That is your own user ID!');
+          } else {
+            setSearchResult(found);
+          }
+        } else {
+          setSearchError('No user found with that ID');
+        }
+      } else {
+        setSearchError(data.message || 'Search failed');
+      }
+    } catch (err) {
+      setSearchError('Search failed');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Fetch friends list on mount
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        const token = await getFirebaseToken();
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/friends`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFriends(data);
+        }
+      } catch (err) {
+        // Ignore errors for now
+      }
+    };
+    fetchFriends();
+    // eslint-disable-next-line
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -366,6 +468,34 @@ const Profile = () => {
 
   return (
     <div className="space-y-6 mt-8">
+      {/* Username Prompt */}
+      {!user?.username && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex flex-col items-center mb-4">
+          <h2 className="text-lg font-semibold mb-2">Choose your unique LifeBuddy ID</h2>
+          <form onSubmit={handleSetUsername} className="flex flex-col sm:flex-row gap-2 items-center w-full max-w-md">
+            <input
+              type="text"
+              value={usernameInput}
+              onChange={e => setUsernameInput(e.target.value)}
+              placeholder="Enter a unique username (3-30 chars)"
+              className="border rounded px-3 py-2 w-full"
+              minLength={3}
+              maxLength={30}
+              pattern="[a-zA-Z0-9_]+"
+              required
+              disabled={isSettingUsername}
+            />
+            <button
+              type="submit"
+              className="btn-primary px-4 py-2"
+              disabled={isSettingUsername}
+            >
+              {isSettingUsername ? 'Saving...' : 'Set Username'}
+            </button>
+          </form>
+          {usernameError && <div className="text-red-500 mt-2">{usernameError}</div>}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
@@ -460,6 +590,66 @@ const Profile = () => {
                 </div>
               </div>
             </div>
+          </div>
+          {/* User ID Search Bar */}
+          <div className="mt-8 bg-gray-50 dark:bg-gray-900 rounded-xl shadow p-4">
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><MagnifyingGlassIcon className="w-5 h-5" /> Search User by ID</h3>
+            <form onSubmit={handleSearch} className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by user ID (e.g. @username)"
+                className="border rounded px-3 py-2 w-full"
+                minLength={2}
+                required
+                disabled={searchLoading}
+              />
+              <button type="submit" className="btn-secondary px-4 py-2" disabled={searchLoading}>
+                {searchLoading ? 'Searching...' : 'Search'}
+              </button>
+            </form>
+            {searchError && <div className="text-danger-600 mb-2">{searchError}</div>}
+            {searchResult && (
+              <div className="flex items-center gap-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow mt-2">
+                <img src={searchResult.avatar || '/default-profile.png'} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                <div className="flex-1">
+                  <div className="font-semibold">@{searchResult.username}</div>
+                  <div className="text-gray-500">{searchResult.displayName}</div>
+                </div>
+                <a
+                  href={`/profile/${searchResult.username}`}
+                  className="btn-primary px-3 py-1 text-sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View Profile
+                </a>
+              </div>
+            )}
+            {/* Friends List */}
+            {friends.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-semibold mb-2">Your Friends</h4>
+                <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {friends.map(friend => (
+                    <li key={friend._id} className="flex items-center gap-3 py-2">
+                      <img src={friend.avatar || '/default-profile.png'} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
+                      <span className="font-medium">@{friend.username}</span>
+                      <span className="text-gray-500">{friend.displayName}</span>
+                      <a
+                        href={`/profile/${friend.username}`}
+                        className="btn-secondary px-2 py-1 text-xs ml-auto"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 

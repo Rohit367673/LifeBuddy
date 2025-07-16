@@ -260,6 +260,7 @@ router.post('/register', authRateLimiter, async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       avatar: user.avatar,
+      username: user.username, // <-- Added username
       preferences: user.preferences,
       stats: user.stats,
       createdAt: user.createdAt
@@ -357,6 +358,7 @@ router.post('/login', authRateLimiter, async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       avatar: user.avatar,
+      username: user.username, // <-- Added username
       preferences: user.preferences,
       stats: user.stats,
       createdAt: user.createdAt

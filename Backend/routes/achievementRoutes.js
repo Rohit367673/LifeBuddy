@@ -373,4 +373,43 @@ router.post('/test-badge-system', authenticateUser, async (req, res) => {
   }
 });
 
+// Public: Get achievements for a user by username or ID
+router.get('/public/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    let user;
+    if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      user = await User.findById(identifier);
+    } else {
+      user = await User.findOne({ username: identifier });
+      if (!user) {
+        user = await User.findOne({ firebaseUid: identifier });
+      }
+    }
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const achievements = await Achievement.find({ user: user._id }).sort({ earnedAt: -1 });
+    // Map to required fields for frontend
+    const mappedAchievements = achievements.map(a => ({
+      _id: a._id,
+      type: a.type,
+      isEarned: a.isEarned,
+      name: a.name,
+      description: a.description,
+      earnedAt: a.earnedAt,
+      points: a.points
+    }));
+    const stats = {
+      totalAchievements: achievements.length,
+      completedAchievements: achievements.filter(a => a.isEarned).length,
+      completionRate: achievements.length > 0 ? Math.round(achievements.filter(a => a.isEarned).length / achievements.length * 100) : 0
+    };
+    res.json({ achievements: mappedAchievements, stats });
+  } catch (error) {
+    console.error('Error fetching public achievements:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 module.exports = router; 
