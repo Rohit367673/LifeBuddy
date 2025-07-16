@@ -13,6 +13,7 @@ import {
 import { auth } from '../utils/firebaseConfig';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import UsernameModal from '../components/UsernameModal';
 
 const AuthContext = createContext();
 
@@ -31,6 +32,8 @@ export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const navigate = useNavigate();
 
   // Get authentication token (ALWAYS use backend JWT, never Google ID token)
@@ -152,7 +155,8 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       setToken(data.token);
       setFirebaseUser(firebaseUser);
-      setUser(data.user);
+      setUser(data.user); // Set user immediately for fast UI feedback
+      fetchUserProfile(data.token); // Update with latest info in background
       console.log('AuthContext: user set after login/register:', data.user);
       console.log('AuthContext: firebaseUser set after login/register:', firebaseUser);
       
@@ -197,7 +201,8 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       setToken(data.token);
       setFirebaseUser(firebaseUser);
-      setUser(data.user);
+      setUser(data.user); // Set user immediately for fast UI feedback
+      fetchUserProfile(data.token); // Update with latest info in background
       console.log('AuthContext: user set after login/register:', data.user);
       console.log('AuthContext: firebaseUser set after login/register:', firebaseUser);
       
@@ -293,7 +298,6 @@ export const AuthProvider = ({ children }) => {
         });
         if (response.status === 409) {
           // User already exists, try login again
-          console.log('User already exists after registration attempt, retrying login...');
           response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
             method: 'POST',
             headers: {
@@ -309,28 +313,61 @@ export const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to authenticate with backend. Response:', response.status, errorText);
-        throw new Error('Failed to authenticate with backend');
+        throw new Error('Failed to authenticate with backend: ' + errorText);
       }
 
       const data = await response.json();
-      console.log('Google login backend response:', data);
       setToken(data.token);
       setFirebaseUser(firebaseUser);
-      setUser(data.user);
-      console.log('Token set in state:', data.token);
-      setTimeout(() => {
-        console.log('Token in localStorage after setToken:', localStorage.getItem('token'));
-      }, 500);
+      setUser(data.user); // Set user immediately for fast UI feedback
+      // Fetch the latest user profile (which will have the username if set)
+      await fetchUserProfile(data.token);
+      // setUser(data.user); // Remove this line, as fetchUserProfile sets the user
+      // If user has no username, show modal
+      if (!data.user.username) {
+        setPendingGoogleUser({ firebaseUser, token: data.token });
+        setShowUsernameModal(true);
+        return;
+      }
       toast.success('Welcome to LifeBuddy!');
-      // Wait for token to be saved in localStorage before navigating
       setTimeout(() => {
         navigate('/dashboard');
       }, 150);
     } catch (error) {
-      console.error('Google login backend error:', error);
       toast.error('Failed to complete Google login');
       throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler for setting username from modal
+  const handleSetGoogleUsername = async (username) => {
+    if (!pendingGoogleUser) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/set-username`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${pendingGoogleUser.token}`
+        },
+        body: JSON.stringify({ username })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'Failed to set username');
+        return;
+      }
+      setUser(data.user);
+      setShowUsernameModal(false);
+      setPendingGoogleUser(null);
+      toast.success('Username set successfully!');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 150);
+    } catch (err) {
+      toast.error('Failed to set username');
     } finally {
       setLoading(false);
     }
@@ -487,6 +524,15 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  // Add this useEffect to check for missing username after user is set
+  useEffect(() => {
+    if (user && !user.username) {
+      setShowUsernameModal(true);
+    } else {
+      setShowUsernameModal(false);
+    }
+  }, [user]);
+
   const value = {
     user,
     firebaseUser,
@@ -505,6 +551,11 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={value}>
       {children}
+      <UsernameModal
+        isOpen={showUsernameModal}
+        onClose={() => {}}
+        onSetUsername={handleSetGoogleUsername}
+      />
     </AuthContext.Provider>
   );
 }; 

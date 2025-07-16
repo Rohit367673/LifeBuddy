@@ -196,7 +196,10 @@ const PublicProfile = () => {
 
   const loginDays = getLastNDaysLoginData(loginHistory, 35);
   const weeks = chunkIntoWeeks(loginDays);
-  const earnedBadges = (profile.badges || []).filter(Boolean);
+  // Use achievements from achievements API to determine earned badges
+  const earnedBadges = achievements.filter(a => a.isEarned).map(a => a.type);
+  // For recent achievements, show the most recent earned ones
+  const recentAchievements = achievements.filter(a => a.isEarned).sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt)).slice(0, 6);
   const currentStreak = profile.currentStreak || 0;
   const longestStreak = profile.longestStreak || 0;
   const totalTasks = profile.totalTasks || 0;
@@ -225,10 +228,20 @@ const PublicProfile = () => {
               </div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
+                {profile.owner && (
+                  <span className="flex items-center gap-1 ml-2">
+                    {/* Verified Tick SVG */}
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                    <span className="text-xs font-semibold text-blue-500">Owner</span>
+                  </span>
+                )}
               </h2>
               <p className="text-gray-600 text-sm">
                 @{profile.username || 'lifebuddy_user'}
               </p>
+              {profile.ownerEmail && (
+                <p className="text-xs text-blue-500 font-semibold mt-1">Owner Email: {profile.ownerEmail}</p>
+              )}
               {profile.personalQuote && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <p className="text-gray-700 italic">"{profile.personalQuote}"</p>
@@ -236,7 +249,6 @@ const PublicProfile = () => {
               )}
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 mt-6">
-                
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-500">{currentStreak}</div>
                   <div className="text-sm text-gray-600">Current Streak</div>
@@ -370,38 +382,35 @@ const PublicProfile = () => {
         </div>
       </div>
       {/* Recent Achievements */}
-      {achievements.filter(a => a.isEarned).length > 0 && (
+      {recentAchievements.length > 0 && (
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <StarIcon className="w-5 h-5" />
             Recent Achievements
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {achievements
-              .filter(a => a.isEarned)
-              .slice(0, 6)
-              .map((achievement) => (
-                <div key={achievement._id} className="p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
-                      <TrophyIcon className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {achievement.name}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {achievement.description}
+            {recentAchievements.map((achievement) => (
+              <div key={achievement._id} className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <TrophyIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      {achievement.name}
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {achievement.description}
+                    </p>
+                    {achievement.earnedAt && (
+                      <p className="text-xs text-gray-500">
+                        Earned {new Date(achievement.earnedAt).toLocaleDateString()}
                       </p>
-                      {achievement.earnedAt && (
-                        <p className="text-xs text-gray-500">
-                          Earned {new Date(achievement.earnedAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
         </div>
       )}

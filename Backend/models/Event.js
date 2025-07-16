@@ -4,30 +4,21 @@ const eventSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   title: {
     type: String,
     required: true,
-    trim: true,
-    maxlength: 100
+    trim: true
   },
-  type: {
+  eventType: {
     type: String,
     required: true,
-    enum: ['moving', 'job-change', 'college', 'wedding', 'trip', 'car-purchase', 'other'],
-    default: 'other'
+    enum: ['Moving', 'Wedding', 'Career', 'Travel', 'Home', 'Education', 'Business', 'Health', 'Social', 'Custom']
   },
   description: {
     type: String,
-    trim: true,
-    maxlength: 500
-  },
-  status: {
-    type: String,
-    enum: ['planning', 'in-progress', 'completed', 'paused'],
-    default: 'planning'
+    trim: true
   },
   startDate: {
     type: Date,
@@ -37,50 +28,68 @@ const eventSchema = new mongoose.Schema({
     type: Date
   },
   budget: {
-    planned: {
-      type: Number,
-      default: 0
-    },
-    spent: {
-      type: Number,
-      default: 0
-    },
-    currency: {
-      type: String,
-      default: 'USD'
-    }
-  },
-  progress: {
     type: Number,
-    min: 0,
-    max: 100,
+    default: 0
+  },
+  spentAmount: {
+    type: Number,
     default: 0
   },
   priority: {
     type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
+    enum: ['low', 'medium', 'high'],
     default: 'medium'
   },
-  tags: [{
+  status: {
     type: String,
-    trim: true,
-    maxlength: 20
-  }],
-  location: {
-    address: String,
-    city: String,
-    state: String,
-    country: String,
-    coordinates: {
-      lat: Number,
-      lng: Number
-    }
+    enum: ['planning', 'in-progress', 'completed', 'archived'],
+    default: 'planning'
   },
+  location: {
+    type: String,
+    trim: true
+  },
+  checklist: [{
+    item: {
+      type: String,
+      required: true
+    },
+    completed: {
+      type: Boolean,
+      default: false
+    },
+    completedAt: {
+      type: Date
+    },
+    notes: {
+      type: String
+    }
+  }],
+  // Template-based event tracking
+  isTemplateBased: {
+    type: Boolean,
+    default: false
+  },
+  templateId: {
+    type: String
+  },
+  // Custom event tracking
+  isCustom: {
+    type: Boolean,
+    default: false
+  },
+  // Progress tracking
+  progress: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  // Notes and journal
   notes: [{
     content: {
       type: String,
-      required: true,
-      maxlength: 1000
+      required: true
     },
     createdAt: {
       type: Date,
@@ -91,55 +100,110 @@ const eventSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  attachments: [{
-    name: String,
-    url: String,
+  // Tags for filtering
+  tags: [{
     type: String,
-    size: Number,
-    uploadedAt: {
+    trim: true
+  }],
+  // Color theme
+  color: {
+    type: String,
+    default: 'blue'
+  },
+  // Icon
+  icon: {
+    type: String,
+    default: '📅'
+  },
+  // Timeline
+  timeline: {
+    type: String
+  },
+  // Budget tracking
+  budgetItems: [{
+    name: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true
+    },
+    category: {
+      type: String,
+      enum: ['venue', 'catering', 'entertainment', 'decoration', 'transportation', 'other'],
+      default: 'other'
+    },
+    date: {
       type: Date,
       default: Date.now
+    },
+    notes: {
+      type: String
     }
   }],
+  // Sharing and collaboration
   isPublic: {
     type: Boolean,
     default: false
   },
-  isArchived: {
-    type: Boolean,
-    default: false
-  }
+  sharedWith: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    role: {
+      type: String,
+      enum: ['viewer', 'editor', 'admin'],
+      default: 'viewer'
+    }
+  }]
 }, {
   timestamps: true
 });
 
 // Indexes for better query performance
 eventSchema.index({ user: 1, status: 1 });
-eventSchema.index({ user: 1, startDate: -1 });
-eventSchema.index({ user: 1, type: 1 });
-eventSchema.index({ status: 1, startDate: 1 });
+eventSchema.index({ user: 1, eventType: 1 });
+eventSchema.index({ user: 1, startDate: 1 });
 
-// Virtual for duration
-eventSchema.virtual('duration').get(function() {
-  if (!this.startDate || !this.endDate) return null;
-  return Math.ceil((this.endDate - this.startDate) / (1000 * 60 * 60 * 24));
+// Virtual for budget remaining
+eventSchema.virtual('budgetRemaining').get(function() {
+  return this.budget - this.spentAmount;
 });
 
-// Virtual for budget status
-eventSchema.virtual('budgetStatus').get(function() {
-  if (this.budget.planned === 0) return 'not-set';
-  if (this.budget.spent === 0) return 'not-started';
-  if (this.budget.spent <= this.budget.planned * 0.8) return 'under-budget';
-  if (this.budget.spent <= this.budget.planned) return 'on-budget';
-  return 'over-budget';
+// Virtual for budget percentage used
+eventSchema.virtual('budgetPercentageUsed').get(function() {
+  if (this.budget === 0) return 0;
+  return Math.round((this.spentAmount / this.budget) * 100);
 });
 
-// Method to update progress based on completed tasks
-eventSchema.methods.updateProgress = function(completedTasks, totalTasks) {
-  if (totalTasks === 0) {
-    this.progress = 0;
-  } else {
-    this.progress = Math.round((completedTasks / totalTasks) * 100);
+// Virtual for checklist completion percentage
+eventSchema.virtual('checklistCompletionPercentage').get(function() {
+  if (this.checklist.length === 0) return 0;
+  const completedItems = this.checklist.filter(item => item.completed).length;
+  return Math.round((completedItems / this.checklist.length) * 100);
+});
+
+// Method to update progress based on checklist completion
+eventSchema.methods.updateProgress = function() {
+  this.progress = this.checklistCompletionPercentage;
+  return this.save();
+};
+
+// Method to add budget item
+eventSchema.methods.addBudgetItem = function(item) {
+  this.budgetItems.push(item);
+  this.spentAmount += item.amount;
+  return this.save();
+};
+
+// Method to complete checklist item
+eventSchema.methods.completeChecklistItem = function(itemIndex) {
+  if (this.checklist[itemIndex]) {
+    this.checklist[itemIndex].completed = true;
+    this.checklist[itemIndex].completedAt = new Date();
+    this.updateProgress();
   }
   return this.save();
 };
@@ -150,23 +214,40 @@ eventSchema.methods.addNote = function(content) {
   return this.save();
 };
 
-// Method to update budget
-eventSchema.methods.updateBudget = function(spent) {
-  this.budget.spent = spent;
-  return this.save();
+// Static method to get events by status
+eventSchema.statics.getEventsByStatus = function(userId, status) {
+  return this.find({ user: userId, status });
 };
 
-// Pre-save middleware to update user stats
-eventSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    try {
-      const User = mongoose.model('User');
-      await User.findByIdAndUpdate(this.user, {
-        $inc: { 'stats.totalEvents': 1 }
-      });
-    } catch (error) {
-      console.error('Error updating user stats:', error);
-    }
+// Static method to get events by type
+eventSchema.statics.getEventsByType = function(userId, eventType) {
+  return this.find({ user: userId, eventType });
+};
+
+// Static method to get upcoming events
+eventSchema.statics.getUpcomingEvents = function(userId, limit = 5) {
+  return this.find({
+    user: userId,
+    startDate: { $gte: new Date() },
+    status: { $in: ['planning', 'in-progress'] }
+  })
+  .sort('startDate')
+  .limit(limit);
+};
+
+// Static method to get overdue events
+eventSchema.statics.getOverdueEvents = function(userId) {
+  return this.find({
+    user: userId,
+    endDate: { $lt: new Date() },
+    status: { $ne: 'completed' }
+  });
+};
+
+// Pre-save middleware to update progress
+eventSchema.pre('save', function(next) {
+  if (this.checklist && this.checklist.length > 0) {
+    this.progress = this.checklistCompletionPercentage;
   }
   next();
 });

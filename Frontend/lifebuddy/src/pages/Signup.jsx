@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
@@ -14,6 +14,11 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [username, setUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const { register, loginWithGoogle, registerTraditional } = useAuth();
   const navigate = useNavigate();
 
@@ -31,6 +36,51 @@ const Signup = () => {
       }));
     }
   };
+
+  // Helper to strip @ and lowercase
+  const cleanUsername = (val) => val.replace(/^@/, '').toLowerCase();
+
+  // Username availability check
+  useEffect(() => {
+    if (!username || cleanUsername(username).length < 3) {
+      setUsernameAvailable(null);
+      setUsernameSuggestions([]);
+      return;
+    }
+    let isCurrent = true;
+    const check = async () => {
+      setCheckingUsername(true);
+      setUsernameAvailable(null);
+      setUsernameError('');
+      try {
+        const q = cleanUsername(username);
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          setUsernameAvailable(null);
+          setUsernameError('Error checking username');
+          setUsernameSuggestions([]);
+        } else if (data.some(u => u.username === q)) {
+          setUsernameAvailable(false);
+          // Suggest alternatives
+          const base = q.replace(/\d+$/, '');
+          const nums = [Math.floor(Math.random()*1000), Date.now()%1000, Math.floor(Math.random()*9000+1000)];
+          setUsernameSuggestions(nums.map(n => `@${base}${n}`));
+        } else {
+          setUsernameAvailable(true);
+          setUsernameSuggestions([]);
+        }
+      } catch {
+        setUsernameAvailable(null);
+        setUsernameError('Error checking username');
+        setUsernameSuggestions([]);
+      } finally {
+        if (isCurrent) setCheckingUsername(false);
+      }
+    };
+    check();
+    return () => { isCurrent = false; };
+  }, [username]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -59,6 +109,15 @@ const Signup = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    // Username validation
+    if (!username || cleanUsername(username).length < 3) {
+      newErrors.username = 'User ID is required (min 3 chars)';
+    } else if (!/^@[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      newErrors.username = 'User ID must start with @ and use only letters, numbers, underscores (3-30 chars)';
+    } else if (usernameAvailable === false) {
+      newErrors.username = 'User ID is already taken';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -73,7 +132,7 @@ const Signup = () => {
     setLoading(true);
     
     try {
-      await registerTraditional(formData.email, formData.password, formData.displayName);
+      await registerTraditional(formData.email, formData.password, formData.displayName, '', '', cleanUsername(username));
       navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
@@ -229,6 +288,38 @@ const Signup = () => {
               </div>
               {errors.confirmPassword && (
                 <p className="mt-1 text-sm text-danger-600">{errors.confirmPassword}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="username" className="label">
+                User ID (unique, like @yourname)
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={username}
+                onChange={e => {
+                  let val = e.target.value;
+                  if (!val.startsWith('@')) val = '@' + val;
+                  setUsername(val.replace(/[^@a-zA-Z0-9_]/g, ''));
+                }}
+                className={`input ${errors.username ? 'input-error' : ''}`}
+                placeholder="@yourname"
+                minLength={3}
+                maxLength={30}
+                autoComplete="off"
+              />
+              {checkingUsername && <p className="text-sm text-gray-500">Checking availability...</p>}
+              {usernameAvailable && !errors.username && <p className="text-sm text-green-600">User ID is available!</p>}
+              {usernameAvailable === false && <p className="text-sm text-danger-600">User ID is taken.</p>}
+              {errors.username && <p className="mt-1 text-sm text-danger-600">{errors.username}</p>}
+              {usernameSuggestions.length > 0 && (
+                <div className="mt-2 text-sm text-gray-600">Suggestions: {usernameSuggestions.map(s => (
+                  <button type="button" key={s} className="underline mr-2" onClick={() => setUsername(s)}>{s}</button>
+                ))}</div>
               )}
             </div>
           </div>
