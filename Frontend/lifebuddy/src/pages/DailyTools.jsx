@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
 import UsageLimitBanner from '../components/UsageLimitBanner';
+import PremiumCalendar from './PremiumCalendar';
 import { 
   PlusIcon, 
   CheckCircleIcon, 
@@ -519,14 +520,17 @@ const DailyTools = () => {
 
         {/* Calendar Tab */}
         {activeTab === 'calendar' && (
-          <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Calendar View</h2>
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <p className="text-gray-600 text-center py-8">
-                Calendar view coming soon! This will show your tasks, events, and mood entries in a monthly calendar format.
-              </p>
+          user?.subscription?.plan === 'premium' ? (
+            <PremiumCalendar />
+          ) : (
+            <div className="p-8 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl text-center shadow-xl mt-8">
+              <h2 className="text-2xl font-extrabold text-yellow-700 mb-2 tracking-tight">Premium Feature</h2>
+              <p className="mb-6 text-yellow-800 text-lg">Unlock the AI Task Scheduler, daily motivation, and advanced analytics with LifeBuddy Premium.</p>
+              <a href="/upgrade" className="inline-block px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-bold rounded-xl shadow hover:from-yellow-500 hover:to-yellow-700 transition-all text-lg">
+                Upgrade to Premium
+              </a>
             </div>
-          </div>
+          )
         )}
       </div>
 

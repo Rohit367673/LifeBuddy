@@ -171,11 +171,10 @@ router.put('/:id', authenticateUser, async (req, res) => {
         priority: task.priority,
         tags: task.tags
       });
-      
-      // Check for achievements after task completion
       const userStats = await User.getUserStats(req.user._id);
+      console.log('User stats after completing task:', userStats); // Log stats
       const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
-      
+      console.log('New achievements unlocked:', newAchievements); // Log achievements
       return res.json({
         task,
         newAchievements: newAchievements.length > 0 ? newAchievements : null

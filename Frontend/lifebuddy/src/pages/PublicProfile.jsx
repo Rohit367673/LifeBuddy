@@ -390,27 +390,27 @@ const PublicProfile = () => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentAchievements.map((achievement) => (
-              <div key={achievement._id} className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
-                    <TrophyIcon className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      {achievement.name}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {achievement.description}
-                    </p>
-                    {achievement.earnedAt && (
-                      <p className="text-xs text-gray-500">
-                        Earned {new Date(achievement.earnedAt).toLocaleDateString()}
+                <div key={achievement._id} className="p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                      <TrophyIcon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">
+                        {achievement.name}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {achievement.description}
                       </p>
-                    )}
+                      {achievement.earnedAt && (
+                        <p className="text-xs text-gray-500">
+                          Earned {new Date(achievement.earnedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}

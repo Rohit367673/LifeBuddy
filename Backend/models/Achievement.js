@@ -351,6 +351,36 @@ achievementSchema.statics.getAvailableAchievements = function() {
       points: 300,
       category: 'streaks',
       criteria: { taskStreak: 30 }
+    },
+    {
+      type: 'birthday_planner_pro',
+      title: 'Birthday Planner Pro',
+      description: 'Planned and completed your first birthday event',
+      icon: '🎉',
+      badge: 'silver',
+      points: 40,
+      category: 'events',
+      criteria: { birthdayEventsCompleted: 1 }
+    },
+    {
+      type: 'budget_master',
+      title: 'Budget Master',
+      description: 'Successfully completed your first event budget plan',
+      icon: '💰',
+      badge: 'silver',
+      points: 30,
+      category: 'events',
+      criteria: { budgetsCompleted: 1 }
+    },
+    {
+      type: 'checklist_champion',
+      title: 'Checklist Champion',
+      description: 'Completed your first event checklist',
+      icon: '📋',
+      badge: 'bronze',
+      points: 20,
+      category: 'tasks',
+      criteria: { checklistsCompleted: 1 }
     }
   ];
 };

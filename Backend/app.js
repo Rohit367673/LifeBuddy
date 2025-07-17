@@ -15,6 +15,7 @@ const motivationalRoutes = require('./routes/motivationalRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const storeRoutes = require('./routes/storeRoutes');
+const premiumTaskRoutes = require('./routes/premiumTaskRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -67,6 +68,7 @@ app.use('/api/motivational', motivationalRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/store', storeRoutes);
+app.use('/api/premium-tasks', premiumTaskRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
