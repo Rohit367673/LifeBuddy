@@ -194,7 +194,11 @@ const userSchema = new mongoose.Schema({
     moodEntryHistory: {
       type: [Date],
       default: []
-    }
+    },
+    birthdayEventsCompleted: { type: Number, default: 0 },
+    budgetsCompleted: { type: Number, default: 0 },
+    checklistsCompleted: { type: Number, default: 0 },
+    eventMilestones: [{ name: String, date: Date }],
   },
   isActive: {
     type: Boolean,
@@ -321,7 +325,8 @@ const userSchema = new mongoose.Schema({
         default: Date.now
       }
     }]
-  }
+  },
+  fcmToken: { type: String },
 }, {
   timestamps: true
 });
@@ -609,7 +614,7 @@ userSchema.statics.getUserStats = async function(userId) {
   const Task = require('./Task');
   const Event = require('./Event');
   const Mood = require('./Mood');
-  
+  const user = await this.findById(userId); // Fetch the user document
   const [taskStats, eventStats, moodStats] = await Promise.all([
     Task.aggregate([
       { $match: { user: new mongoose.Types.ObjectId(userId) } },
@@ -641,6 +646,7 @@ userSchema.statics.getUserStats = async function(userId) {
   return {
     totalTasks: taskStats[0]?.totalTasks || 0,
     completedTasks: taskStats[0]?.completedTasks || 0,
+    tasksCompleted: user?.stats?.completedTasks || 0, // Now this will work
     totalEvents: eventStats[0]?.totalEvents || 0,
     completedEvents: eventStats[0]?.completedEvents || 0,
     moodEntries: moodStats || 0

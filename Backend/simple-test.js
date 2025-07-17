@@ -1,49 +1,59 @@
-const axios = require('axios');
+const mongoose = require('mongoose');
+const User = require('./models/User');
+const Task = require('./models/Task');
+const Achievement = require('./models/Achievement');
 
-const API_URL = 'http://localhost:5000/api';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/lifebuddy';
 
-async function testBasicFunctionality() {
-  console.log('🧪 Testing Basic Event Planner Functionality...\n');
-  
-  try {
-    // Test 1: Check if server is running
-    console.log('1. Testing server connectivity...');
-    const healthResponse = await axios.get(`${API_URL}/health`);
-    console.log('✅ Server is running');
-    
-    // Test 2: Check if templates endpoint exists
-    console.log('\n2. Testing templates endpoint...');
-    try {
-      const templatesResponse = await axios.get(`${API_URL}/events/templates`);
-      console.log('✅ Templates endpoint exists');
-      console.log(`📋 Found ${templatesResponse.data.templates?.length || 0} templates`);
-    } catch (error) {
-      console.log('❌ Templates endpoint failed:', error.response?.status);
-    }
-    
-    // Test 3: Check if events endpoint exists
-    console.log('\n3. Testing events endpoint...');
-    try {
-      const eventsResponse = await axios.get(`${API_URL}/events`);
-      console.log('✅ Events endpoint exists');
-    } catch (error) {
-      console.log('❌ Events endpoint failed:', error.response?.status);
-    }
-    
-    // Test 4: Check if stats endpoint exists
-    console.log('\n4. Testing stats endpoint...');
-    try {
-      const statsResponse = await axios.get(`${API_URL}/events/stats/overview`);
-      console.log('✅ Stats endpoint exists');
-    } catch (error) {
-      console.log('❌ Stats endpoint failed:', error.response?.status);
-    }
-    
-    console.log('\n✅ Basic functionality test completed!');
-    
-  } catch (error) {
-    console.error('❌ Test failed:', error.message);
+async function runTest() {
+  await mongoose.connect(MONGO_URI);
+  console.log('Connected to MongoDB');
+
+  // Create a test user
+  let user = await User.findOne({ email: 'test-achievement@example.com' });
+  if (!user) {
+    user = new User({
+      email: 'test-achievement@example.com',
+      displayName: 'Test User',
+      password: 'test1234',
+      firebaseUid: 'test-achievement-firebase-uid', // Ensure unique firebaseUid
+    });
+    await user.save();
+    console.log('Created test user:', user._id);
+  } else {
+    console.log('Using existing test user:', user._id);
   }
+
+  // Create a new task for the user
+  const task = new Task({
+    user: user._id,
+    title: 'Test Task',
+    status: 'pending',
+  });
+  await task.save();
+  console.log('Created test task:', task._id);
+
+  // Mark the task as completed
+  task.status = 'completed';
+  task.completedAt = new Date();
+  await task.save();
+  await user.incrementCompletedTasks();
+  console.log('Marked task as completed and incremented user stats.');
+
+  // Check for achievements
+  const userStats = await User.getUserStats(user._id);
+  console.log('User stats:', userStats);
+  const newAchievements = await Achievement.checkAchievements(user._id, userStats);
+  console.log('New achievements unlocked:', newAchievements);
+
+  // List all achievements for the user
+  const allAchievements = await Achievement.find({ user: user._id });
+  console.log('All achievements for user:', allAchievements.map(a => a.type));
+
+  await mongoose.disconnect();
 }
 
-testBasicFunctionality(); 
+runTest().catch(err => {
+  console.error('Test script error:', err);
+  process.exit(1);
+}); 
