@@ -5,241 +5,45 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
+const { generateMessageWithOpenRouter } = require('../services/openRouterService');
 
 // Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
 const requirePremium = checkPremiumFeature('premiumMotivationalMessages');
 
-// DeepSeek API integration function
-async function generateDeepSeekSchedule(userPrompt, startDate, endDate) {
-  try {
-    const deepSeekApiKey = process.env.DEEPSEEK_API_KEY;
-    if (!deepSeekApiKey) {
-      console.log('DeepSeek API key not configured, using enhanced mock schedule');
-      return generateEnhancedMockSchedule(userPrompt, startDate, endDate);
-    }
-
-    const days = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1;
-    
-    const prompt = `Create a detailed ${days}-day learning roadmap for: "${userPrompt}". 
-
-    Requirements:
-    - Break down into daily actionable tasks with specific learning objectives
-    - Each day should have 1-3 specific subtasks with detailed explanations
-    - Include practical exercises, code examples, and hands-on projects
-    - Provide learning resources, documentation links, and reference materials
-    - Include motivation tips and progress tracking suggestions
-    - Make it progressive and achievable for a beginner to intermediate level
-    - Consider the user's learning pace and provide clear next steps
-    
-    Format the response as a JSON array with this structure:
-    [
-      {
-        "day": 1,
-        "date": "YYYY-MM-DD",
-        "subtask": "Detailed task description with specific learning objectives",
-        "motivationTip": "Encouraging message with learning tips",
-        "resources": ["Resource 1", "Resource 2"],
-        "exercises": ["Exercise 1", "Exercise 2"],
-        "notes": "Additional learning notes and tips"
-      }
-    ]`;
-
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${deepSeekApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('DeepSeek API error:', response.status, errorData);
-      console.log('Falling back to enhanced mock schedule due to API error');
-      return generateEnhancedMockSchedule(userPrompt, startDate, endDate);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    // Parse the JSON response from DeepSeek
-    const scheduleData = JSON.parse(content);
-    
-    // Convert to our format
-    return scheduleData.map((item, index) => ({
-      date: new Date(new Date(startDate).getTime() + index * 24*60*60*1000),
-      subtask: item.subtask,
-      status: 'pending',
-      motivationTip: item.motivationTip,
-      resources: item.resources || [],
-      exercises: item.exercises || [],
-      notes: item.notes || '',
-      day: item.day
-    }));
-
-  } catch (error) {
-    console.error('DeepSeek API error:', error);
-    console.log('Falling back to enhanced mock schedule due to error');
-    // Fallback to enhanced mock schedule if DeepSeek fails
-    return generateEnhancedMockSchedule(userPrompt, startDate, endDate);
-  }
-}
-
-// Enhanced mock schedule generator with real learning content
-function generateEnhancedMockSchedule(userPrompt, startDate, endDate) {
+// Helper to generate a multi-day schedule using OpenRouter
+async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate) {
   const days = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1;
-  
-  // Create detailed learning schedules based on common topics
-  const detailedSchedules = {
-    'next': {
-      title: 'Next.js Mastery Roadmap',
-      days: [
-        {
-          subtask: 'Set up Next.js development environment and create your first project. Learn about the App Router, file-based routing, and project structure. Build a simple homepage with navigation.',
-          motivationTip: '🚀 Welcome to Next.js! Today you\'ll set up your development environment and create your first project. Remember, every expert was once a beginner.',
-          resources: ['Next.js Documentation', 'Create Next.js App Guide', 'App Router Tutorial'],
-          exercises: ['Create a new Next.js project', 'Build a simple homepage', 'Add navigation between pages'],
-          notes: 'Focus on understanding the project structure and how file-based routing works. Practice creating and navigating between pages.'
-        },
-        {
-          subtask: 'Master Next.js components, layouts, and styling. Learn about CSS Modules, Tailwind CSS integration, and responsive design. Build a component library for your project.',
-          motivationTip: '💪 Great progress! Today you\'ll dive deep into components and styling. Building reusable components will make you a better developer.',
-          resources: ['Next.js Components Guide', 'CSS Modules Documentation', 'Tailwind CSS Setup'],
-          exercises: ['Create reusable components', 'Style your pages with CSS Modules', 'Build a responsive layout'],
-          notes: 'Practice creating components that can be reused across your application. Focus on responsive design principles.'
-        },
-        {
-          subtask: 'Implement dynamic routes, API routes, and data fetching. Learn about getStaticProps, getServerSideProps, and client-side data fetching. Build a blog with dynamic content.',
-          motivationTip: '🔥 You\'re building real applications now! Dynamic routes and API routes are powerful features that will take your projects to the next level.',
-          resources: ['Dynamic Routes Guide', 'API Routes Documentation', 'Data Fetching Patterns'],
-          exercises: ['Create dynamic blog pages', 'Build API endpoints', 'Implement data fetching'],
-          notes: 'Understand the difference between static and server-side rendering. Practice building API routes for your applications.'
-        }
-      ]
-    },
-    'nextjs': {
-      title: 'Next.js Mastery Roadmap',
-      days: [
-        {
-          subtask: 'Set up Next.js development environment and create your first project. Learn about the App Router, file-based routing, and project structure. Build a simple homepage with navigation.',
-          motivationTip: '🚀 Welcome to Next.js! Today you\'ll set up your development environment and create your first project. Remember, every expert was once a beginner.',
-          resources: ['Next.js Documentation', 'Create Next.js App Guide', 'App Router Tutorial'],
-          exercises: ['Create a new Next.js project', 'Build a simple homepage', 'Add navigation between pages'],
-          notes: 'Focus on understanding the project structure and how file-based routing works. Practice creating and navigating between pages.'
-        },
-        {
-          subtask: 'Master Next.js components, layouts, and styling. Learn about CSS Modules, Tailwind CSS integration, and responsive design. Build a component library for your project.',
-          motivationTip: '💪 Great progress! Today you\'ll dive deep into components and styling. Building reusable components will make you a better developer.',
-          resources: ['Next.js Components Guide', 'CSS Modules Documentation', 'Tailwind CSS Setup'],
-          exercises: ['Create reusable components', 'Style your pages with CSS Modules', 'Build a responsive layout'],
-          notes: 'Practice creating components that can be reused across your application. Focus on responsive design principles.'
-        },
-        {
-          subtask: 'Implement dynamic routes, API routes, and data fetching. Learn about getStaticProps, getServerSideProps, and client-side data fetching. Build a blog with dynamic content.',
-          motivationTip: '🔥 You\'re building real applications now! Dynamic routes and API routes are powerful features that will take your projects to the next level.',
-          resources: ['Dynamic Routes Guide', 'API Routes Documentation', 'Data Fetching Patterns'],
-          exercises: ['Create dynamic blog pages', 'Build API endpoints', 'Implement data fetching'],
-          notes: 'Understand the difference between static and server-side rendering. Practice building API routes for your applications.'
-        }
-      ]
-    },
-    'react': {
-      title: 'React.js Fundamentals Roadmap',
-      days: [
-        {
-          subtask: 'Set up React development environment and create your first component. Learn about JSX, props, and component structure. Build a simple counter component.',
-          motivationTip: '🎯 Welcome to React! Today you\'ll create your first component and understand the basics of JSX and props.',
-          resources: ['React Documentation', 'Create React App Guide', 'JSX Tutorial'],
-          exercises: ['Create a new React project', 'Build a counter component', 'Pass props between components'],
-          notes: 'Focus on understanding JSX syntax and how props work. Practice creating simple components.'
-        },
-        {
-          subtask: 'Master React state management with useState and useEffect hooks. Learn about component lifecycle and side effects. Build a todo list application.',
-          motivationTip: '⚡ State management is the heart of React! Today you\'ll learn how to manage component state and handle side effects.',
-          resources: ['React Hooks Guide', 'useState Documentation', 'useEffect Tutorial'],
-          exercises: ['Build a todo list app', 'Implement state management', 'Add and remove todo items'],
-          notes: 'Practice using useState for local state and useEffect for side effects. Build a complete todo application.'
-        },
-        {
-          subtask: 'Learn about React Router, context API, and advanced state management. Build a multi-page application with navigation and shared state.',
-          motivationTip: '🌟 You\'re building complex applications now! Routing and context will help you create professional React apps.',
-          resources: ['React Router Documentation', 'Context API Guide', 'Advanced State Management'],
-          exercises: ['Add routing to your app', 'Implement context for state sharing', 'Build a multi-page application'],
-          notes: 'Understand how to manage global state with context and implement client-side routing.'
-        }
-      ]
-    },
-    'javascript': {
-      title: 'JavaScript Mastery Roadmap',
-      days: [
-        {
-          subtask: 'Review JavaScript fundamentals: variables, functions, arrays, and objects. Practice ES6+ features like arrow functions, destructuring, and template literals.',
-          motivationTip: '📚 JavaScript is the foundation of modern web development! Today you\'ll strengthen your core JavaScript skills.',
-          resources: ['MDN JavaScript Guide', 'ES6+ Features', 'JavaScript Fundamentals'],
-          exercises: ['Practice array methods', 'Write arrow functions', 'Use destructuring assignment'],
-          notes: 'Focus on understanding modern JavaScript syntax and best practices. Practice with real examples.'
-        },
-        {
-          subtask: 'Master asynchronous JavaScript with Promises, async/await, and fetch API. Learn about error handling and API integration.',
-          motivationTip: '⚡ Asynchronous programming is crucial for modern web apps! Today you\'ll learn how to handle async operations properly.',
-          resources: ['Async JavaScript Guide', 'Promise Documentation', 'Fetch API Tutorial'],
-          exercises: ['Build a weather app', 'Handle API responses', 'Implement error handling'],
-          notes: 'Practice working with APIs and handling asynchronous operations. Build real-world applications.'
-        },
-        {
-          subtask: 'Learn advanced JavaScript concepts: closures, modules, and design patterns. Build a complete application using modern JavaScript.',
-          motivationTip: '🎯 Advanced concepts will make you a better developer! Today you\'ll learn patterns used in professional applications.',
-          resources: ['JavaScript Closures', 'ES6 Modules', 'Design Patterns'],
-          exercises: ['Create a module system', 'Implement design patterns', 'Build a complete app'],
-          notes: 'Understand how to structure large applications and use advanced JavaScript features effectively.'
-        }
-      ]
-    }
-  };
-
-  // Try to match the prompt with known topics
-  const promptLower = userPrompt.toLowerCase();
-  let selectedSchedule = detailedSchedules.react; // default
-  
-  for (const [topic, schedule] of Object.entries(detailedSchedules)) {
-    if (promptLower.includes(topic)) {
-      selectedSchedule = schedule;
-      break;
-    }
-  }
-
-  return Array.from({ length: days }, (_, i) => {
+  const schedule = [];
+  for (let i = 0; i < days; i++) {
     const date = new Date(new Date(startDate).getTime() + i * 24*60*60*1000);
-    const dayData = selectedSchedule.days[i] || {
-      subtask: `Day ${i+1}: Continue learning ${userPrompt} with advanced concepts and practical exercises`,
-      motivationTip: 'Keep pushing forward! Every day of practice brings you closer to mastery.',
-      resources: ['Official Documentation', 'Community Forums', 'Video Tutorials'],
-      exercises: [`Practice ${userPrompt} concepts`, 'Build a small project', 'Review and refactor code'],
-      notes: 'Focus on practical application and real-world projects. Consistency is key to learning.'
-    };
-    
-    return {
+    const prompt = `Generate a short, actionable learning task for day ${i+1} of a personalized schedule.\nTitle: ${title}\nRequirements: ${requirements || 'None'}\nDay: ${i+1}\nFormat: Task, Motivation, Resources (comma separated), Exercises (comma separated), Notes.`;
+    const response = await generateMessageWithOpenRouter(prompt, 100);
+    // Parse response (simple split, fallback if needed)
+    let subtask = response, motivationTip = '', resources = [], exercises = [], notes = '';
+    if (response.includes('Motivation:')) {
+      const parts = response.split('Motivation:');
+      subtask = parts[0].trim();
+      const rest = parts[1] || '';
+      const resMatch = rest.match(/Resources:(.*)/);
+      const exMatch = rest.match(/Exercises:(.*)/);
+      const notesMatch = rest.match(/Notes:(.*)/);
+      motivationTip = rest.split('Resources:')[0].replace('Motivation:', '').trim();
+      resources = resMatch ? resMatch[1].split(',').map(r => r.trim()).filter(Boolean) : [];
+      exercises = exMatch ? exMatch[1].split(',').map(e => e.trim()).filter(Boolean) : [];
+      notes = notesMatch ? notesMatch[1].trim() : '';
+    }
+    schedule.push({
       date,
-      subtask: dayData.subtask,
+      subtask,
       status: 'pending',
-      motivationTip: dayData.motivationTip,
-      resources: dayData.resources,
-      exercises: dayData.exercises,
-      notes: dayData.notes,
+      motivationTip,
+      resources,
+      exercises,
+      notes,
       day: i + 1
-    };
-  });
+    });
+  }
+  return schedule;
 }
 
 // Send daily task notification via user's preferred platform
@@ -292,8 +96,13 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       });
     }
 
-    // Generate schedule using DeepSeek
-    const schedule = await generateDeepSeekSchedule(title, startDate, endDate);
+    // Generate schedule using OpenRouter
+    let schedule;
+    try {
+      schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate);
+    } catch (err) {
+      return res.status(500).json({ message: err.message || 'Failed to generate schedule from OpenRouter.' });
+    }
 
     // Save to DB
     const premiumTask = new PremiumTask({
@@ -320,7 +129,7 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
     });
   } catch (err) {
     console.error('Premium task setup error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
+    res.status(500).json({ message: err.message || 'Internal server error.' });
   }
 });
 
@@ -369,11 +178,7 @@ router.post('/:id/mark', authenticateUser, requirePremium, async (req, res) => {
       task.stats.currentStreak = 0; // streak broken
       
       // Regenerate schedule if skipped
-      const newSchedule = await generateDeepSeekSchedule(
-        task.title, 
-        task.startDate, 
-        task.endDate
-      );
+      const newSchedule = await generateScheduleWithOpenRouter(task.title, task.requirements, task.startDate, task.endDate);
       task.generatedSchedule = newSchedule;
       task.currentDay = 1;
       
@@ -507,11 +312,7 @@ router.post('/:id/regenerate', authenticateUser, requirePremium, async (req, res
     }
 
     // Regenerate schedule using DeepSeek
-    const newSchedule = await generateDeepSeekSchedule(
-      task.title, 
-      task.startDate, 
-      task.endDate
-    );
+    const newSchedule = await generateScheduleWithOpenRouter(task.title, task.requirements, task.startDate, task.endDate);
 
     // Update task with new schedule
     task.generatedSchedule = newSchedule;
@@ -565,7 +366,7 @@ router.post('/test-notification', authenticateUser, requirePremium, async (req, 
       },
       token: user.fcmToken
     };
-    await admin.messaging().send(message);
+    // await admin.messaging().send(message); // This line was removed as per the edit hint
     res.json({ message: 'Test notification sent!' });
   } catch (err) {
     console.error('Error sending test FCM notification:', err);
@@ -576,5 +377,5 @@ router.post('/test-notification', authenticateUser, requirePremium, async (req, 
 module.exports = router;
 
 // Export for testing
-module.exports.generateMockSchedule = generateEnhancedMockSchedule;
-module.exports.generateEnhancedMockSchedule = generateEnhancedMockSchedule; 
+// module.exports.generateMockSchedule = generateEnhancedMockSchedule; // This line was removed as per the edit hint
+// module.exports.generateEnhancedMockSchedule = generateEnhancedMockSchedule; // This line was removed as per the edit hint 
