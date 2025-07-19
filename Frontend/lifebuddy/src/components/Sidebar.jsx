@@ -20,13 +20,15 @@ import {
   UserIcon,
   WrenchScrewdriverIcon,
   StarIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Events', href: '/events', icon: CalendarIcon },
   { name: 'Daily Tools', href: '/daily-tools', icon: WrenchScrewdriverIcon },
+  { name: 'Productivity System', href: '/productivity', icon: SparklesIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },

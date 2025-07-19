@@ -1,189 +1,184 @@
-import { Link } from 'react-router-dom';
-import { 
-  CalendarIcon, 
-  CheckCircleIcon, 
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  CalendarIcon,
+  CheckCircleIcon,
   ChartBarIcon,
   UserGroupIcon,
   SparklesIcon,
-  ArrowRightIcon
+  CpuChipIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 
+const aiFeatures = [
+  {
+    name: 'AI-Powered Scheduling',
+    description: 'Let our AI create smart daily plans tailored to your goals and habits.',
+    icon: CpuChipIcon,
+  },
+  {
+    name: 'Smart Reminders',
+    description: 'Never miss a beat with intelligent, personalized notifications.',
+    icon: SparklesIcon,
+  },
+  {
+    name: 'Personal Analytics',
+    description: 'Visualize your progress and get actionable insights with beautiful analytics.',
+    icon: ChartBarIcon,
+  },
+  {
+    name: 'Motivational Boosts',
+    description: 'Stay inspired with AI-generated messages and streak rewards.',
+    icon: CheckCircleIcon,
+  },
+];
+
+const showcase = [
+  {
+    name: 'Profile Analysis',
+    description: 'Get deep insights into your habits, achievements, and growth areas.',
+    icon: UserGroupIcon,
+    link: '/profile',
+  },
+  {
+    name: 'Event Planning',
+    description: 'Plan life events with structured checklists, timelines, and smart suggestions.',
+    icon: CalendarIcon,
+    link: '/events',
+  },
+  {
+    name: 'Productivity Dashboard',
+    description: 'Track your tasks, streaks, and progress in one beautiful dashboard.',
+    icon: ChartBarIcon,
+    link: '/dashboard',
+  },
+];
+
+const eventTypes = [
+  { name: 'Moving', description: 'Plan your move with checklists, budget tracking, and timeline management.' },
+  { name: 'Job Change', description: 'Navigate career transitions with structured planning and resource guides.' },
+  { name: 'College', description: 'Prepare for academic life with comprehensive planning tools and checklists.' },
+  { name: 'Wedding', description: 'Organize your special day with detailed planning and vendor management.' },
+  { name: 'Trip Planning', description: 'Plan your adventures with itinerary management and travel checklists.' },
+  { name: 'Car Purchase', description: 'Make informed decisions with research tools and comparison features.' },
+];
+
 const Home = () => {
-  const features = [
-    {
-      name: 'Life Event Planning',
-      description: 'Organize major life transitions like moving, job changes, and college with structured checklists and timelines.',
-      icon: CalendarIcon,
-    },
-    {
-      name: 'Daily Tools',
-      description: 'Access powerful productivity tools including to-do lists, notes, mood tracking, and weekly planners.',
-      icon: CheckCircleIcon,
-    },
-    {
-      name: 'Progress Tracking',
-      description: 'Visualize your progress with charts and analytics to stay motivated and on track.',
-      icon: ChartBarIcon,
-    },
-    {
-      name: 'Smart Reminders',
-      description: 'Never miss important deadlines with intelligent notifications and customizable reminders.',
-      icon: SparklesIcon,
-    },
-  ];
-
-  const eventTypes = [
-    { name: 'Moving', description: 'Plan your move with checklists, budget tracking, and timeline management.' },
-    { name: 'Job Change', description: 'Navigate career transitions with structured planning and resource guides.' },
-    { name: 'College', description: 'Prepare for academic life with comprehensive planning tools and checklists.' },
-    { name: 'Wedding', description: 'Organize your special day with detailed planning and vendor management.' },
-    { name: 'Trip Planning', description: 'Plan your adventures with itinerary management and travel checklists.' },
-    { name: 'Car Purchase', description: 'Make informed decisions with research tools and comparison features.' },
-  ];
-
+  const navigate = useNavigate();
   return (
-    <div className="bg-white">
-      {/* Header */}
-      <header className="absolute inset-x-0 top-0 z-50">
-        <nav className="flex items-center justify-between p-6 lg:px-8" aria-label="Global">
-          <div className="flex lg:flex-1">
-            <Link to="/" className="-m-1.5 p-1.5">
-              <span className="text-2xl font-bold text-primary-600">LifeBuddy</span>
-            </Link>
-          </div>
-          <div className="flex gap-x-12">
-            <Link to="/login" className="text-sm font-semibold leading-6 text-gray-900 hover:text-primary-600">
-              Sign in
-            </Link>
-            <Link to="/signup" className="text-sm font-semibold leading-6 text-gray-900 hover:text-primary-600">
-              Sign up
-            </Link>
-          </div>
-        </nav>
+    <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen">
+      {/* Hero Section */}
+      <header className="relative z-10 flex flex-col items-center justify-center pt-24 pb-16 text-center">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute left-1/2 top-0 w-[60vw] h-[60vw] -translate-x-1/2 bg-gradient-to-br from-purple-400 via-pink-300 to-yellow-200 opacity-30 blur-3xl animate-pulse" />
+        </div>
+        <span className="inline-block bg-gradient-to-r from-purple-500 to-pink-400 rounded-full p-6 mb-6 animate-bounce shadow-lg">
+          <span className="text-4xl font-extrabold text-white tracking-widest select-none" style={{fontFamily: 'monospace'}}>LB</span>
+        </span>
+        <h1 className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500 drop-shadow-lg mb-4">
+          LifeBuddy: Your AI Life Organizer
+        </h1>
+        <p className="text-xl sm:text-2xl text-gray-700 max-w-2xl mx-auto mb-8 font-medium">
+          Supercharge your life with AI-powered planning, analytics, and motivation. Organize events, track progress, and unlock your best self.
+        </p>
+        <div className="flex flex-wrap justify-center gap-4 mb-6">
+          <Link to="/signup" className="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-bold text-xl shadow-xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
+            Get Started Free
+          </Link>
+          <Link to="/login" className="px-8 py-4 rounded-2xl bg-white/80 text-purple-700 font-bold text-xl shadow hover:bg-white/90 border border-purple-200">
+            Sign In
+          </Link>
+        </div>
       </header>
 
-      {/* Hero section */}
-      <div className="relative isolate pt-14">
-        <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
-          <div
-            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-primary-600 to-purple-600 opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-            style={{
-              clipPath:
-                'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
-            }}
-          />
-        </div>
-
-        <div className="py-24 sm:py-32 lg:pb-40">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-                Your Life,{' '}
-                <span className="text-primary-600">Organized</span>
-              </h1>
-              <p className="mt-6 text-lg leading-8 text-gray-600">
-                Navigate life's biggest moments with confidence. LifeBuddy helps you plan, track, and manage everything from daily tasks to major life transitions.
-              </p>
-              <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Link to="/login" className="text-base font-semibold leading-6 text-gray-900 hover:text-primary-600">
-                  Sign in <span aria-hidden="true">→</span>
-                </Link>
-              </div>
+      {/* AI Features Section */}
+      <section className="max-w-5xl mx-auto px-4 py-12">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500">AI Features</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          {aiFeatures.map((feature) => (
+            <div key={feature.name} className="glassmorphism-card p-6 rounded-3xl shadow-xl flex flex-col items-center text-center hover:scale-105 transition-transform bg-white/60 backdrop-blur-lg border border-purple-100">
+              <feature.icon className="h-10 w-10 mb-3 text-purple-500 animate-pulse" />
+              <h3 className="font-bold text-lg mb-2 text-purple-700">{feature.name}</h3>
+              <p className="text-gray-700 text-base">{feature.description}</p>
             </div>
-          </div>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* Features section */}
-      <div className="mx-auto mt-32 max-w-7xl px-6 sm:mt-40 lg:px-8">
-        <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="text-base font-semibold leading-7 text-primary-600">Everything you need</h2>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Powerful tools for life's biggest moments
-          </p>
-          <p className="mt-6 text-lg leading-8 text-gray-600">
-            Whether you're planning a move, starting a new job, or just want to stay organized, LifeBuddy has the tools you need to succeed.
-          </p>
-        </div>
-        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-          <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-2">
-            {features.map((feature) => (
-              <div key={feature.name} className="flex flex-col">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
-                  <feature.icon className="h-5 w-5 flex-none text-primary-600" aria-hidden="true" />
-                  {feature.name}
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                  <p className="flex-auto">{feature.description}</p>
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-
-      {/* Event types section */}
-      <div className="mx-auto mt-32 max-w-7xl px-6 sm:mt-40 lg:px-8">
-        <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="text-base font-semibold leading-7 text-primary-600">Life Events</h2>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Ready for any life transition
-          </p>
-          <p className="mt-6 text-lg leading-8 text-gray-600">
-            From moving to a new city to starting college, we've got you covered with specialized planning tools for every major life event.
-          </p>
-        </div>
-        <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {eventTypes.map((event) => (
-              <div key={event.name} className="card p-6 hover:shadow-medium transition-shadow">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{event.name}</h3>
-                <p className="text-gray-600">{event.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* CTA section */}
-      <div className="mx-auto mt-32 max-w-7xl px-6 sm:mt-40 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Ready to get organized?
-          </h2>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-gray-600">
-            Join thousands of people who are already using LifeBuddy to manage their life events and daily tasks.
-          </p>
-          <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Link
-              to="/signup"
-              className="btn-primary text-base px-8 py-3"
+      {/* Showcase Section */}
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-purple-600 to-pink-500">Explore LifeBuddy</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {showcase.map((item) => (
+            <button
+              key={item.name}
+              className="group glassmorphism-card p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center bg-white/70 backdrop-blur-xl border border-blue-100 cursor-pointer hover:scale-105 transition-transform focus:outline-none"
+              onClick={() => navigate('/login')}
+              type="button"
             >
-              Start your free account
-            </Link>
-            <Link to="/login" className="text-base font-semibold leading-6 text-gray-900 hover:text-primary-600">
-              Sign in <span aria-hidden="true">→</span>
-            </Link>
-          </div>
+              <item.icon className="h-12 w-12 mb-4 text-blue-500 group-hover:animate-bounce" />
+              <h3 className="font-extrabold text-xl mb-2 text-blue-700">{item.name}</h3>
+              <p className="text-gray-700 text-base mb-4">{item.description}</p>
+              <span className="inline-flex items-center gap-1 text-blue-600 font-semibold group-hover:underline">
+                Learn More <ArrowRightIcon className="h-4 w-4" />
+              </span>
+            </button>
+          ))}
         </div>
-      </div>
+      </section>
+
+      {/* Event Types Section */}
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-transparent bg-clip-text bg-gradient-to-r from-pink-700 via-yellow-600 to-purple-500">Plan Any Life Event</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          {eventTypes.map((event) => (
+            <div key={event.name} className="glassmorphism-card p-6 rounded-2xl shadow-lg bg-white/60 backdrop-blur-md border border-pink-100">
+              <h3 className="font-bold text-lg mb-2 text-pink-700">{event.name}</h3>
+              <p className="text-gray-700 text-base">{event.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500">Ready to unlock your future?</h2>
+        <p className="text-lg text-gray-700 mb-8">Join thousands using LifeBuddy to organize, analyze, and achieve more with AI-powered tools.</p>
+        <Link to="/signup" className="px-12 py-5 rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-extrabold text-2xl shadow-2xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
+          Start Your Free Account
+        </Link>
+      </section>
 
       {/* Footer */}
-      <footer className="mx-auto mt-32 max-w-7xl px-6 py-12 sm:mt-40 lg:px-8">
-        <div className="border-t border-gray-200 pt-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-xl font-bold text-primary-600">LifeBuddy</span>
-              <span className="ml-4 text-sm text-gray-500">Your life, organized</span>
-            </div>
-            <div className="flex space-x-6 text-sm text-gray-500">
-              <a href="#" className="hover:text-primary-600">Privacy</a>
-              <a href="#" className="hover:text-primary-600">Terms</a>
-              <a href="#" className="hover:text-primary-600">Support</a>
-            </div>
+      <footer className="max-w-7xl mx-auto px-6 py-12">
+        <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-purple-600">LifeBuddy</span>
+            <span className="ml-2 text-sm text-gray-500">Your AI-powered life, organized</span>
+          </div>
+          <div className="flex space-x-6 text-sm text-gray-500">
+            <a href="#" className="hover:text-purple-600">Privacy</a>
+            <a href="#" className="hover:text-purple-600">Terms</a>
+            <a href="#" className="hover:text-purple-600">Support</a>
           </div>
         </div>
       </footer>
+
+      {/* Glassmorphism utility (optional, for custom style) */}
+      <style>{`
+        .glassmorphism-card {
+          background: rgba(255,255,255,0.7);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
+          backdrop-filter: blur(12px);
+          border-radius: 1.5rem;
+          border: 1px solid rgba(255,255,255,0.18);
+        }
+        .animate-spin-slow {
+          animation: spin 4s linear infinite;
+        }
+        .animate-bounce-once {
+          animation: bounce 1s 1;
+        }
+      `}</style>
     </div>
   );
 };

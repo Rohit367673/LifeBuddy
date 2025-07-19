@@ -37,6 +37,8 @@ const Profile = () => {
   const [achievementStats, setAchievementStats] = useState({});
   const [productivityData, setProductivityData] = useState([]);
   const [loginHistory, setLoginHistory] = useState([]);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [isSettingUsername, setIsSettingUsername] = useState(false);
@@ -157,6 +159,7 @@ const Profile = () => {
         setProfileData(data);
         setPersonalQuote(data.personalQuote || '');
         setProfileVisibility(data.profileVisibility || 'public');
+        setPhoneNumber(data.phoneNumber || '');
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Profile response error:', errorData);
@@ -263,16 +266,25 @@ const Profile = () => {
   };
 
   const updateProfileSettings = async () => {
+    // Validate phone number
+    if (phoneNumber && !/^\+[1-9]\d{1,14}$/.test(phoneNumber.replace(/\s+/g, ''))) {
+      setPhoneError('Please enter a valid phone number with country code (e.g., +1 5551234567)');
+      return;
+    } else {
+      setPhoneError('');
+    }
     try {
+      const token = await getFirebaseToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getFirebaseToken()}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           personalQuote,
-          profileVisibility
+          profileVisibility,
+          phoneNumber: phoneNumber.trim()
         })
       });
 
@@ -831,6 +843,22 @@ const Profile = () => {
             </select>
           </div>
           
+          {/* Phone Number Input */}
+          <div className="mb-4">
+            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Contact Number (with country code)</label>
+            <input
+              type="tel"
+              id="phoneNumber"
+              name="phoneNumber"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              placeholder="+1 5551234567"
+              value={phoneNumber}
+              onChange={e => setPhoneNumber(e.target.value)}
+              autoComplete="tel"
+            />
+            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
+          </div>
+
           <button
             onClick={updateProfileSettings}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"

@@ -163,7 +163,7 @@ class TelegramService {
 class EmailService {
   constructor() {
     // Configure email transporter (you'll need to set up your email service)
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: process.env.EMAIL_PORT || 587,
       secure: false,

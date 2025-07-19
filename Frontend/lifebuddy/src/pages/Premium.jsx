@@ -13,6 +13,8 @@ import {
   ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useRef } from 'react';
+import UsernameModal from '../components/UsernameModal';
 
 const Premium = () => {
   const { subscription, features, usage, startTrial, subscribe, getPlans } = usePremium();
@@ -20,6 +22,9 @@ const Premium = () => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('yearly');
+  const pricingRef = useRef(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
     const loadPlans = async () => {
@@ -28,6 +33,13 @@ const Premium = () => {
     };
     loadPlans();
   }, [getPlans]);
+
+  useEffect(() => {
+    // Scroll to pricing if hash or ref present
+    if (window.location.hash === '#pricing' && pricingRef.current) {
+      pricingRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
 
   const handleStartTrial = async () => {
     setLoading(true);
@@ -96,6 +108,17 @@ const Premium = () => {
       answer: "No, your data stays safe. You'll just have limited access to features."
     }
   ];
+
+  const selectedPlanObj = plans.find(p => p.id === selectedPlan);
+
+  const handleUpgradeClick = (e) => {
+    e.stopPropagation();
+    setShowConfirmModal(true);
+  };
+  const handleConfirmUpgrade = async () => {
+    setShowConfirmModal(false);
+    await handleSubscribe(selectedPlan);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -297,17 +320,25 @@ const Premium = () => {
       </div>
 
       {/* Pricing Plans */}
-      <div id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div id="pricing" ref={pricingRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">Choose Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan) => {
             const isCurrent = subscription?.plan === plan.id || (plan.id === 'free' && (!subscription || subscription.plan === 'free'));
+            const isSelected = selectedPlan === plan.id;
             return (
               <div
                 key={plan.id}
-                className={`relative bg-white rounded-2xl shadow-lg p-8 ${
-                  plan.id === 'yearly' ? 'ring-2 ring-purple-500 scale-105' : ''
-                } ${isCurrent ? 'border-4 border-green-400' : ''}`}
+                tabIndex={0}
+                onClick={() => setSelectedPlan(plan.id)}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setSelectedPlan(plan.id)}
+                className={`relative bg-white rounded-2xl shadow-lg p-8 cursor-pointer transition-all duration-300 outline-none
+                  ${plan.id === 'yearly' ? 'ring-4 ring-purple-500 scale-105 z-10' : ''}
+                  ${isSelected ? 'border-4 border-blue-500 shadow-2xl scale-105' : ''}
+                  ${isCurrent ? 'border-4 border-green-400' : ''}
+                  hover:scale-105 hover:shadow-2xl focus:ring-4 focus:ring-blue-400`
+                }
+                aria-pressed={isSelected}
               >
                 {plan.id === 'yearly' && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -350,28 +381,62 @@ const Premium = () => {
                 <div className="text-center">
                   {isCurrent ? (
                     <div className="text-green-600 font-bold">Current Plan</div>
-                  ) : plan.id === 'monthly' ? (
+                  ) : (
                     <button
-                      onClick={() => handleSubscribe('monthly')}
-                      disabled={loading}
-                      className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
+                      onClick={handleUpgradeClick}
+                      disabled={loading || plan.id !== selectedPlan}
+                      className={`w-full py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50
+                        ${plan.id === 'monthly' ? 'bg-blue-500 hover:bg-blue-600 text-white' : ''}
+                        ${plan.id === 'yearly' ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
+                        ${plan.id === 'free' ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
                     >
-                      {loading ? 'Processing...' : 'Choose Monthly'}
+                      {loading && plan.id === selectedPlan ? 'Processing...' : plan.id === 'monthly' ? 'Choose Monthly' : plan.id === 'yearly' ? 'Choose Yearly' : 'Free'}
                     </button>
-                  ) : plan.id === 'yearly' ? (
-                    <button
-                      onClick={() => handleSubscribe('yearly')}
-                      disabled={loading}
-                      className="w-full bg-purple-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
-                    >
-                      {loading ? 'Processing...' : 'Choose Yearly'}
-                    </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
+        {/* Confirmation Modal */}
+        {showConfirmModal && selectedPlanObj && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border border-purple-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Confirm Your Upgrade</h3>
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">{selectedPlanObj.name}</div>
+                <div className="text-3xl font-bold text-purple-600 mb-2">${selectedPlanObj.price}<span className="text-lg text-gray-500">/month</span></div>
+                {selectedPlanObj.savings && <div className="text-green-600 font-medium mb-2">{selectedPlanObj.savings}</div>}
+                <ul className="mb-4 list-disc list-inside text-gray-700 dark:text-gray-200">
+                  {selectedPlanObj.features.map((feature, i) => <li key={i}>{feature}</li>)}
+                </ul>
+                <div className="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to upgrade to <span className="font-bold">{selectedPlanObj.name}</span>? You’ll be charged <span className="font-bold">${selectedPlanObj.price}/month</span>.</div>
+                <div className="flex gap-4 mt-6">
+                  <button
+                    onClick={handleConfirmUpgrade}
+                    className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold rounded-xl shadow hover:from-purple-600 hover:to-blue-600 transition-all text-lg"
+                  >
+                    Confirm & Upgrade
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmModal(false)}
+                    className="flex-1 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl shadow hover:bg-gray-300 transition-all text-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* FAQ Section */}

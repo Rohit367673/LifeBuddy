@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { TaskSchedulerForm } from '../components/figma/TaskSchedulerForm';
 import { CalendarIcon, PencilIcon, SparklesIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { useNavigate } from 'react-router-dom';
+import { Sidebar } from '../components/figma/Sidebar';
+import { motion } from 'framer-motion';
 
 export default function PremiumCalendar() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [step, setStep] = useState('setup');
   const [form, setForm] = useState({
     title: '',
@@ -11,12 +16,53 @@ export default function PremiumCalendar() {
     requirements: '',
     startDate: '',
     endDate: '',
-    consentGiven: false
+    consentGiven: false,
+    phoneNumber: ''
   });
+  const [phoneError, setPhoneError] = useState('');
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(false);
   const [todayTask, setTodayTask] = useState(null);
   const [message, setMessage] = useState('');
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = user && user.email === 'rohit367673@gmail.com';
+
+  // Helper to reset all state for a new schedule
+  const resetSchedule = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/current`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setMessage(data.message || 'Failed to end current schedule.');
+        setLoading(false);
+        return;
+      }
+      setStep('setup');
+      setForm({
+        title: '',
+        description: '',
+        requirements: '',
+        startDate: '',
+        endDate: '',
+        consentGiven: false,
+        phoneNumber: ''
+      });
+      setPhoneError('');
+      setSchedule(null);
+      setTodayTask(null);
+      setMessage('');
+    } catch (err) {
+      setMessage('Failed to end current schedule.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle form input
   const handleChange = e => {
@@ -29,6 +75,14 @@ export default function PremiumCalendar() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    // Validate phone number
+    if (!/^\+[1-9]\d{1,14}$/.test(form.phoneNumber.replace(/\s+/g, ''))) {
+      setPhoneError('Please enter a valid phone number with country code (e.g., +1 5551234567)');
+      setLoading(false);
+      return;
+    } else {
+      setPhoneError('');
+    }
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/setup`, {
         method: 'POST',
@@ -103,99 +157,97 @@ export default function PremiumCalendar() {
   const streakPercent = todayTask && todayTask.bestStreak ? Math.round((todayTask.streak / todayTask.bestStreak) * 100) : 0;
 
   return (
-    <div className="max-w-2xl mx-auto p-4 bg-gradient-to-br from-blue-50/60 to-purple-100/60 min-h-[70vh] rounded-3xl shadow-2xl backdrop-blur-xl border border-blue-100">
-      <h1 className="text-4xl font-extrabold mb-8 text-center text-gradient bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent tracking-tight flex items-center justify-center gap-2 animate-fade-in">
-        <SparklesIcon className="h-8 w-8 text-purple-400 animate-pulse" />
-        Premium AI Task Scheduler
-      </h1>
-      {message && <div className="mb-4 text-red-600 text-center font-semibold animate-fade-in-fast">{message}</div>}
-      {step === 'setup' && (
-        <form onSubmit={handleSetup} className="space-y-8 bg-white/60 p-8 rounded-3xl shadow-2xl border border-blue-100 glassmorphism animate-fade-in">
-          <h2 className="text-2xl font-bold text-blue-700 mb-4 flex items-center gap-2">
-            <CalendarIcon className="h-6 w-6 text-blue-400" /> Set Up Your Premium Task
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="relative">
-              <input name="title" value={form.title} onChange={handleChange} required className="peer w-full border-b-2 border-blue-300 bg-transparent px-2 pt-6 pb-2 text-lg focus:outline-none focus:border-blue-600 transition-all" />
-              <label className="absolute left-2 top-2 text-blue-500 text-sm font-semibold pointer-events-none transition-all peer-focus:-translate-y-2 peer-focus:scale-90 peer-focus:text-blue-700 peer-placeholder-shown:translate-y-4 peer-placeholder-shown:scale-100">Task Title</label>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden">
+      {/* Top Bar */}
+      <motion.div 
+        className="relative w-full bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg"
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
+      >
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <motion.div 
+            className="flex items-center justify-center gap-3"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <motion.div
+              className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+            >
+              <SparklesIcon className="w-6 h-6 text-white" />
+            </motion.div>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Premium AI Task Scheduler
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">Powered by LifeBuddy Intelligence</p>
             </div>
-            <div className="relative">
-              <input type="date" name="startDate" value={form.startDate} onChange={handleChange} required className="peer w-full border-b-2 border-blue-300 bg-transparent px-2 pt-6 pb-2 text-lg focus:outline-none focus:border-blue-600 transition-all" />
-              <label className="absolute left-2 top-2 text-blue-500 text-sm font-semibold pointer-events-none transition-all peer-focus:-translate-y-2 peer-focus:scale-90 peer-focus:text-blue-700 peer-placeholder-shown:translate-y-4 peer-placeholder-shown:scale-100">Start Date</label>
-            </div>
-            <div className="md:col-span-2 relative">
-              <textarea name="description" value={form.description} onChange={handleChange} className="peer w-full border-b-2 border-blue-300 bg-transparent px-2 pt-6 pb-2 text-lg focus:outline-none focus:border-blue-600 transition-all min-h-[60px]" />
-              <label className="absolute left-2 top-2 text-blue-500 text-sm font-semibold pointer-events-none transition-all peer-focus:-translate-y-2 peer-focus:scale-90 peer-focus:text-blue-700 peer-placeholder-shown:translate-y-4 peer-placeholder-shown:scale-100">Description</label>
-            </div>
-            <div className="relative">
-              <input type="date" name="endDate" value={form.endDate} onChange={handleChange} required className="peer w-full border-b-2 border-blue-300 bg-transparent px-2 pt-6 pb-2 text-lg focus:outline-none focus:border-blue-600 transition-all" />
-              <label className="absolute left-2 top-2 text-blue-500 text-sm font-semibold pointer-events-none transition-all peer-focus:-translate-y-2 peer-focus:scale-90 peer-focus:text-blue-700 peer-placeholder-shown:translate-y-4 peer-placeholder-shown:scale-100">End Date</label>
-            </div>
-            <div className="relative">
-              <textarea name="requirements" value={form.requirements} onChange={handleChange} className="peer w-full border-b-2 border-blue-300 bg-transparent px-2 pt-6 pb-2 text-lg focus:outline-none focus:border-blue-600 transition-all min-h-[60px]" />
-              <label className="absolute left-2 top-2 text-blue-500 text-sm font-semibold pointer-events-none transition-all peer-focus:-translate-y-2 peer-focus:scale-90 peer-focus:text-blue-700 peer-placeholder-shown:translate-y-4 peer-placeholder-shown:scale-100">Requirements/Questions</label>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <input type="checkbox" name="consentGiven" checked={form.consentGiven} onChange={handleChange} required className="accent-blue-600 h-5 w-5" />
-            <span className="text-sm text-blue-700">I agree to receive AI-generated daily task notifications and productivity support.</span>
-          </div>
-          <button type="submit" className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all text-xl tracking-wide flex items-center justify-center gap-2 animate-bounce-once" disabled={loading}>
-            <SparklesIcon className="h-6 w-6 text-white animate-spin-slow" />
-            {loading ? 'Generating...' : 'Generate with AI'}
-          </button>
-        </form>
-      )}
-      {step === 'preview' && schedule && (
-        <div className="bg-white/90 p-6 rounded-2xl shadow-lg border border-purple-100 mt-6">
-          <h2 className="text-xl font-bold text-purple-700 mb-4">Your AI-Generated Schedule</h2>
-          <ul className="mb-6 divide-y divide-gray-100">
-            {schedule.map((s, i) => (
-              <li key={i} className="py-3">
-                <span className="font-semibold text-blue-700">{new Date(s.date).toLocaleDateString()}:</span> {s.subtask}
-                <br /><span className="text-sm text-gray-600">Tip: {s.motivationTip}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-4">
-            <button className="flex-1 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-xl shadow hover:from-green-600 hover:to-blue-600 transition-all" onClick={fetchTodayTask}>Start Daily Flow</button>
-            <button className="flex-1 py-3 bg-gray-300 text-gray-700 font-bold rounded-xl shadow hover:bg-gray-400 transition-all" onClick={() => setStep('setup')}>Back</button>
-          </div>
+            <motion.div
+              className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg"
+              whileHover={{ scale: 1.1, rotate: -5 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+            >
+              <PencilIcon className="w-6 h-6 text-white" />
+            </motion.div>
+          </motion.div>
         </div>
-      )}
-      {step === 'today' && todayTask && (
-        <div className="bg-white/90 p-6 rounded-2xl shadow-lg border border-blue-100 mt-6">
-          <h2 className="text-xl font-bold text-blue-700 mb-4">Today's Focus Task</h2>
-          <div className="mb-4">
-            <span className="font-semibold text-lg text-purple-700">{todayTask.subtask}</span>
-            <br /><span className="text-sm text-gray-600">Tip: {todayTask.motivationTip}</span>
-          </div>
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm text-gray-600">Streak</span>
-              <span className="text-sm text-gray-600">Best: <span className="font-bold text-purple-700">{todayTask.bestStreak}</span></span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full" style={{ width: `${streakPercent}%` }}></div>
-            </div>
-            <div className="text-xs text-gray-500">Current: <span className="font-bold text-blue-700">{todayTask.streak}</span> days</div>
-          </div>
-          <div className="mb-4 flex gap-4">
-            <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-bold text-green-700">{todayTask.completed}</div>
-              <div className="text-xs text-gray-600">Completed</div>
-            </div>
-            <div className="flex-1 bg-red-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-bold text-red-700">{todayTask.skipped}</div>
-              <div className="text-xs text-gray-600">Skipped</div>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <button className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-green-500 text-white font-bold rounded-xl shadow hover:from-blue-700 hover:to-green-600 transition-all" onClick={() => markTodayTask('completed')} disabled={loading}>Mark Complete</button>
-            <button className="flex-1 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold rounded-xl shadow hover:from-red-600 hover:to-pink-600 transition-all" onClick={() => markTodayTask('skipped')} disabled={loading}>Skip</button>
-          </div>
+      </motion.div>
+
+      {/* Main Layout */}
+      <motion.div 
+        className="max-w-7xl mx-auto p-6"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.3 }}
+      >
+        <div className="grid grid-cols-12 gap-8 min-h-[calc(100vh-140px)]">
+          {/* Sidebar - 30% width */}
+          <motion.div 
+            className="col-span-4"
+            initial={{ x: -100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+          >
+            <Sidebar />
+          </motion.div>
+
+          {/* Main Form Area - 70% width */}
+          <motion.div 
+            className="col-span-8"
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+          >
+            {/* Exit Confirmation Modal */}
+            {showExitConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+                  <h2 className="text-xl font-bold mb-4 text-red-600">End Schedule?</h2>
+                  <p className="mb-6 text-gray-700">Are you sure you want to exit? This will end your schedule.</p>
+                  <div className="flex justify-center gap-4">
+                    <button
+                      className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                      onClick={() => setShowExitConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="px-6 py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold hover:from-red-600 hover:to-pink-600"
+                      onClick={async () => { setShowExitConfirm(false); await resetSchedule(); }}
+                    >
+                      Yes, Exit
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <TaskSchedulerForm />
+          </motion.div>
         </div>
-      )}
+      </motion.div>
     </div>
   );
 } 

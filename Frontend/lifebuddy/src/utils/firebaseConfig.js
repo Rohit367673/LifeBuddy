@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
+import { getMessaging } from 'firebase/messaging';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -46,11 +47,13 @@ try {
 let auth;
 let db;
 let storage;
+let messaging;
 
 try {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+  messaging = getMessaging(app);
 } catch (error) {
   console.error('Firebase services initialization error:', error);
   throw error;
@@ -66,5 +69,5 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
   }
 }
 
-export { auth, db, storage, analytics };
+export { auth, db, storage, analytics, messaging };
 export default app; 
