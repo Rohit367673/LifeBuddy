@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
 import UsageLimitBanner from '../components/UsageLimitBanner';
-import PremiumCalendar from './PremiumCalendar';
 import { 
   PlusIcon, 
   CheckCircleIcon, 
@@ -296,243 +295,220 @@ const DailyTools = () => {
 
   return (
     <div className="space-y-6 mt-8">
-      {/* Usage Limit Banner */}
-      <UsageLimitBanner 
-        limitType="dailyTasks"
-        current={checkUsageLimit('dailyTasks').current}
-        limit={checkUsageLimit('dailyTasks').limit}
-      />
-      
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Daily Tools</h1>
-          <p className="text-gray-600">{getGreeting()}, {user?.displayName || 'there'}!</p>
-        </div>
-        
-        {/* Today's Mood Quick View */}
-        <div className="flex items-center space-x-4">
-          {currentMood ? (
-            <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
-              <span className="text-2xl">{currentMood.mood.emoji}</span>
-              <span className="text-sm text-green-700">Mood logged</span>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowMoodModal(true)}
-              className="flex items-center space-x-2 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
-            >
-              <FaceSmileIcon className="h-5 w-5 text-blue-600" />
-              <span className="text-sm text-blue-700">Log Mood</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {[
-            { id: 'todo', name: 'To-Do List', icon: CheckCircleIcon },
-            { id: 'mood', name: 'Mood Tracker', icon: FaceSmileIcon },
-            { id: 'calendar', name: 'Calendar', icon: CalendarIcon }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <tab.icon className="h-5 w-5" />
-              <span>{tab.name}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
-      <div className="mt-6">
-        {/* To-Do List Tab */}
-        {activeTab === 'todo' && (
-          <div className="space-y-6">
-            {/* Add Task Button */}
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+      {/* Main Content */}
+      <main className="min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Daily Tools</h1>
+            <p className="text-gray-600">{getGreeting()}, {user?.displayName || 'there'}!</p>
+          </div>
+          {/* Today's Mood Quick View */}
+          <div className="flex items-center space-x-4">
+            {currentMood ? (
+              <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
+                <span className="text-2xl">{currentMood.mood.emoji}</span>
+                <span className="text-sm text-green-700">Mood logged</span>
+              </div>
+            ) : (
               <button
-                onClick={() => setShowTaskModal(true)}
-                className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                onClick={() => setShowMoodModal(true)}
+                className="flex items-center space-x-2 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
               >
-                <PlusIcon className="h-5 w-5" />
-                <span>Add Task</span>
+                <FaceSmileIcon className="h-5 w-5 text-blue-600" />
+                <span className="text-sm text-blue-700">Log Mood</span>
               </button>
-            </div>
+            )}
+          </div>
+        </div>
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'todo', name: 'To-Do List', icon: CheckCircleIcon },
+              { id: 'mood', name: 'Mood Tracker', icon: FaceSmileIcon }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-5 w-5" />
+                <span>{tab.name}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+        {/* Tab Content */}
+        <div className="mt-6">
+          {/* To-Do List Tab */}
+          {activeTab === 'todo' && (
+            <div className="space-y-6">
+              {/* Add Task Button */}
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+                <button
+                  onClick={() => setShowTaskModal(true)}
+                  className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  <span>Add Task</span>
+                </button>
+              </div>
 
-            {/* Tasks List */}
-            <div className="space-y-4">
-              {loading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                </div>
-              ) : pendingTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <CheckCircleIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No pending tasks</h3>
-                  <p className="text-gray-600">Add a task to get started!</p>
-                </div>
-              ) : (
-                pendingTasks.map((task) => (
-                  <div
-                    key={task._id}
-                    className="flex items-center space-x-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-                  >
-                    <button
-                      onClick={() => toggleTaskComplete(task._id, task.status)}
-                      className={`flex-shrink-0 ${
-                        task.status === 'completed' ? 'text-green-600' : 'text-gray-400 hover:text-green-600'
-                      }`}
-                    >
-                      <CheckCircleIcon className="h-6 w-6" />
-                    </button>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`text-sm font-medium ${
-                        task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-900'
-                      }`}>
-                        {task.title}
-                      </h3>
-                      {task.description && (
-                        <p className="text-sm text-gray-500 mt-1">{task.description}</p>
-                      )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        {task.dueDate && (
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <ClockIcon className="h-4 w-4" />
-                            <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        <span className={`badge ${priorityColors[task.priority]}`}>
-                          {task.priority}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => deleteTask(task._id)}
-                      className="flex-shrink-0 text-gray-400 hover:text-red-600 transition-colors"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+              {/* Tasks List */}
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* Completed Tasks */}
-            {completedTasks.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Completed Tasks</h3>
-                <div className="space-y-2">
-                  {completedTasks.map((task) => (
+                ) : pendingTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircleIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No pending tasks</h3>
+                    <p className="text-gray-600">Add a task to get started!</p>
+                  </div>
+                ) : (
+                  pendingTasks.map((task) => (
                     <div
                       key={task._id}
-                      className="flex items-center space-x-4 p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                      className="flex items-center space-x-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
                     >
-                      <CheckCircleIcon className="h-5 w-5 text-green-600 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-500 line-through">{task.title}</h4>
-                        <p className="text-xs text-gray-400">
-                          Completed {task.completedAt ? new Date(task.completedAt).toLocaleDateString() : 'recently'}
-                        </p>
+                      <button
+                        onClick={() => toggleTaskComplete(task._id, task.status)}
+                        className={`flex-shrink-0 ${
+                          task.status === 'completed' ? 'text-green-600' : 'text-gray-400 hover:text-green-600'
+                        }`}
+                      >
+                        <CheckCircleIcon className="h-6 w-6" />
+                      </button>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-medium ${
+                          task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-900'
+                        }`}>
+                          {task.title}
+                        </h3>
+                        {task.description && (
+                          <p className="text-sm text-gray-500 mt-1">{task.description}</p>
+                        )}
+                        <div className="flex items-center space-x-2 mt-2">
+                          {task.dueDate && (
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              <ClockIcon className="h-4 w-4" />
+                              <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          <span className={`badge ${priorityColors[task.priority]}`}>
+                            {task.priority}
+                          </span>
+                        </div>
                       </div>
+                      
+                      <button
+                        onClick={() => deleteTask(task._id)}
+                        className="flex-shrink-0 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Completed Tasks */}
+              {completedTasks.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Completed Tasks</h3>
+                  <div className="space-y-2">
+                    {completedTasks.map((task) => (
+                      <div
+                        key={task._id}
+                        className="flex items-center space-x-4 p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                      >
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-gray-500 line-through">{task.title}</h4>
+                          <p className="text-xs text-gray-400">
+                            Completed {task.completedAt ? new Date(task.completedAt).toLocaleDateString() : 'recently'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mood Tracker Tab */}
+          {activeTab === 'mood' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-900">Mood Tracker</h2>
+                {!currentMood && (
+                  <button
+                    onClick={() => setShowMoodModal(true)}
+                    className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    <span>Log Today's Mood</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Today's Mood */}
+              {currentMood && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Today's Mood</h3>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-4xl">{currentMood.mood.emoji}</span>
+                    <div>
+                      <p className="text-lg font-medium text-gray-900 capitalize">{currentMood.mood.label}</p>
+                      <p className="text-sm text-gray-600">Rating: {currentMood.mood.rating}/10</p>
+                      {currentMood.notes && (
+                        <p className="text-sm text-gray-600 mt-1">"{currentMood.notes}"</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowMoodModal(true)}
+                      className="ml-auto text-primary-600 hover:text-primary-700"
+                    >
+                      <PencilIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Mood Entries */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Moods</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {moodEntries.slice(0, 6).map((entry) => (
+                    <div key={entry._id} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{entry.mood.emoji}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(entry.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 capitalize">{entry.mood.label}</p>
+                      <p className="text-xs text-gray-600">Rating: {entry.mood.rating}/10</p>
+                      {entry.notes && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">"{entry.notes}"</p>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Mood Tracker Tab */}
-        {activeTab === 'mood' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Mood Tracker</h2>
-              {!currentMood && (
-                <button
-                  onClick={() => setShowMoodModal(true)}
-                  className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  <span>Log Today's Mood</span>
-                </button>
-              )}
             </div>
-
-            {/* Today's Mood */}
-            {currentMood && (
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Today's Mood</h3>
-                <div className="flex items-center space-x-4">
-                  <span className="text-4xl">{currentMood.mood.emoji}</span>
-                  <div>
-                    <p className="text-lg font-medium text-gray-900 capitalize">{currentMood.mood.label}</p>
-                    <p className="text-sm text-gray-600">Rating: {currentMood.mood.rating}/10</p>
-                    {currentMood.notes && (
-                      <p className="text-sm text-gray-600 mt-1">"{currentMood.notes}"</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowMoodModal(true)}
-                    className="ml-auto text-primary-600 hover:text-primary-700"
-                  >
-                    <PencilIcon className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Recent Mood Entries */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Moods</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {moodEntries.slice(0, 6).map((entry) => (
-                  <div key={entry._id} className="bg-white border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-2xl">{entry.mood.emoji}</span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(entry.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 capitalize">{entry.mood.label}</p>
-                    <p className="text-xs text-gray-600">Rating: {entry.mood.rating}/10</p>
-                    {entry.notes && (
-                      <p className="text-xs text-gray-500 mt-1 truncate">"{entry.notes}"</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Calendar Tab */}
-        {activeTab === 'calendar' && (
-          user?.subscription?.plan === 'premium' ? (
-            <PremiumCalendar />
-          ) : (
-            <div className="p-8 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl text-center shadow-xl mt-8">
-              <h2 className="text-2xl font-extrabold text-yellow-700 mb-2 tracking-tight">Premium Feature</h2>
-              <p className="mb-6 text-yellow-800 text-lg">Unlock the AI Task Scheduler, daily motivation, and advanced analytics with LifeBuddy Premium.</p>
-              <a href="/upgrade" className="inline-block px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-bold rounded-xl shadow hover:from-yellow-500 hover:to-yellow-700 transition-all text-lg">
-                Upgrade to Premium
-              </a>
-            </div>
-          )
-        )}
-      </div>
+          )}
+        </div>
+      </main>
 
       {/* Task Modal */}
       {showTaskModal && (

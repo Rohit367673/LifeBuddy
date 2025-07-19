@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { PremiumProvider } from './context/PremiumContext';
@@ -17,6 +17,8 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import PublicProfile from './pages/PublicProfile';
+import Productivity from './pages/Productivity';
+import MySchedule from './pages/MySchedule';
 
 function App() {
   return (
@@ -31,11 +33,13 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/premium" element={<Premium />} />
-                <Route path="/store" element={<MainLayout><Store /></MainLayout>} />
                 <Route path="/profile/:identifier" element={<PublicProfile />} />
-                
-                {/* Protected routes */}
+
+                {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
+                  <Route path="/store" element={<Store />} />
+                  <Route path="/productivity" element={<Productivity />} />
+                  <Route path="/my-schedule" element={<MySchedule />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/events" element={<Events />} />
                   <Route path="/events/new" element={<EventForm />} />

@@ -438,7 +438,7 @@ const Settings = () => {
               </p>
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Version</h4>
-                <p>1.0.0</p>
+                <p>3.0.0</p>
               </div>
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Contact</h4>

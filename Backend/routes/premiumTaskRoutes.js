@@ -5,46 +5,10 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
-const { generateMessageWithOpenRouter } = require('../services/openRouterService');
+const { generateScheduleWithOpenRouter } = require('../services/openRouterService');
 
 // Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
 const requirePremium = checkPremiumFeature('premiumMotivationalMessages');
-
-// Helper to generate a multi-day schedule using OpenRouter
-async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate) {
-  const days = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1;
-  const schedule = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date(new Date(startDate).getTime() + i * 24*60*60*1000);
-    const prompt = `Generate a short, actionable learning task for day ${i+1} of a personalized schedule.\nTitle: ${title}\nRequirements: ${requirements || 'None'}\nDay: ${i+1}\nFormat: Task, Motivation, Resources (comma separated), Exercises (comma separated), Notes.`;
-    const response = await generateMessageWithOpenRouter(prompt, 100);
-    // Parse response (simple split, fallback if needed)
-    let subtask = response, motivationTip = '', resources = [], exercises = [], notes = '';
-    if (response.includes('Motivation:')) {
-      const parts = response.split('Motivation:');
-      subtask = parts[0].trim();
-      const rest = parts[1] || '';
-      const resMatch = rest.match(/Resources:(.*)/);
-      const exMatch = rest.match(/Exercises:(.*)/);
-      const notesMatch = rest.match(/Notes:(.*)/);
-      motivationTip = rest.split('Resources:')[0].replace('Motivation:', '').trim();
-      resources = resMatch ? resMatch[1].split(',').map(r => r.trim()).filter(Boolean) : [];
-      exercises = exMatch ? exMatch[1].split(',').map(e => e.trim()).filter(Boolean) : [];
-      notes = notesMatch ? notesMatch[1].trim() : '';
-    }
-    schedule.push({
-      date,
-      subtask,
-      status: 'pending',
-      motivationTip,
-      resources,
-      exercises,
-      notes,
-      day: i + 1
-    });
-  }
-  return schedule;
-}
 
 // Send daily task notification via user's preferred platform
 async function sendDailyTaskNotification(userId, task, dayNumber) {

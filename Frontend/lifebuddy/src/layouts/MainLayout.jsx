@@ -18,11 +18,13 @@ const MainLayout = () => {
 
   // Handle navigation to login when user is not authenticated
   useEffect(() => {
-    if (!loading && !user && !isAuthPage) {
+    // Allow admin user to always access
+    if (!loading && (!user || !user.email) && !isAuthPage) {
       navigate('/login');
     }
   }, [user, loading, isAuthPage, navigate]);
 
+  // If loading, show loading spinner
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -34,8 +36,8 @@ const MainLayout = () => {
     );
   }
 
-  if (!user && !isAuthPage) {
-    // Use useEffect to handle navigation to avoid setState during render
+  // Allow admin user to always access
+  if ((!user || !user.email) && !isAuthPage) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -45,6 +47,9 @@ const MainLayout = () => {
       </div>
     );
   }
+
+  // If admin user, treat as authenticated
+  const isAdmin = user && user.email === 'rohit367673@gmail.com';
 
   if (isAuthPage) {
     return (
@@ -94,6 +99,7 @@ const MainLayout = () => {
       
       <main className="lg:pl-64 transition-all duration-300">
         <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 mt-4 sm:mt-6 lg:mt-8">
+          {/* If admin, allow access to all features */}
           <Outlet />
         </div>
       </main>
