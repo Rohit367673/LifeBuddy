@@ -4,7 +4,11 @@ const subtaskSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   subtask: { type: String, required: true },
   status: { type: String, enum: ['pending', 'completed', 'skipped'], default: 'pending' },
-  motivationTip: { type: String }
+  motivationTip: { type: String },
+  resources: [{ type: String }], // Learning resources and links
+  exercises: [{ type: String }], // Practical exercises and tasks
+  notes: { type: String }, // Additional learning notes
+  day: { type: Number } // Track day number
 });
 
 const premiumTaskSchema = new mongoose.Schema({
@@ -16,6 +20,7 @@ const premiumTaskSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
   generatedSchedule: [subtaskSchema],
   consentGiven: { type: Boolean, default: false },
+  currentDay: { type: Number, default: 1 }, // Track current day in roadmap
   streak: { type: Number, default: 0 },
   stats: {
     completed: { type: Number, default: 0 },

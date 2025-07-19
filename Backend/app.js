@@ -102,4 +102,4 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
     process.exit(1);
   });
 
-module.exports = app; 
+module.exports = app;
