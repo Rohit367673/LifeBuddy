@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const fetch = require('node-fetch');
 
 // Messaging platform types
 const PLATFORMS = {
@@ -104,19 +105,53 @@ class WhatsAppService {
   }
 }
 
-// Telegram Service (Mock implementation)
+// Telegram Service (Real implementation)
 class TelegramService {
-  async send(telegramUsername, messageContent) {
+  async send(telegramUsernameOrChatId, messageContent) {
     try {
-      // Mock Telegram API call
-      console.log(`📱 Telegram message to @${telegramUsername}:`);
-      console.log(`Title: ${messageContent.title}`);
-      console.log(`Body: ${messageContent.body.substring(0, 100)}...`);
-      
-      // In real implementation, you would use Telegram Bot API
-      // const response = await telegramBot.sendMessage(telegramUsername, messageContent);
-      
-      return true; // Mock success
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (!botToken) {
+        console.error('TELEGRAM_BOT_TOKEN not set in env');
+        return false;
+      }
+
+      // Prefer chat ID from user, fallback to env for testing
+      let chatId = telegramUsernameOrChatId;
+      if (!chatId || chatId === '@' || chatId === '') {
+        chatId = process.env.TELEGRAM_CHAT_ID;
+      }
+      if (!chatId) {
+        console.error('No Telegram chat ID provided');
+        return false;
+      }
+
+      // If username, you must resolve to chat ID (not supported here)
+      if (chatId.startsWith('@')) {
+        console.error('Telegram username provided, but chat_id is required. Please provide chat ID.');
+        return false;
+      }
+
+      const text = `*${messageContent.title}*\n${messageContent.body}`;
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'Markdown'
+        })
+      });
+
+      const data = await response.json();
+      if (data.ok) {
+        console.log(`✅ Telegram message sent to ${chatId}`);
+        return true;
+      } else {
+        console.error('Telegram API error:', data);
+        return false;
+      }
     } catch (error) {
       console.error('Telegram send error:', error);
       return false;
