@@ -42,20 +42,47 @@ router.get('/profile', authenticateUser, async (req, res) => {
 // Update user profile
 router.put('/profile', authenticateUser, async (req, res) => {
   try {
-    const { personalQuote, profileVisibility } = req.body;
+    const { personalQuote, profileVisibility, phoneNumber } = req.body;
     
+    const updateFields = { personalQuote, profileVisibility };
+    if (typeof phoneNumber === 'string') updateFields.phoneNumber = phoneNumber;
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      {
-        personalQuote,
-        profileVisibility
-      },
+      updateFields,
       { new: true, runValidators: true }
     ).select('-password');
     
     res.json(updatedUser);
   } catch (error) {
     console.error('Error updating user profile:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Update notification platform
+router.put('/notification-platform', authenticateUser, async (req, res) => {
+  try {
+    const { notificationPlatform } = req.body;
+    
+    if (!['whatsapp', 'telegram', 'email'].includes(notificationPlatform)) {
+      return res.status(400).json({ message: 'Invalid notification platform' });
+    }
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { notificationPlatform },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    res.json({ 
+      message: 'Notification platform updated successfully',
+      notificationPlatform: updatedUser.notificationPlatform 
+    });
+  } catch (error) {
+    console.error('Error updating notification platform:', error);
     if (error.name === 'ValidationError') {
       return res.status(400).json({ message: error.message });
     }

@@ -212,6 +212,12 @@ const userSchema = new mongoose.Schema({
     type: [Date],
     default: []
   },
+  phoneNumber: {
+    type: String,
+    trim: true,
+    maxlength: 20,
+    default: ''
+  },
   // Premium subscription fields
   subscription: {
     plan: {
@@ -326,7 +332,20 @@ const userSchema = new mongoose.Schema({
       }
     }]
   },
-  fcmToken: { type: String },
+  // Messaging platform configuration
+  notificationPlatform: {
+    type: String,
+    enum: ['whatsapp', 'telegram', 'email'],
+    default: 'email'
+  },
+  telegramUsername: {
+    type: String,
+    trim: true,
+    maxlength: 50,
+    default: ''
+  },
+  // Remove FCM token field
+  // fcmToken: { type: String },
 }, {
   timestamps: true
 });
