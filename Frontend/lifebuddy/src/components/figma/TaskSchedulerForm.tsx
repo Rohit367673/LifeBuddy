@@ -60,13 +60,6 @@ export function TaskSchedulerForm() {
 
   const handleSubmit = async () => {
     setFormError(null);
-    // Validation for Telegram: must be numeric chat ID
-    if (formData.notificationPlatform === 'telegram') {
-      if (!formData.contactInfo || !/^[0-9]+$/.test(formData.contactInfo)) {
-        setFormError('Please enter a valid numeric Telegram chat ID.');
-        return;
-      }
-    }
     console.log('Form submitted:', formData);
     
     try {

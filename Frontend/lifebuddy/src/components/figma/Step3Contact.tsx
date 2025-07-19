@@ -187,8 +187,33 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
              selectedPlatform === 'telegram' ? 'Telegram Chat ID' : 'Email Address'}
           </Label>
           {selectedPlatform === 'telegram' && (
-            <div className="text-xs text-indigo-700 mb-2">
-              Enter your numeric Telegram chat ID (not @username). <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">How to find?</a>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                className="btn-primary w-full py-3 text-lg"
+                onClick={async () => {
+                  // Fetch link token from backend
+                  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/telegram/link-token`, {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    const token = data.token;
+                    window.open(`https://t.me/lifebuddy_AI_bot?start=${token}`, '_blank');
+                  } else {
+                    alert('Failed to get Telegram link token.');
+                  }
+                }}
+              >
+                Connect Telegram
+              </button>
+              <div className="text-xs text-indigo-700 mt-2">
+                After clicking, send <b>/start</b> to the bot. Your account will be linked automatically.<br/>
+                <span className="text-gray-500">Waiting for connection...</span>
+              </div>
             </div>
           )}
           <motion.div 
