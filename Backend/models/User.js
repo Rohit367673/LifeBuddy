@@ -338,6 +338,10 @@ const userSchema = new mongoose.Schema({
     enum: ['whatsapp', 'telegram', 'email'],
     default: 'email'
   },
+  telegramChatId: {
+    type: String,
+    default: null
+  },
   telegramUsername: {
     type: String,
     trim: true,

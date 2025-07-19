@@ -166,6 +166,18 @@ Backend/
 | `FRONTEND_URL` | Frontend URL for CORS | http://localhost:5173 |
 | `OPENROUTER_API_KEY` | OpenRouter API key for AI schedule/motivation | required |
 
+## Telegram Connect Flow
+- Users now connect Telegram by clicking a button in the app and sending /start to the bot (@lifebuddy_AI_bot).
+- The bot links their Telegram chat ID to their LifeBuddy account via the backend.
+- No need for users to enter their chat ID manually.
+
+### Bot Setup
+- Set TELEGRAM_BOT_TOKEN and BACKEND_URL in your .env.
+- Run the bot with `node bot/lifebuddy_telegram_bot.js`.
+
+### Backend Endpoint
+- POST /api/users/telegram/link { userId, chatId }
+
 ## Deployment
 
 ### Render (Recommended)

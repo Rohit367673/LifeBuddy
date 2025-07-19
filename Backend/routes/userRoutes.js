@@ -4,6 +4,7 @@ const Event = require('../models/Event');
 const Task = require('../models/Task');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const Achievement = require('../models/Achievement');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
@@ -465,6 +466,35 @@ router.post('/fcm-token', authenticateUser, async (req, res) => {
     console.error('Error updating FCM token:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
+});
+
+// Link Telegram chat ID to user securely using a token
+router.post('/telegram/link', async (req, res) => {
+  const { token, chatId } = req.body;
+  if (!token || !chatId) {
+    return res.status(400).json({ message: 'token and chatId are required' });
+  }
+  try {
+    const secret = process.env.JWT_SECRET || 'telegram-link-secret';
+    const payload = jwt.verify(token, secret);
+    const userId = payload.userId;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.telegramChatId = chatId;
+    await user.save();
+    res.json({ message: 'Telegram linked successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to link Telegram', error: err.message });
+  }
+});
+
+// Generate a secure, time-limited Telegram link token for the logged-in user
+router.get('/telegram/link-token', authenticateUser, async (req, res) => {
+  const userId = req.user._id;
+  const payload = { userId };
+  const secret = process.env.JWT_SECRET || 'telegram-link-secret';
+  const token = jwt.sign(payload, secret, { expiresIn: '10m' });
+  res.json({ token });
 });
 
 module.exports = router; 
