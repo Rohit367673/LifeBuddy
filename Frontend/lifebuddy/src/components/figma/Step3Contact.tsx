@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -19,7 +19,10 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState('email');
-  const canSubmit = formData.contactInfo?.trim() && formData.agreeToTerms;
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const canSubmit = (selectedPlatform === 'telegram' && telegramConnected) || (formData.contactInfo?.trim() && formData.agreeToTerms);
 
   const countryCodes = [
     { code: '+1', country: 'US/CA', flag: '🇺🇸' },
@@ -40,6 +43,47 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
     onSubmit();
     setIsSubmitting(false);
   };
+
+  // Poll for Telegram connection after Connect Telegram is clicked
+  const startTelegramPolling = () => {
+    console.log('Starting Telegram polling...');
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      try {
+        console.log('Polling for Telegram connection...');
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          console.log('Profile data:', data);
+          if (data.telegramChatId) {
+            console.log('Telegram connected! Chat ID:', data.telegramChatId);
+            setTelegramConnected(true);
+            setTelegramChatId(data.telegramChatId);
+            updateFormData({ contactInfo: data.telegramChatId });
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current);
+              pollingRef.current = null;
+            }
+          }
+        } else {
+          console.log('Failed to fetch profile:', res.status);
+        }
+      } catch (error) {
+        console.error('Error polling for Telegram:', error);
+      }
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -203,17 +247,36 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
                     const data = await res.json();
                     const token = data.token;
                     window.open(`https://t.me/lifebuddy_AI_bot?start=${token}`, '_blank');
+                    startTelegramPolling();
                   } else {
                     alert('Failed to get Telegram link token.');
                   }
                 }}
+                disabled={telegramConnected}
               >
-                Connect Telegram
+                {telegramConnected ? 'Telegram Connected!' : 'Connect Telegram'}
               </button>
               <div className="text-xs text-indigo-700 mt-2">
-                After clicking, send <b>/start</b> to the bot. Your account will be linked automatically.<br/>
-                <span className="text-gray-500">Waiting for connection...</span>
+                {telegramConnected ? (
+                  <span className="text-green-600 font-semibold">Connected! Your Telegram chat ID: <b>{telegramChatId}</b></span>
+                ) : (
+                  <>
+                    After clicking, send <b>/start</b> to the bot. Your account will be linked automatically.<br/>
+                    <span className="text-gray-500">Waiting for connection...</span>
+                  </>
+                )}
               </div>
+              {telegramConnected && telegramChatId && (
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-600 mb-1">Your Telegram Chat ID</label>
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+              )}
             </div>
           )}
           <motion.div 

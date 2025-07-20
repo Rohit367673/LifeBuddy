@@ -5,6 +5,7 @@ const Task = require('../models/Task');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const Achievement = require('../models/Achievement');
 const jwt = require('jsonwebtoken');
+const { MessagingService } = require('../services/messagingService');
 
 const router = express.Router();
 
@@ -495,6 +496,160 @@ router.get('/telegram/link-token', authenticateUser, async (req, res) => {
   const secret = process.env.JWT_SECRET || 'telegram-link-secret';
   const token = jwt.sign(payload, secret, { expiresIn: '10m' });
   res.json({ token });
+});
+
+// Test endpoint to manually set telegramChatId (for testing only)
+router.post('/test-set-telegram', authenticateUser, async (req, res) => {
+  try {
+    const { chatId } = req.body;
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.user.firebaseUid },
+      { telegramChatId: chatId },
+      { new: true }
+    );
+    res.json({ success: true, telegramChatId: user.telegramChatId });
+  } catch (error) {
+    console.error('Error setting test telegram chat ID:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Test endpoint to manually test Telegram messaging
+router.post('/test-telegram-message', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const messagingService = new MessagingService();
+    
+    // Create a mock task for testing
+    const mockTask = {
+      _id: 'test-task-id',
+      title: 'Test Java Learning',
+      generatedSchedule: [{
+        day: 1,
+        subtask: 'Day 1 - Learn Java Basics',
+        motivationTip: 'Stay focused and positive! You are making great progress.',
+        resources: ['W3Schools Java Tutorial'],
+        exercises: ['Write your first Hello World program'],
+        notes: 'Start with the fundamentals'
+      }]
+    };
+    
+    const result = await messagingService.sendMessage(user, mockTask, 1);
+    
+    res.json({ 
+      success: result, 
+      message: result ? 'Test message sent successfully' : 'Failed to send test message',
+      userPlatform: user.notificationPlatform,
+      telegramChatId: user.telegramChatId
+    });
+  } catch (error) {
+    console.error('Error testing Telegram message:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Test WhatsApp messaging
+router.post('/test-whatsapp-message', authenticateUser, async (req, res) => {
+  try {
+    const user = req.user;
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Create a test task
+    const testTask = {
+      _id: 'test-task-id',
+      title: 'Learn Python Programming',
+      generatedSchedule: [{
+        day: 1,
+        subtask: 'Introduction to Python basics',
+        resources: ['Python.org documentation', 'W3Schools Python tutorial'],
+        exercises: ['Write Hello World program', 'Practice variables'],
+        notes: 'Focus on understanding syntax and basic concepts',
+        motivationTip: 'Python is the perfect language for beginners!'
+      }]
+    };
+
+    const messagingService = new MessagingService();
+    
+    // Temporarily set user's notification platform to WhatsApp
+    const originalPlatform = user.notificationPlatform;
+    user.notificationPlatform = 'whatsapp';
+    user.phoneNumber = phoneNumber;
+    
+    const result = await messagingService.sendMessage(user, testTask, 1);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'WhatsApp message sent successfully!' : 'Failed to send WhatsApp message',
+      details: result,
+      sandboxCode: process.env.WHATSAPP_SANDBOX_CODE
+    });
+  } catch (error) {
+    console.error('WhatsApp test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test all messaging platforms
+router.post('/test-all-messaging', authenticateUser, async (req, res) => {
+  try {
+    const user = req.user;
+    
+    // Create a test task
+    const testTask = {
+      _id: 'test-task-id',
+      title: 'Learn Python Programming',
+      generatedSchedule: [{
+        day: 1,
+        subtask: 'Introduction to Python basics',
+        resources: ['Python.org documentation', 'W3Schools Python tutorial'],
+        exercises: ['Write Hello World program', 'Practice variables'],
+        notes: 'Focus on understanding syntax',
+        motivationTip: 'Python is the perfect language for beginners!'
+      }]
+    };
+
+    const messagingService = new MessagingService();
+    
+    // Test all platforms
+    const results = {};
+    
+    // Test Telegram
+    if (user.telegramChatId) {
+      const originalPlatform = user.notificationPlatform;
+      user.notificationPlatform = 'telegram';
+      results.telegram = await messagingService.sendMessage(user, testTask, 1);
+      user.notificationPlatform = originalPlatform;
+    }
+    
+    // Test WhatsApp (if phone number provided)
+    if (req.body.phoneNumber) {
+      const originalPlatform = user.notificationPlatform;
+      user.notificationPlatform = 'whatsapp';
+      user.phoneNumber = req.body.phoneNumber;
+      results.whatsapp = await messagingService.sendMessage(user, testTask, 1);
+      user.notificationPlatform = originalPlatform;
+    }
+    
+    // Test Email
+    const originalPlatform = user.notificationPlatform;
+    user.notificationPlatform = 'email';
+    results.email = await messagingService.sendMessage(user, testTask, 1);
+    user.notificationPlatform = originalPlatform;
+    
+    res.json({
+      success: true,
+      message: 'All messaging platforms tested',
+      results,
+      sandboxCode: process.env.WHATSAPP_SANDBOX_CODE
+    });
+  } catch (error) {
+    console.error('Multi-platform test error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router; 
