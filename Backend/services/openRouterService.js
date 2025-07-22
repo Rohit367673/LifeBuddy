@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'openai/gpt-4o-mini'; // Using a better model for more detailed responses
+const MODEL = 'tngtech/deepseek-r1t2-chimera:free'; // Use Mixtral-8x7B for all AI schedule generation
 
 // Debug logging
 console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
@@ -334,61 +334,17 @@ function splitContentIntoMessages(fullContent, topic, dayNumber) {
   const messages = [];
   
   // Message 1: Introduction and Learning Objectives
-  const introMessage = `📚 Day ${dayNumber}: ${topic}
-
-🎯 What You'll Learn Today:
-• Core fundamentals and key concepts
-• Essential syntax and structure
-• Your first program and hands-on practice
-
-💡 Why This Matters:
-${topic} is a powerful programming language used in web development, mobile apps, and enterprise software. Understanding it opens doors to amazing career opportunities!
-
-🚀 Today's Goal:
-By the end of today, you'll write and run your first ${topic} program confidently!`;
+  const introMessage = `<b>📚 Day ${dayNumber}: ${topic}</b>\n\n<b>🎯 What You'll Learn Today:</b>\n• Core fundamentals and key concepts\n• Essential syntax and structure\n• Your first program and hands-on practice\n\n<i>💡 Why This Matters:</i>\n${topic} is a powerful programming language used in web development, mobile apps, and enterprise software. Understanding it opens doors to amazing career opportunities!\n\n<b>🚀 Today's Goal:</b>\nBy the end of today, you'll write and run your first ${topic} program confidently!`;
 
   messages.push(introMessage);
 
   // Message 2: Deep Dive and Examples
-  const deepDiveMessage = `📖 Deep Dive - Understanding ${topic}:
-
-🔍 Key Concepts:
-• Variables and data types
-• Basic syntax and structure
-• Writing your first program
-
-💻 Code Example:
-public class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}
-
-🎯 Practice Exercise:
-Create a simple program that prints your name and age to the console.`;
+  const deepDiveMessage = `<b>📖 Deep Dive - Understanding ${topic}:</b>\n\n<u>🔍 Key Concepts:</u>\n• Variables and data types\n• Basic syntax and structure\n• Writing your first program\n\n<b>💻 Code Example:</b>\n<code>public class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println('Hello, World!');\n    }\n}</code>\n\n<b>🎯 Practice Exercise:</b>\nCreate a simple program that prints your name and age to the console.`;
 
   messages.push(deepDiveMessage);
 
   // Message 3: Resources and Motivation
-  const resourcesMessage = `📚 Essential Resources:
-
-🔗 Official Documentation:
-• Oracle Java Documentation: https://docs.oracle.com/javase/tutorial/
-• W3Schools Java Tutorial: https://www.w3schools.com/java/
-
-🎥 Video Courses:
-• "Java for Beginners" by Programming with Mosh
-• "Complete Java Course" by freeCodeCamp
-
-💪 Practice Platforms:
-• HackerRank Java challenges
-• LeetCode beginner problems
-• CodeWars katas
-
-🎯 Motivation:
-Every expert was once a beginner! You're taking the first step toward becoming a skilled ${topic} developer. Stay patient, practice daily, and celebrate every small victory!
-
-💡 Pro Tip: Start with small programs and gradually build complexity. Focus on understanding the logic before worrying about advanced features.`;
+  const resourcesMessage = `<b>📚 Essential Resources:</b>\n\n<u>🔗 Official Documentation:</u>\n• Oracle Java Documentation: https://docs.oracle.com/javase/tutorial/\n• W3Schools Java Tutorial: https://www.w3schools.com/java/\n\n<u>🎥 Video Courses:</u>\n• "Java for Beginners" by Programming with Mosh\n• "Complete Java Course" by freeCodeCamp\n\n<u>💪 Practice Platforms:</u>\n• HackerRank Java challenges\n• LeetCode beginner problems\n• CodeWars katas\n\n<b>🎯 Motivation:</b>\nEvery expert was once a beginner! You're taking the first step toward becoming a skilled ${topic} developer. Stay patient, practice daily, and celebrate every small victory!\n\n<i>💡 Pro Tip:</i> Start with small programs and gradually build complexity. Focus on understanding the logic before worrying about advanced features.`;
 
   messages.push(resourcesMessage);
 
@@ -500,7 +456,11 @@ Make it comprehensive, educational, and inspiring like ChatGPT or DeepSeek would
       const fallbackContent = generateDetailedFallbackContent(title, i + 1);
       response = fallbackContent.content;
     }
-    
+
+    // Auto-generate a true/false quiz based on the day's topic
+    const quizStatement = `True or False: Today's lesson on ${title} (Day ${i+1}) covered a key concept that is essential for understanding this topic.`;
+    const correctAnswer = 'True'; // Always true for now, can be improved with NLP
+
     // Create the correct structure for PremiumTask validation
     schedule.push({
       date: date,
@@ -520,7 +480,17 @@ Make it comprehensive, educational, and inspiring like ChatGPT or DeepSeek would
         'Build a basic class structure'
       ],
       notes: response,
-      day: i + 1
+      day: i + 1,
+      prerequisiteMet: i === 0, // First day unlocked, others locked by default
+      quiz: {
+        question: quizStatement,
+        options: ['True', 'False'],
+        correctAnswer: correctAnswer,
+        userAnswer: '',
+        isCorrect: null
+      },
+      quizAnswered: false,
+      quizCorrect: false
     });
   }
   return schedule;

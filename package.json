@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "dotenv": "^17.2.0",
     "express-rate-limit": "^6.10.0",
     "firebase-admin": "^13.4.0",
     "html2canvas": "^1.4.1",
