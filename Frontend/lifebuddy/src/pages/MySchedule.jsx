@@ -10,6 +10,7 @@ export default function MySchedule() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [notificationPlatform, setNotificationPlatform] = useState('');
 
   useEffect(() => {
     fetchTodayTask();
@@ -25,6 +26,7 @@ export default function MySchedule() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'No task for today');
       setTodayTask(data);
+      setNotificationPlatform(data.notificationPlatform || '');
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -223,52 +225,54 @@ export default function MySchedule() {
                         <h3 className="text-xl font-semibold text-slate-800 mb-2">
                           {todayTask.subtask}
                         </h3>
-                        <p className="text-slate-600 mb-4">{todayTask.motivationTip}</p>
-                        
-                        {/* Resources Section */}
-                        {todayTask.resources && todayTask.resources.length > 0 && (
-                          <div className="mb-4">
-                            <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                              📚 Learning Resources
-                            </h4>
-                            <div className="space-y-1">
-                              {todayTask.resources.map((resource, index) => (
-                                <div key={index} className="text-sm text-slate-600 bg-white/50 p-2 rounded">
-                                  {resource}
+                        {notificationPlatform === 'telegram' ? (
+                          <div className="text-slate-600 mb-4 font-semibold">Full schedule sent to your Telegram!</div>
+                        ) : (
+                          <>
+                            <p className="text-slate-600 mb-4">{todayTask.motivationTip}</p>
+                            {/* Resources Section */}
+                            {todayTask.resources && todayTask.resources.length > 0 && (
+                              <div className="mb-4">
+                                <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                  📚 Learning Resources
+                                </h4>
+                                <div className="space-y-1">
+                                  {todayTask.resources.map((resource, index) => (
+                                    <div key={index} className="text-sm text-slate-600 bg-white/50 p-2 rounded">
+                                      {resource}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Exercises Section */}
-                        {todayTask.exercises && todayTask.exercises.length > 0 && (
-                          <div className="mb-4">
-                            <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                              💪 Practical Exercises
-                            </h4>
-                            <div className="space-y-1">
-                              {todayTask.exercises.map((exercise, index) => (
-                                <div key={index} className="text-sm text-slate-600 bg-white/50 p-2 rounded">
-                                  {exercise}
+                              </div>
+                            )}
+                            {/* Exercises Section */}
+                            {todayTask.exercises && todayTask.exercises.length > 0 && (
+                              <div className="mb-4">
+                                <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                  💪 Practical Exercises
+                                </h4>
+                                <div className="space-y-1">
+                                  {todayTask.exercises.map((exercise, index) => (
+                                    <div key={index} className="text-sm text-slate-600 bg-white/50 p-2 rounded">
+                                      {exercise}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          </div>
+                              </div>
+                            )}
+                            {/* Notes Section */}
+                            {todayTask.notes && (
+                              <div className="mb-4">
+                                <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                  📝 Learning Notes
+                                </h4>
+                                <div className="text-sm text-slate-600 bg-white/50 p-3 rounded">
+                                  {todayTask.notes}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
-                        
-                        {/* Notes Section */}
-                        {todayTask.notes && (
-                          <div className="mb-4">
-                            <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                              📝 Learning Notes
-                            </h4>
-                            <div className="text-sm text-slate-600 bg-white/50 p-3 rounded">
-                              {todayTask.notes}
-                            </div>
-                          </div>
-                        )}
-                        
                         {/* Action Buttons */}
                         <div className="flex gap-3">
                           <motion.button
@@ -291,38 +295,41 @@ export default function MySchedule() {
                       </div>
                     </div>
                   </motion.div>
-
-                  {/* Progress Stats */}
-                  <motion.div
-                    className="grid grid-cols-3 gap-4 p-6 bg-white/50 rounded-xl"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.0 }}
-                  >
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">{todayTask.streak}</div>
-                      <div className="text-sm text-slate-500">Current Streak</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{todayTask.bestStreak}</div>
-                      <div className="text-sm text-slate-500">Best Streak</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{todayTask.completed}</div>
-                      <div className="text-sm text-slate-500">Completed</div>
-                    </div>
-                  </motion.div>
-
-                  {/* Task Info */}
-                  <motion.div
-                    className="p-4 bg-slate-50 rounded-xl"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.1 }}
-                  >
-                    <h4 className="font-semibold text-slate-700 mb-2">Roadmap: {todayTask.title}</h4>
-                    <p className="text-sm text-slate-600">{todayTask.description}</p>
-                  </motion.div>
+                  {/* Progress Stats & Task Info - Only show if not Telegram */}
+                  {notificationPlatform !== 'telegram' && (
+                    <>
+                      {/* Progress Stats */}
+                      <motion.div
+                        className="grid grid-cols-3 gap-4 p-6 bg-white/50 rounded-xl"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.0 }}
+                      >
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">{todayTask.streak}</div>
+                          <div className="text-sm text-slate-500">Current Streak</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">{todayTask.bestStreak}</div>
+                          <div className="text-sm text-slate-500">Best Streak</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">{todayTask.completed}</div>
+                          <div className="text-sm text-slate-500">Completed</div>
+                        </div>
+                      </motion.div>
+                      {/* Task Info */}
+                      <motion.div
+                        className="p-4 bg-slate-50 rounded-xl"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.1 }}
+                      >
+                        <h4 className="font-semibold text-slate-700 mb-2">Roadmap: {todayTask.title}</h4>
+                        <p className="text-sm text-slate-600">{todayTask.description}</p>
+                      </motion.div>
+                    </>
+                  )}
                 </div>
               )}
             </motion.div>

@@ -47,6 +47,7 @@ const Profile = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [friends, setFriends] = useState([]);
+  const [calendarStatus, setCalendarStatus] = useState([]);
 
   // Badge definitions with images
   const badgeDefinitions = {
@@ -124,6 +125,7 @@ const Profile = () => {
     loadAchievements();
     loadProductivityData();
     loadLoginHistory();
+    loadCalendarStatus();
   }, [user, firebaseUser]);
 
   // Show toast if a new badge is earned after login
@@ -231,6 +233,24 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error loading login history:', error);
+    }
+  };
+
+  const loadCalendarStatus = async () => {
+    try {
+      const token = await getFirebaseToken();
+      if (!token) return;
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/calendar-status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCalendarStatus(data.days || []);
+      }
+    } catch (error) {
+      console.error('Error loading calendar status:', error);
     }
   };
 
@@ -368,6 +388,12 @@ const Profile = () => {
     return weeks;
   }
 
+  // Utility to get last N days from calendarStatus
+  function getLastNDaysCalendarStatus(n = 35) {
+    if (!calendarStatus || calendarStatus.length === 0) return [];
+    return calendarStatus.slice(-n);
+  }
+
   // Username prompt logic
   const handleSetUsername = async (e) => {
     e.preventDefault();
@@ -477,6 +503,8 @@ const Profile = () => {
   const totalTasks = profileData?.totalTasks || 0;
   const completedTasks = profileData?.completedTasks || 0;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const calendarDays = getLastNDaysCalendarStatus(35); // 5 weeks
+  const weeksCalendar = chunkIntoWeeks(calendarDays);
 
   return (
     <div className="space-y-6 mt-8">
@@ -677,17 +705,18 @@ const Profile = () => {
               <div className="overflow-x-auto">
                 <div className="flex gap-1">
                   {/* Week columns */}
-                  {weeks.map((week, wi) => (
+                  {weeksCalendar.map((week, wi) => (
                     <div key={wi} className="flex flex-col gap-1">
                       {week.map((day, di) => (
                         <div
                           key={di}
                           className={`w-4 h-4 rounded-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200
                             ${!day ? 'bg-transparent' :
-                              day.loggedIn ? 'bg-green-500' :
+                              day.status === 'completed' ? 'bg-green-500' :
+                              day.status === 'skipped' ? 'bg-gray-400 dark:bg-gray-600' :
                               'bg-gray-200 dark:bg-gray-800'}
                           `}
-                          title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : ''}` : ''}
+                          title={day ? `${day.date}: ${day.status === 'completed' ? 'Completed' : day.status === 'skipped' ? 'Rescheduled/Skipped' : ''}` : ''}
                           style={{ minWidth: 16, minHeight: 16 }}
                         />
                       ))}

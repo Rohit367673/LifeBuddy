@@ -186,6 +186,9 @@ router.get('/today', authenticateUser, requirePremium, async (req, res) => {
       return res.status(404).json({ message: 'No scheduled subtask for today.' });
     }
 
+    // Fetch user's notification platform
+    const user = await User.findById(req.user._id);
+
     res.json({
       taskId: task._id,
       title: task.title,
@@ -200,7 +203,8 @@ router.get('/today', authenticateUser, requirePremium, async (req, res) => {
       streak: task.stats.currentStreak,
       bestStreak: task.stats.bestStreak,
       completed: task.stats.completed,
-      skipped: task.stats.skipped
+      skipped: task.stats.skipped,
+      notificationPlatform: user ? user.notificationPlatform : 'email'
     });
   } catch (err) {
     console.error("Fetch today's subtask error:", err);
@@ -335,6 +339,42 @@ router.post('/test-notification', authenticateUser, requirePremium, async (req, 
   } catch (err) {
     console.error('Error sending test FCM notification:', err);
     res.status(500).json({ message: 'Failed to send test notification.' });
+  }
+});
+
+// Get last 35 days of premium task completion/skipped status for activity calendar
+router.get('/calendar-status', authenticateUser, requirePremium, async (req, res) => {
+  try {
+    // Find the most recent active premium task for the user
+    const task = await PremiumTask.findOne({
+      user: req.user._id
+    }).sort({ createdAt: -1 });
+
+    const days = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 34; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      let status = 'none';
+      if (task && Array.isArray(task.generatedSchedule)) {
+        const subtask = task.generatedSchedule.find(s => {
+          const sd = new Date(s.date);
+          sd.setHours(0, 0, 0, 0);
+          return sd.getTime() === d.getTime();
+        });
+        if (subtask) {
+          if (subtask.status === 'completed') status = 'completed';
+          else if (subtask.status === 'skipped') status = 'skipped';
+        }
+      }
+      days.push({ date: d.toISOString().split('T')[0], status });
+    }
+    res.json({ days });
+  } catch (err) {
+    console.error('Calendar status error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 

@@ -8,7 +8,18 @@ const subtaskSchema = new mongoose.Schema({
   resources: [{ type: String }], // Learning resources and links
   exercises: [{ type: String }], // Practical exercises and tasks
   notes: { type: String }, // Additional learning notes
-  day: { type: Number } // Track day number
+  day: { type: Number }, // Track day number
+  // Advanced course logic fields:
+  prerequisiteMet: { type: Boolean, default: true }, // Locked if previous not completed
+  quiz: {
+    question: { type: String },
+    options: [{ type: String }], // For true/false: ["True", "False"]
+    correctAnswer: { type: String }, // "True" or "False"
+    userAnswer: { type: String },
+    isCorrect: { type: Boolean }
+  },
+  quizAnswered: { type: Boolean, default: false },
+  quizCorrect: { type: Boolean, default: false }
 });
 
 const premiumTaskSchema = new mongoose.Schema({
