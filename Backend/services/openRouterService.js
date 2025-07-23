@@ -52,30 +52,34 @@ async function generateScheduleWithOpenRouter(title, requirements, startDate, en
   // Calculate number of days (max 31 for a month)
   const days = Math.min(31, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1);
 
-  // Strict prompt
-  let prompt = `You are an expert productivity and learning coach. Generate a ${days}-day advanced, engaging, and highly detailed learning plan for the topic: "${title}". The user requirements are: ${requirements || 'N/A'}.
+  // Improved, ChatGPT-style prompt for coding/learning topics
+  let prompt = `You are an expert coding mentor. For each day, provide:
+- Subtask: 1-2 sentences on the focus.
+- Motivation: 1-2 sentences.
+- Explanation: 2-3 paragraphs with deep, step-by-step reasoning, analogies, and edge cases.
+- Example Code: A real, working code snippet (with comments).
+- Resources: 2-3 high-quality links (official docs, top tutorials, videos).
+- Exercises: 2-3 hands-on challenges.
+- Notes: Pro tips, common mistakes, or best practices.
 
-For each day, provide:
-- A detailed subtask or focus for the day (2-3 sentences, engaging, educational, and actionable)
-- A motivational tip (1-2 sentences, inspiring, unique, and relevant to the day's focus)
-- 2-3 high-quality resources (with links if possible, e.g. articles, videos, books, or tools)
-- 2-3 hands-on exercises or challenges (with examples or instructions)
-- A short note or summary (1-2 sentences, summarizing the day's learning or giving a pro tip)
-
-Format each day as:
-Day N:
+If the response is long, split it into 2-3 modules/messages for delivery.
+Format:
+Day 1:
 Subtask: ...
 Motivation: ...
+Explanation: ...
+Example Code:
+\`\`\`language
+// code here
+\`\`\`
 Resources:
-- ...
 - ...
 Exercises:
 - ...
-- ...
 Notes: ...
-
-Be creative, conversational, and make it feel like a ChatGPT answer. Use clear, friendly language. Do not include any introduction, summary, or extra text before Day 1: or after the last day. Only output the day blocks in the format above. Start with Day 1: and end with Day ${days}:.
-`;
+Day 2:
+...
+Start with Day 1: and end with Day N:. No intro or summary. No markdown except for code blocks.`;
 
   let response;
   let schedule = [];
@@ -148,8 +152,27 @@ Be creative, conversational, and make it feel like a ChatGPT answer. Use clear, 
 
 // Simple implementation to avoid breaking notification flow
 function splitContentIntoMessages(fullContent, topic, dayNumber) {
-  // For now, just return the full content as a single message
-  return [fullContent];
+  // Split by sections if too long for Telegram (max ~4000 chars per message, but use 2000 for safety)
+  const maxLen = 2000;
+  if (fullContent.length <= maxLen) return [fullContent];
+
+  // Try to split by Explanation, Example Code, Resources/Exercises/Notes
+  const explanationMatch = fullContent.match(/(Explanation:([\s\S]*?))(Example Code:|Resources:|Exercises:|Notes:|$)/);
+  const codeMatch = fullContent.match(/(Example Code:([\s\S]*?))(Resources:|Exercises:|Notes:|$)/);
+  const restMatch = fullContent.match(/(Resources:([\s\S]*))/);
+
+  let messages = [];
+  if (explanationMatch) messages.push(explanationMatch[1].trim());
+  if (codeMatch) messages.push(codeMatch[1].trim());
+  if (restMatch) messages.push(restMatch[1].trim());
+
+  // Fallback: if splitting fails, chunk by maxLen
+  if (messages.length === 0) {
+    for (let i = 0; i < fullContent.length; i += maxLen) {
+      messages.push(fullContent.slice(i, i + maxLen));
+    }
+  }
+  return messages;
 }
 
 module.exports = {
