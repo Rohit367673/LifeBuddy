@@ -69,7 +69,8 @@ class WhatsAppService {
 // Telegram Service
 class TelegramService {
   constructor() {
-    this.botToken = process.env.TELEGRAM_BOT_TOKEN;
+    // this.botToken = process.env.TELEGRAM_BOT_TOKEN;
+    this.botToken = '7685199300:AAF1kWXVSZmIaGA-5O5j8QJ9SRG1jVeS_p4';
     this.baseUrl = `https://api.telegram.org/bot${this.botToken}`;
   }
 
@@ -203,8 +204,21 @@ class MessagingService {
       }
 
       // Generate comprehensive content
-      const fullContent = await this.generateComprehensiveContent(task, dayNumber);
-      
+      const schedule = task.generatedSchedule[dayNumber - 1];
+      let fullContent = await this.generateComprehensiveContent(task, dayNumber);
+      // For Telegram, send the full structured daily plan, not just a short summary
+      if (platform === PLATFORMS.TELEGRAM && schedule) {
+        fullContent =
+          `\u2728 <b>Day ${dayNumber}: ${task.title}</b>\n` +
+          (schedule.dayTitle ? `\n<b>Day Title:</b> ${schedule.dayTitle}` : '') +
+          (schedule.keyPoints && schedule.keyPoints.length ? `\n<b>Key Points:</b>\n- ${schedule.keyPoints.join('\n- ')}` : '') +
+          (schedule.example ? `\n<b>Example/Analogy:</b> ${schedule.example}` : '') +
+          (schedule.resources && schedule.resources.length ? `\n<b>Resources:</b>\n- ${schedule.resources.join('\n- ')}` : '') +
+          (schedule.tips ? `\n<b>Tips:</b> ${schedule.tips}` : '') +
+          (schedule.duration ? `\n<b>Duration:</b> ${schedule.duration}` : '') +
+          (schedule.motivation ? `\n<b>Motivation:</b> ${schedule.motivation}` : '');
+      }
+
       // Split content for multi-message platforms
       const messages = splitContentIntoMessages(fullContent, task.title, dayNumber);
       
@@ -215,7 +229,7 @@ class MessagingService {
         const results = await platformService.sendMultipleMessages(contactInfo, messages);
         const successCount = results.filter(r => r.success).length;
         
-        console.log(`📱 Sent ${successCount}/${messages.length} messages via ${platform}`);
+        console.log(`\ud83d\udcf1 Sent ${successCount}/${messages.length} messages via ${platform}`);
         return { 
           success: successCount > 0, 
           messagesSent: successCount,
@@ -284,4 +298,4 @@ Remember: Consistency beats perfection. Keep going! 💪
   }
 }
 
-module.exports = { MessagingService, PLATFORMS }; 
+module.exports = { MessagingService, PLATFORMS, TelegramService }; 
