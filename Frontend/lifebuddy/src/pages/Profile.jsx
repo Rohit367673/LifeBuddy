@@ -37,8 +37,6 @@ const Profile = () => {
   const [achievementStats, setAchievementStats] = useState({});
   const [productivityData, setProductivityData] = useState([]);
   const [loginHistory, setLoginHistory] = useState([]);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneError, setPhoneError] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [isSettingUsername, setIsSettingUsername] = useState(false);
@@ -48,6 +46,7 @@ const Profile = () => {
   const [searchError, setSearchError] = useState('');
   const [friends, setFriends] = useState([]);
   const [calendarStatus, setCalendarStatus] = useState([]);
+  const [friendMessage, setFriendMessage] = useState('');
 
   // Badge definitions with images
   const badgeDefinitions = {
@@ -126,6 +125,11 @@ const Profile = () => {
     loadProductivityData();
     loadLoginHistory();
     loadCalendarStatus();
+
+    // Listen for calendar status update events (from PremiumCalendar)
+    const reloadCalendar = () => loadCalendarStatus();
+    window.addEventListener('calendarStatusUpdated', reloadCalendar);
+    return () => window.removeEventListener('calendarStatusUpdated', reloadCalendar);
   }, [user, firebaseUser]);
 
   // Show toast if a new badge is earned after login
@@ -161,7 +165,6 @@ const Profile = () => {
         setProfileData(data);
         setPersonalQuote(data.personalQuote || '');
         setProfileVisibility(data.profileVisibility || 'public');
-        setPhoneNumber(data.phoneNumber || '');
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Profile response error:', errorData);
@@ -286,13 +289,6 @@ const Profile = () => {
   };
 
   const updateProfileSettings = async () => {
-    // Validate phone number
-    if (phoneNumber && !/^\+[1-9]\d{1,14}$/.test(phoneNumber.replace(/\s+/g, ''))) {
-      setPhoneError('Please enter a valid phone number with country code (e.g., +1 5551234567)');
-      return;
-    } else {
-      setPhoneError('');
-    }
     try {
       const token = await getFirebaseToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
@@ -304,7 +300,6 @@ const Profile = () => {
         body: JSON.stringify({
           personalQuote,
           profileVisibility,
-          phoneNumber: phoneNumber.trim()
         })
       });
 
@@ -495,6 +490,8 @@ const Profile = () => {
     );
   }
 
+  // Defensive: declare 'today' only once before any calendar logic
+  const today = new Date();
   const loginDays = getLastNDaysLoginData(loginHistory, 35); // 5 weeks
   const weeks = chunkIntoWeeks(loginDays);
   const earnedBadges = getEarnedBadges();
@@ -503,8 +500,93 @@ const Profile = () => {
   const totalTasks = profileData?.totalTasks || 0;
   const completedTasks = profileData?.completedTasks || 0;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const calendarDays = getLastNDaysCalendarStatus(35); // 5 weeks
-  const weeksCalendar = chunkIntoWeeks(calendarDays);
+
+  // Defensive: if profileData is not loaded, show a fallback UI
+  if (!profileData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Simple Monthly Activity Calendar
+  const generateMonthlyCalendar = () => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    // Get first day of current month
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    
+    // Build activity map
+    const activityMap = {};
+    if (profileData.completedTaskDatesDetailed) {
+      profileData.completedTaskDatesDetailed.forEach(entry => {
+        const dateStr = new Date(entry.date).toISOString().slice(0, 10);
+        activityMap[dateStr] = entry.completedCount || 1;
+      });
+    }
+    if (profileData.completedTaskDates) {
+      profileData.completedTaskDates.forEach(dateStr => {
+        if (!activityMap[dateStr]) {
+          activityMap[dateStr] = 1;
+        } else {
+          activityMap[dateStr]++;
+        }
+      });
+    }
+    
+    // Generate calendar days
+    const calendarDays = [];
+    const startDay = firstDay.getDay(); // 0 = Sunday
+    
+    // Add empty cells for days before month starts
+    for (let i = 0; i < startDay; i++) {
+      calendarDays.push(null);
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentYear, currentMonth, day);
+      const dateStr = date.toISOString().slice(0, 10);
+      
+      calendarDays.push({
+        date: dateStr,
+        day: day,
+        completedCount: activityMap[dateStr] || 0,
+        isToday: day === currentDate.getDate(),
+        isPast: date <= currentDate
+      });
+    }
+    
+    // Group into weeks
+    const calendarWeeks = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      calendarWeeks.push(calendarDays.slice(i, i + 7));
+    }
+    
+    return { calendarWeeks, activityMap };
+  };
+  
+  const { calendarWeeks, activityMap } = generateMonthlyCalendar();
+  
+  // Calculate monthly stats
+  const totalSubmissions = Object.values(activityMap).reduce((sum, count) => sum + count, 0);
+  const totalActiveDays = Object.values(activityMap).filter(count => count > 0).length;
+  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  
+  // Simple color function for monthly calendar
+  const getMonthlyActivityColor = (day) => {
+    if (!day) return 'bg-gray-50 dark:bg-gray-900';
+    if (day.completedCount === 0) return 'bg-gray-100 dark:bg-gray-800';
+    if (day.completedCount === 1) return 'bg-green-200 dark:bg-green-800';
+    if (day.completedCount === 2) return 'bg-green-400 dark:bg-green-600';
+    if (day.completedCount >= 3) return 'bg-green-600 dark:bg-green-400';
+    return 'bg-gray-100 dark:bg-gray-800';
+  };
 
   return (
     <div className="space-y-6 mt-8">
@@ -701,30 +783,92 @@ const Profile = () => {
               Activity Calendar
             </h3>
             <div className="mt-6">
-              <div className="font-semibold mb-2 text-sm text-gray-700 dark:text-gray-200">Activity Calendar</div>
-              <div className="overflow-x-auto">
-                <div className="flex gap-1">
-                  {/* Week columns */}
-                  {weeksCalendar.map((week, wi) => (
-                    <div key={wi} className="flex flex-col gap-1">
-                      {week.map((day, di) => (
-                        <div
-                          key={di}
-                          className={`w-4 h-4 rounded-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200
-                            ${!day ? 'bg-transparent' :
-                              day.status === 'completed' ? 'bg-green-500' :
-                              day.status === 'skipped' ? 'bg-gray-400 dark:bg-gray-600' :
-                              'bg-gray-200 dark:bg-gray-800'}
-                          `}
-                          title={day ? `${day.date}: ${day.status === 'completed' ? 'Completed' : day.status === 'skipped' ? 'Rescheduled/Skipped' : ''}` : ''}
-                          style={{ minWidth: 16, minHeight: 16 }}
-                        />
-                      ))}
+              <div className="font-semibold mb-4 text-lg text-gray-800 dark:text-gray-100">
+                {currentMonth} Activity
+              </div>
+              
+              {/* Monthly Calendar */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                {/* Day headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-1">
+                      {day}
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between mt-1 text-xs text-gray-400">
-                  <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                
+                {/* Calendar grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarWeeks.map((week, weekIndex) => (
+                    week.map((day, dayIndex) => (
+                      <div
+                        key={`${weekIndex}-${dayIndex}`}
+                                                  className={`
+                            aspect-square rounded-lg border border-gray-200 dark:border-gray-700 
+                            transition-all duration-200 cursor-pointer relative
+                            ${getMonthlyActivityColor(day)}
+                            ${day?.isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
+                            ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                          `}
+                        title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
+                      >
+                        {day && (
+                          <div className="flex flex-col items-center justify-center h-full">
+                            <span className={`text-xs font-medium ${
+                              day.isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 
+                              day.isPast ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
+                            }`}>
+                              {day.day}
+                            </span>
+                            {day.completedCount > 0 && (
+                              <span className="text-xs text-green-600 dark:text-green-400 font-bold">
+                                {day.completedCount}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ))}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-4 mt-4 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                    <span>No activity</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-200 dark:bg-green-800 rounded"></div>
+                    <span>1 task</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-400 dark:bg-green-600 rounded"></div>
+                    <span>2 tasks</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-600 dark:bg-green-400 rounded"></div>
+                    <span>3+ tasks</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Monthly Stats */}
+              <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalSubmissions}</div>
+                  <div className="text-sm text-green-600 dark:text-green-400">Tasks Completed</div>
+                </div>
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalActiveDays}</div>
+                  <div className="text-sm text-blue-600 dark:text-blue-400">Active Days</div>
+                </div>
+                <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {totalActiveDays > 0 ? Math.round((totalActiveDays / new Date().getDate()) * 100) : 0}%
+                  </div>
+                  <div className="text-sm text-purple-600 dark:text-purple-400">Monthly Progress</div>
                 </div>
               </div>
             </div>
@@ -872,22 +1016,6 @@ const Profile = () => {
             </select>
           </div>
           
-          {/* Phone Number Input */}
-          <div className="mb-4">
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Contact Number (with country code)</label>
-            <input
-              type="tel"
-              id="phoneNumber"
-              name="phoneNumber"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              placeholder="+1 5551234567"
-              value={phoneNumber}
-              onChange={e => setPhoneNumber(e.target.value)}
-              autoComplete="tel"
-            />
-            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
-          </div>
-
           <button
             onClick={updateProfileSettings}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
