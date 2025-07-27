@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -17,6 +17,22 @@ const Navbar = ({ onMenuClick }) => {
   const { user, firebaseUser, logout } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const [notifications] = useState([]);
+  const [notificationsOn, setNotificationsOn] = useState(() => {
+    const saved = localStorage.getItem('notificationsOn');
+    return saved === null ? true : saved === 'true';
+  });
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('notificationsOn', notificationsOn);
+  }, [notificationsOn]);
+
+  const handleToggleNotifications = () => {
+    setAnimating(true);
+    setNotificationsOn((prev) => !prev);
+    setTimeout(() => setAnimating(false), 400);
+    // Optionally, sync with backend settings here
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -78,19 +94,24 @@ const Navbar = ({ onMenuClick }) => {
             {/* Notifications */}
             <button
               type="button"
-              className={`relative p-2 rounded-md transition-colors ${
-                isDarkMode 
-                  ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
-                  : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
-              }`}
+              onClick={handleToggleNotifications}
+              className={`relative p-2 rounded-md transition-colors flex items-center gap-2 group ${
+                notificationsOn
+                  ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg' 
+                  : isDarkMode 
+                    ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+                    : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
+              } ${animating ? 'scale-110 ring-2 ring-green-400' : ''}`}
+              style={{ transition: 'all 0.3s cubic-bezier(.4,2,.6,1)' }}
             >
-              <span className="sr-only">View notifications</span>
-              <BellIcon className="h-6 w-6" aria-hidden="true" />
-              {notifications.length > 0 && (
-                <span className={`absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400 ring-2 ${
-                  isDarkMode ? 'ring-gray-800' : 'ring-white'
-                }`} />
-              )}
+              <span className="sr-only">Toggle notifications</span>
+              <BellIcon 
+                className={`h-6 w-6 transition-all duration-300 ${notificationsOn ? 'fill-green-400 text-white' : ''} ${animating ? 'animate-bounce' : ''}`}
+                aria-hidden="true" 
+              />
+              <span className={`text-xs font-semibold transition-colors duration-300 ${notificationsOn ? 'text-white' : isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                {notificationsOn ? 'On' : 'Off'}
+              </span>
             </button>
 
             {/* User menu */}

@@ -200,89 +200,89 @@ const Premium = () => {
       )}
 
       {/* Premium Benefits Showcase */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">Why Upgrade to Premium?</h2>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Why Upgrade to Premium?</h2>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Free Limitations */}
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <LockClosedIcon className="w-6 h-6 text-red-500 mr-3" />
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+              <LockClosedIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 mr-2 sm:mr-3" />
               Free Users Can't
             </h3>
-            <div className="space-y-4">
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Only 2 active events</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Basic to-do list</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>7-day mood view</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>No calendar sync</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Ads on page</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Default badge icons</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>No budget tools</span>
               </div>
-              <div className="flex items-center text-gray-600">
-                <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
+              <div className="flex items-center text-gray-600 text-sm sm:text-base">
+                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Basic support</span>
               </div>
             </div>
           </div>
 
           {/* Premium Benefits */}
-          <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg p-8 text-white">
-            <h3 className="text-2xl font-bold mb-6 flex items-center">
-              <SparklesIcon className="w-6 h-6 mr-3" />
+          <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg p-6 sm:p-8 text-white">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
+              <SparklesIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
               Premium Users Get
             </h3>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Unlimited events</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Unlimited task system</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Full trend graph + analytics</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Full calendar + notifications</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Ad-free experience</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Premium badge glow & animations</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Full event budgeting + charts</span>
               </div>
-              <div className="flex items-center">
-                <CheckIcon className="w-5 h-5 text-green-300 mr-3" />
+              <div className="flex items-center text-sm sm:text-base">
+                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-300 mr-2 sm:mr-3 flex-shrink-0" />
                 <span>Priority 24h support</span>
               </div>
             </div>
@@ -291,21 +291,21 @@ const Premium = () => {
       </div>
 
       {/* Testimonials */}
-      <div className="bg-white py-16">
+      <div className="bg-white py-8 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">Loved by Productivity Enthusiasts</h2>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Loved by Productivity Enthusiasts</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-6 sm:mb-8">
             {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 hover:shadow-lg transition-shadow">
-                <div className="text-2xl mb-4">💬</div>
-                <p className="text-gray-700 mb-4 italic">"{testimonial.quote}"</p>
+              <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-shadow">
+                <div className="text-xl sm:text-2xl mb-3 sm:mb-4">💬</div>
+                <p className="text-gray-700 mb-3 sm:mb-4 italic text-sm sm:text-base">"{testimonial.quote}"</p>
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold text-gray-900">{testimonial.author}</div>
-                    <div className="text-sm text-gray-600">{testimonial.badge}</div>
+                    <div className="font-semibold text-gray-900 text-sm sm:text-base">{testimonial.author}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">{testimonial.badge}</div>
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-xs sm:text-sm text-gray-500">
                     Streak: {testimonial.streak}
                   </div>
                 </div>
@@ -320,25 +320,21 @@ const Premium = () => {
       </div>
 
       {/* Pricing Plans */}
-      <div id="pricing" ref={pricingRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">Choose Your Plan</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div id="pricing" ref={pricingRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Choose Your Plan</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           {plans.map((plan) => {
             const isCurrent = subscription?.plan === plan.id || (plan.id === 'free' && (!subscription || subscription.plan === 'free'));
             const isSelected = selectedPlan === plan.id;
             return (
               <div
                 key={plan.id}
-                tabIndex={0}
-                onClick={() => setSelectedPlan(plan.id)}
-                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setSelectedPlan(plan.id)}
-                className={`relative bg-white rounded-2xl shadow-lg p-8 cursor-pointer transition-all duration-300 outline-none
+                className={`relative bg-white rounded-2xl shadow-lg p-6 sm:p-8 transition-all duration-300 outline-none
                   ${plan.id === 'yearly' ? 'ring-4 ring-purple-500 scale-105 z-10' : ''}
                   ${isSelected ? 'border-4 border-blue-500 shadow-2xl scale-105' : ''}
                   ${isCurrent ? 'border-4 border-green-400' : ''}
                   hover:scale-105 hover:shadow-2xl focus:ring-4 focus:ring-blue-400`
                 }
-                aria-pressed={isSelected}
               >
                 {plan.id === 'yearly' && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -347,48 +343,58 @@ const Premium = () => {
                     </span>
                   </div>
                 )}
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <div className="text-4xl font-bold text-gray-900 mb-1">
+                <div className="text-center mb-6 sm:mb-8">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-900 mb-1">
                     ${plan.price}
-                    {plan.id !== 'free' && <span className="text-lg text-gray-500">/month</span>}
+                    {plan.id !== 'free' && <span className="text-base sm:text-lg text-gray-500">/month</span>}
                   </div>
                   {plan.savings && (
-                    <p className="text-sm text-green-600 font-medium">{plan.savings}</p>
+                    <p className="text-xs sm:text-sm text-green-600 font-medium">{plan.savings}</p>
                   )}
                   {plan.trial && (
-                    <p className="text-sm text-green-600 font-medium">{plan.trial}</p>
+                    <p className="text-xs sm:text-sm text-green-600 font-medium">{plan.trial}</p>
                   )}
                 </div>
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                   {plan.features.map((feature, index) => (
                     <div key={index} className="flex items-center">
-                      <CheckIcon className="w-5 h-5 text-green-500 mr-3" />
-                      <span className="text-gray-700">{feature}</span>
+                      <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 mr-2 sm:mr-3 flex-shrink-0" />
+                      <span className="text-gray-700 text-sm sm:text-base">{feature}</span>
                     </div>
                   ))}
                   {plan.limitations && (
                     <>
                       {plan.limitations.map((limitation, index) => (
                         <div key={index} className="flex items-center">
-                          <XMarkIcon className="w-5 h-5 text-red-500 mr-3" />
-                          <span className="text-gray-500">{limitation}</span>
+                          <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mr-2 sm:mr-3 flex-shrink-0" />
+                          <span className="text-gray-500 text-sm sm:text-base">{limitation}</span>
                         </div>
                       ))}
                     </>
                   )}
                 </div>
-                <div className="text-center">
-                  {isCurrent ? (
-                    <div className="text-green-600 font-bold">Current Plan</div>
-                  ) : (
+                <div className="text-center space-y-3">
+                  {/* Plan selection button for mobile */}
+                  <button
+                    onClick={() => setSelectedPlan(plan.id)}
+                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors text-sm sm:text-base
+                      ${isSelected ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                      ${isCurrent ? 'bg-green-100 text-green-700 border-2 border-green-300' : ''}`}
+                  >
+                    {isCurrent ? 'Current Plan' : isSelected ? 'Selected' : 'Select Plan'}
+                  </button>
+                  
+                  {/* Purchase button - only show when plan is selected */}
+                  {!isCurrent && (
                     <button
                       onClick={handleUpgradeClick}
                       disabled={loading || plan.id !== selectedPlan}
-                      className={`w-full py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50
+                      className={`w-full py-3 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm sm:text-base
                         ${plan.id === 'monthly' ? 'bg-blue-500 hover:bg-blue-600 text-white' : ''}
                         ${plan.id === 'yearly' ? 'bg-purple-500 hover:bg-purple-600 text-white' : ''}
-                        ${plan.id === 'free' ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}`}
+                        ${plan.id === 'free' ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''}
+                        ${plan.id !== selectedPlan ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {loading && plan.id === selectedPlan ? 'Processing...' : plan.id === 'monthly' ? 'Choose Monthly' : plan.id === 'yearly' ? 'Choose Yearly' : 'Free'}
                     </button>
@@ -440,22 +446,22 @@ const Premium = () => {
       </div>
 
       {/* FAQ Section */}
-      <div className="bg-gray-50 py-16">
+      <div className="bg-gray-50 py-8 sm:py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-gray-900 text-center mb-12">Frequently Asked Questions</h2>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Frequently Asked Questions</h2>
           
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {faqs.map((faq, index) => (
-              <div key={index} className="bg-white rounded-lg p-6 shadow-sm">
+              <div key={index} className="bg-white rounded-lg p-4 sm:p-6 shadow-sm">
                 <button
                   onClick={() => setShowFAQ(showFAQ === index ? null : index)}
                   className="flex items-center justify-between w-full text-left"
                 >
-                  <h3 className="text-lg font-semibold text-gray-900">{faq.question}</h3>
-                  <ChevronDownIcon className={`w-5 h-5 text-gray-500 transition-transform ${showFAQ === index ? 'rotate-180' : ''}`} />
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">{faq.question}</h3>
+                  <ChevronDownIcon className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform ${showFAQ === index ? 'rotate-180' : ''}`} />
                 </button>
                 {showFAQ === index && (
-                  <p className="mt-4 text-gray-600">{faq.answer}</p>
+                  <p className="mt-3 sm:mt-4 text-gray-600 text-sm sm:text-base">{faq.answer}</p>
                 )}
               </div>
             ))}

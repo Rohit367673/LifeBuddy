@@ -298,32 +298,22 @@ const DailyTools = () => {
       {/* Main Content */}
       <main className="min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Daily Tools</h1>
-            <p className="text-gray-600">{getGreeting()}, {user?.displayName || 'there'}!</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Daily Tools</h1>
+            <p className="text-sm sm:text-base text-gray-600">{getGreeting()}, {user?.displayName || 'there'}!</p>
           </div>
-          {/* Today's Mood Quick View */}
-          <div className="flex items-center space-x-4">
-            {currentMood ? (
-              <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
-                <span className="text-2xl">{currentMood.mood.emoji}</span>
-                <span className="text-sm text-green-700">Mood logged</span>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowMoodModal(true)}
-                className="flex items-center space-x-2 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
-              >
-                <FaceSmileIcon className="h-5 w-5 text-blue-600" />
-                <span className="text-sm text-blue-700">Log Mood</span>
-              </button>
-            )}
-          </div>
+          {/* Today's Mood Quick View - Only show summary, no button */}
+          {currentMood && (
+            <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
+              <span className="text-xl sm:text-2xl">{currentMood.mood.emoji}</span>
+              <span className="text-xs sm:text-sm text-green-700">Mood logged</span>
+            </div>
+          )}
         </div>
         {/* Tab Navigation */}
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex space-x-4 sm:space-x-8">
             {[
               { id: 'todo', name: 'To-Do List', icon: CheckCircleIcon },
               { id: 'mood', name: 'Mood Tracker', icon: FaceSmileIcon }
@@ -331,31 +321,31 @@ const DailyTools = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`flex items-center space-x-1 sm:space-x-2 py-2 px-1 border-b-2 font-medium text-xs sm:text-sm ${
                   activeTab === tab.id
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <tab.icon className="h-5 w-5" />
+                <tab.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>{tab.name}</span>
               </button>
             ))}
           </nav>
         </div>
         {/* Tab Content */}
-        <div className="mt-6">
+        <div className="mt-8"> {/* Increased margin for better separation */}
           {/* To-Do List Tab */}
           {activeTab === 'todo' && (
-            <div className="space-y-6">
+            <div className="space-y-8"> {/* More space for modern look */}
               {/* Add Task Button */}
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4"> {/* Add margin below */}
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Tasks</h2>
                 <button
                   onClick={() => setShowTaskModal(true)}
-                  className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-3 sm:px-4 py-2 rounded-lg shadow-sm transition-colors text-sm sm:text-base"
                 >
-                  <PlusIcon className="h-5 w-5" />
+                  <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                   <span>Add Task</span>
                 </button>
               </div>
@@ -376,15 +366,15 @@ const DailyTools = () => {
                   pendingTasks.map((task) => (
                     <div
                       key={task._id}
-                      className="flex items-center space-x-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
+                      className="flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
                     >
                       <button
                         onClick={() => toggleTaskComplete(task._id, task.status)}
-                        className={`flex-shrink-0 ${
+                        className={`flex-shrink-0 mt-1 ${
                           task.status === 'completed' ? 'text-green-600' : 'text-gray-400 hover:text-green-600'
                         }`}
                       >
-                        <CheckCircleIcon className="h-6 w-6" />
+                        <CheckCircleIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
                       
                       <div className="flex-1 min-w-0">
@@ -394,16 +384,16 @@ const DailyTools = () => {
                           {task.title}
                         </h3>
                         {task.description && (
-                          <p className="text-sm text-gray-500 mt-1">{task.description}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 mt-1">{task.description}</p>
                         )}
-                        <div className="flex items-center space-x-2 mt-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-2">
                           {task.dueDate && (
                             <div className="flex items-center space-x-1 text-xs text-gray-500">
-                              <ClockIcon className="h-4 w-4" />
+                              <ClockIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                               <span>{new Date(task.dueDate).toLocaleDateString()}</span>
                             </div>
                           )}
-                          <span className={`badge ${priorityColors[task.priority]}`}>
+                          <span className={`badge text-xs ${priorityColors[task.priority]}`}>
                             {task.priority}
                           </span>
                         </div>
@@ -447,13 +437,13 @@ const DailyTools = () => {
 
           {/* Mood Tracker Tab */}
           {activeTab === 'mood' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
+            <div className="space-y-8"> {/* More space for modern look */}
+              <div className="flex justify-between items-center mb-4"> {/* Add margin below */}
                 <h2 className="text-lg font-semibold text-gray-900">Mood Tracker</h2>
                 {!currentMood && (
                   <button
                     onClick={() => setShowMoodModal(true)}
-                    className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors"
+                    className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg shadow-sm transition-colors"
                   >
                     <PlusIcon className="h-5 w-5" />
                     <span>Log Today's Mood</span>

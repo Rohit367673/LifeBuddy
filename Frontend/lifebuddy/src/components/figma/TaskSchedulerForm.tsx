@@ -35,6 +35,7 @@ export function TaskSchedulerForm() {
     agreeToTerms: false
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const updateFormData = (updates: Partial<FormData>) => {
     setFormData(prev => ({ ...prev, ...updates }));
@@ -60,6 +61,7 @@ export function TaskSchedulerForm() {
 
   const handleSubmit = async () => {
     setFormError(null);
+    setLoading(true);
     console.log('Form submitted:', formData);
     
     try {
@@ -93,6 +95,8 @@ export function TaskSchedulerForm() {
     } catch (error) {
       setFormError('Error creating schedule');
       // Handle error (show toast, etc.)
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -204,6 +208,13 @@ export function TaskSchedulerForm() {
           transition={{ duration: 0.8, ease: "easeInOut" }}
         />
         {formError && <div className="text-red-600 text-sm mb-2">{formError}</div>}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500 mb-4"></div>
+            <p className="text-lg text-slate-700 font-semibold">Generating your AI schedule...</p>
+            <p className="text-slate-500 mt-2">This may take up to a minute. Please wait.</p>
+          </div>
+        )}
       </Card>
     </motion.div>
   );
