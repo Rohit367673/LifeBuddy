@@ -10,6 +10,7 @@ import {
   SparklesIcon,
   FaceSmileIcon
 } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
 
 const Dashboard = () => {
   const { user, getFirebaseToken } = useAuth();
@@ -25,8 +26,13 @@ const Dashboard = () => {
     moodStreak: 0,
     totalPoints: 0
   });
+  const [prevStats, setPrevStats] = useState({
+    completedTasks: 0,
+    totalPoints: 0
+  });
   const [recentEvents, setRecentEvents] = useState([]);
   const [upcomingTasks, setUpcomingTasks] = useState([]);
+  const [completingTaskId, setCompletingTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +44,7 @@ const Dashboard = () => {
       setLoading(true);
       await Promise.all([
         loadStats(),
+        loadPrevStats(),
         loadRecentEvents(),
         loadUpcomingTasks(),
         loadMotivationalMessage(),
@@ -130,6 +137,40 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch previous period stats for analytics (e.g., previous week)
+  const loadPrevStats = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/stats?period=prev`, {
+        headers: {
+          'Authorization': `Bearer ${await getFirebaseToken()}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPrevStats({
+          completedTasks: data.completedTasks || 0,
+          totalPoints: data.totalPoints || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading previous stats:', error);
+    }
+  };
+
+  // Calculate percentage change
+  const getPercentChange = (current, prev) => {
+    if (prev === 0 && current === 0) return 0;
+    if (prev === 0) return 100;
+    return Math.round(((current - prev) / Math.max(prev, 1)) * 100);
+  };
+
+  // UI badge for percent change
+  const PercentBadge = ({ percent }) => {
+    if (percent > 0) return <span className="ml-2 text-green-600 bg-green-100 px-2 py-0.5 rounded-full text-xs font-semibold">▲ {percent}%</span>;
+    if (percent < 0) return <span className="ml-2 text-red-600 bg-red-100 px-2 py-0.5 rounded-full text-xs font-semibold">▼ {Math.abs(percent)}%</span>;
+    return <span className="ml-2 text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full text-xs font-semibold">0%</span>;
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return 'Good morning';
@@ -158,6 +199,29 @@ const Dashboard = () => {
     }
   };
 
+  // Mark a task as complete
+  const markTaskComplete = async (taskId) => {
+    setCompletingTaskId(taskId);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getFirebaseToken()}`
+        },
+        body: JSON.stringify({ status: 'completed' })
+      });
+      if (res.ok) {
+        await loadUpcomingTasks();
+        await loadStats();
+      }
+    } catch (err) {
+      // Optionally show error
+    } finally {
+      setCompletingTaskId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -169,92 +233,173 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 mt-8">
       {/* Welcome Section with Motivational Message */}
-              <div className="card">
+      <motion.div
+        className="card glassmorphism-card"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7 }}
+      >
         <div className="card-body">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {getGreeting()}, {user?.displayName || 'there'}! 👋
               </h1>
-              <p className="mt-2 text-gray-600">
+              <p className="mt-2 text-gray-600 text-sm sm:text-base">
                 Let's make today productive. You have {stats.pendingTasks} tasks to complete.
               </p>
             </div>
             {motivationalMessage && (
-              <div className="ml-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                <div className="flex items-start space-x-3">
-                  <SparklesIcon className="h-6 w-6 text-purple-600 flex-shrink-0 mt-1" />
+              <motion.div
+                className="w-full lg:w-auto lg:ml-6 p-3 sm:p-4 bg-gradient-to-r from-purple-200/60 to-blue-200/60 rounded-lg border border-purple-200 shadow-lg glassmorphism-card"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="flex items-start space-x-2 sm:space-x-3">
+                  <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 flex-shrink-0 mt-1 animate-pulse" />
                   <div>
-                    <p className="text-sm font-medium text-purple-900 mb-1">Today's Inspiration</p>
-                    <p className="text-sm text-purple-800 italic">"{motivationalMessage.content}"</p>
+                    <p className="text-xs sm:text-sm font-medium text-purple-900 mb-1">Today's Inspiration</p>
+                    <p className="text-xs sm:text-sm text-purple-800 italic">"{motivationalMessage.content}"</p>
                     {motivationalMessage.author && (
                       <p className="text-xs text-purple-600 mt-1">— {motivationalMessage.author}</p>
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card">
-          <div className="card-body">
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+        {/* Stat Card Example */}
+        <motion.div
+          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
+          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
+        >
+          <div className="card-body p-4 sm:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <CalendarIcon className="h-8 w-8 text-primary-600" />
+                <motion.div
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                </motion.div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Active Events</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.activeEvents}</p>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Active Events</p>
+                <motion.p
+                  className="text-lg sm:text-2xl font-semibold text-gray-900"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {stats.activeEvents}
+                </motion.p>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div
+          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
+          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
+        >
           <div className="card-body">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <CheckCircleIcon className="h-8 w-8 text-success-600" />
+                <motion.div
+                  className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg animate-pulse"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <CheckCircleIcon className="h-8 w-8 text-white" />
+                </motion.div>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Completed Tasks</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.completedTasks}</p>
+                <motion.p
+                  className="text-2xl font-semibold text-gray-900 flex items-center"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {stats.completedTasks}
+                  <PercentBadge percent={getPercentChange(stats.completedTasks, prevStats.completedTasks)} />
+                </motion.p>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div
+          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
+          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
+        >
           <div className="card-body">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FaceSmileIcon className="h-8 w-8 text-warning-600" />
+                <motion.div
+                  className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-pink-500 flex items-center justify-center shadow-lg"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <FaceSmileIcon className="h-8 w-8 text-white" />
+                </motion.div>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Mood Streak</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.moodStreak} days</p>
+                <motion.p
+                  className="text-2xl font-semibold text-gray-900"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {stats.moodStreak} days
+                </motion.p>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div
+          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
+          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
+        >
           <div className="card-body">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <TrophyIcon className="h-8 w-8 text-danger-600" />
+                <motion.div
+                  className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-yellow-500 flex items-center justify-center shadow-lg animate-pulse"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <TrophyIcon className="h-8 w-8 text-white" />
+                </motion.div>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Total Points</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalPoints}</p>
+                <motion.p
+                  className="text-2xl font-semibold text-gray-900 flex items-center"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {stats.totalPoints}
+                  <PercentBadge percent={getPercentChange(stats.totalPoints, prevStats.totalPoints)} />
+                </motion.p>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Recent Events and Upcoming Tasks */}
@@ -313,13 +458,24 @@ const Dashboard = () => {
                 upcomingTasks.map((task) => (
                   <div key={task._id} className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{task.title}</h4>
+                      <h4 className={`text-sm font-medium ${task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>{task.title}</h4>
                       {task.event && (
                         <p className="text-sm text-gray-500">{task.event}</p>
                       )}
                     </div>
-                    <div className="ml-4 text-sm text-gray-500">
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
+                    <div className="ml-4 flex items-center gap-2">
+                      <div className="text-sm text-gray-500">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</div>
+                     <button
+                       className={`ml-2 px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition-all ${completingTaskId === task._id ? 'opacity-60 cursor-wait' : ''}`}
+                       disabled={completingTaskId === task._id}
+                       onClick={() => markTaskComplete(task._id)}
+                     >
+                       {completingTaskId === task._id ? (
+                         <span className="inline-block w-4 h-4 border-2 border-white border-t-green-200 rounded-full animate-spin align-middle"></span>
+                       ) : (
+                         'Mark Complete'
+                       )}
+                     </button>
                     </div>
                   </div>
                 ))

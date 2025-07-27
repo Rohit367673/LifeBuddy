@@ -76,7 +76,7 @@ export default function PremiumCalendar() {
     setLoading(true);
     setMessage('');
     // Validate phone number
-    if (!/^\+[1-9]\d{1,14}$/.test(form.phoneNumber.replace(/\s+/g, ''))) {
+    if (!/^[+][1-9]\d{1,14}$/.test(form.phoneNumber.replace(/\s+/g, ''))) {
       setPhoneError('Please enter a valid phone number with country code (e.g., +1 5551234567)');
       setLoading(false);
       return;
@@ -112,9 +112,16 @@ export default function PremiumCalendar() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'No task for today');
+      if (!res.ok) {
+        setTodayTask(null);
+        setStep('setup');
+        setSchedule(null);
+        setLoading(false);
+        return;
+      }
       setTodayTask(data);
       setStep('today');
+      setSchedule(data); // Save the schedule/task for display
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -140,6 +147,10 @@ export default function PremiumCalendar() {
       if (!res.ok) throw new Error(data.message || 'Failed to update task');
       setMessage('Task updated!');
       fetchTodayTask();
+      // Notify Profile page to reload calendar status (if possible)
+      if (window.dispatchEvent) {
+        window.dispatchEvent(new Event('calendarStatusUpdated'));
+      }
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -181,8 +192,8 @@ export default function PremiumCalendar() {
             </motion.div>
             <div className="text-center">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Premium AI Task Scheduler
-              </h1>
+        Premium AI Task Scheduler
+      </h1>
               <p className="text-sm text-slate-600 mt-1">Powered by LifeBuddy Intelligence</p>
             </div>
             <motion.div
@@ -193,7 +204,7 @@ export default function PremiumCalendar() {
               <PencilIcon className="w-6 h-6 text-white" />
             </motion.div>
           </motion.div>
-        </div>
+            </div>
       </motion.div>
 
       {/* Main Layout */}
@@ -240,11 +251,54 @@ export default function PremiumCalendar() {
                     >
                       Yes, Exit
                     </button>
+            </div>
+          </div>
+          </div>
+            )}
+            {loading && step === 'setup' && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
+                <p className="text-lg text-slate-700 font-semibold">Generating your AI schedule...</p>
+                <p className="text-slate-500 mt-2">This may take up to a minute. Please wait.</p>
+        </div>
+      )}
+            {/* Only show TaskSchedulerForm if no schedule exists */}
+            {(!todayTask && step === 'setup') && <TaskSchedulerForm />}
+            {/* If a schedule exists, show the current task and a button to end/reset */}
+            {todayTask && step === 'today' && (
+              <div className="bg-white rounded-xl shadow-lg p-8">
+                <h2 className="text-xl font-bold mb-4">Today's Task</h2>
+                <div className="mb-4">
+                  <div className="font-semibold">{todayTask.title}</div>
+                  <div className="text-gray-600 mb-2">{todayTask.subtask}</div>
+                  <div className="text-sm text-gray-500">{todayTask.notes}</div>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                      onClick={() => markTodayTask('completed')}
+                      disabled={loading}
+                    >
+                      Mark Complete
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                      onClick={() => markTodayTask('skipped')}
+                      disabled={loading}
+                    >
+                      Skip/Reschedule
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                      onClick={() => setShowExitConfirm(true)}
+                      disabled={loading}
+                    >
+                      End Schedule
+                    </button>
                   </div>
                 </div>
+                {message && <div className="text-green-600 mt-2">{message}</div>}
               </div>
             )}
-            <TaskSchedulerForm />
           </motion.div>
         </div>
       </motion.div>

@@ -104,7 +104,7 @@ Day 2:
 ...
 (Start with Day 1 and end with Day ${days}. No markdown except for links.)`;
 
-  let response;
+    let response;
   let schedule = [];
   let attempt = 0;
   let maxAttempts = 2;
@@ -146,7 +146,7 @@ Day 2:
         console.warn('AI schedule parsing: subtask is empty for day', dayNumber, 'raw dayContent:', dayContent);
       }
       const date = new Date(new Date(startDate).getTime() + (dayNumber - 1) * 24*60*60*1000);
-      schedule.push({
+    schedule.push({
         date,
         subtask,
         dayTitle,
@@ -160,9 +160,9 @@ Day 2:
         status: 'pending',
         prerequisiteMet: dayNumber === 1,
         quiz: null,
-        quizAnswered: false,
-        quizCorrect: false
-      });
+      quizAnswered: false,
+      quizCorrect: false
+    });
     }
     // After parsing the AI response into days
     if (!Array.isArray(schedule) || schedule.length === 0 || schedule.some(day => !day.subtask)) {

@@ -98,14 +98,12 @@ const EventModal = ({ isOpen, onClose, onSuccess, type, template, event }) => {
       });
 
       if (response.ok) {
-        onSuccess();
+        toast.success(type === 'edit' ? 'Event updated' : 'Event created');
+        onSuccess && onSuccess(); // Always reload events after success
+        onClose();
       } else {
         const errorData = await response.json();
-        if (errorData.limitReached) {
-          toast.error('Free tier limit reached. Upgrade to create more events.');
-        } else {
-          toast.error(errorData.message || 'Failed to save event');
-        }
+        toast.error(errorData.message || 'Failed to save event');
       }
     } catch (error) {
       console.error('Error saving event:', error);

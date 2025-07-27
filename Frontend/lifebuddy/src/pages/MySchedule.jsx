@@ -11,6 +11,7 @@ export default function MySchedule() {
   const [message, setMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [notificationPlatform, setNotificationPlatform] = useState('');
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   useEffect(() => {
     fetchTodayTask();
@@ -28,6 +29,7 @@ export default function MySchedule() {
       setTodayTask(data);
       setNotificationPlatform(data.notificationPlatform || '');
     } catch (err) {
+      setTodayTask(null);
       setMessage(err.message);
     } finally {
       setLoading(false);
@@ -64,6 +66,26 @@ export default function MySchedule() {
       
     } catch (err) {
       setMessage(err.message);
+    }
+  };
+
+  const endSchedule = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/current`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to end schedule');
+      setTodayTask(null);
+      setMessage('Schedule ended. You can now create a new schedule.');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setShowEndConfirm(false);
+      setLoading(false);
     }
   };
 
@@ -205,6 +227,12 @@ export default function MySchedule() {
                   <CalendarIcon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-slate-700 mb-2">No active roadmap</h3>
                   <p className="text-slate-500">Create a new AI schedule to get started.</p>
+                  <a
+                    href="/productivity"
+                    className="inline-block mt-4 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all text-lg"
+                  >
+                    + Create New Schedule
+                  </a>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -291,6 +319,14 @@ export default function MySchedule() {
                           >
                             ⏭️ Skip & Reschedule
                           </motion.button>
+                          <motion.button
+                            onClick={() => setShowEndConfirm(true)}
+                            className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            🛑 End Schedule
+                          </motion.button>
                         </div>
                       </div>
                     </div>
@@ -336,6 +372,29 @@ export default function MySchedule() {
           </motion.div>
         </div>
       </motion.div>
+      {/* End Schedule Confirmation Dialog */}
+      {showEndConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+            <h2 className="text-xl font-bold mb-4 text-red-600">End Schedule?</h2>
+            <p className="mb-6 text-gray-700">Are you sure you want to end your current schedule? This action cannot be undone.</p>
+            <div className="flex justify-center gap-4">
+              <button
+                className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                onClick={() => setShowEndConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-6 py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-bold hover:from-red-600 hover:to-pink-600"
+                onClick={endSchedule}
+              >
+                Yes, End Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

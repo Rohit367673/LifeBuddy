@@ -120,8 +120,7 @@ const Events = () => {
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (!confirm('Are you sure you want to delete this event?')) return;
-
+    if (!window.confirm('Are you sure you want to delete this event?')) return;
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}`, {
         method: 'DELETE',
@@ -129,17 +128,14 @@ const Events = () => {
           'Authorization': `Bearer ${await getFirebaseToken()}`
         }
       });
-
       if (response.ok) {
-        toast.success('Event deleted successfully');
-        loadEvents();
-        loadStats();
+        toast.success('Event deleted');
+        loadEvents(); // Reload events after delete
       } else {
         toast.error('Failed to delete event');
       }
     } catch (error) {
-      console.error('Error deleting event:', error);
-      toast.error('Failed to delete event');
+      toast.error('Error deleting event');
     }
   };
 
@@ -151,18 +147,25 @@ const Events = () => {
   };
 
   const handleModalSuccess = () => {
-    handleModalClose();
+    // Always reload events after modal actions
     loadEvents();
-    loadStats();
-    toast.success('Event created successfully!');
+    setShowModal(false);
+    setShowDetail(false);
+    setSelectedEvent(null);
+    setSelectedTemplate(null);
+    setModalType('template');
   };
 
   const getFilteredEvents = () => {
     let filtered = [...events];
 
-    // Apply status filter
+    // Apply status filter robustly
     if (filter !== 'all') {
-      filtered = filtered.filter(event => event.status === filter);
+      filtered = filtered.filter(event => {
+        // Fallback: treat missing/unknown status as 'planning'
+        const status = event.status || 'planning';
+        return status === filter;
+      });
     }
 
     // Apply sorting
@@ -242,50 +245,50 @@ const Events = () => {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="card">
-          <div className="card-body">
+          <div className="card-body p-3 sm:p-6">
             <div className="flex items-center">
-              <CalendarIcon className="h-8 w-8 text-primary-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total Events</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalEvents}</p>
+              <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary-600" />
+              <div className="ml-2 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Total Events</p>
+                <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalEvents}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-body">
+          <div className="card-body p-3 sm:p-6">
             <div className="flex items-center">
-              <CheckCircleIcon className="h-8 w-8 text-success-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Completed</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.completedEvents}</p>
+              <CheckCircleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-success-600" />
+              <div className="ml-2 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Completed</p>
+                <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.completedEvents}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-body">
+          <div className="card-body p-3 sm:p-6">
             <div className="flex items-center">
-              <ClockIcon className="h-8 w-8 text-warning-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">In Progress</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.inProgressEvents}</p>
+              <ClockIcon className="h-6 w-6 sm:h-8 sm:w-8 text-warning-600" />
+              <div className="ml-2 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">In Progress</p>
+                <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.inProgressEvents}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-body">
+          <div className="card-body p-3 sm:p-6">
             <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-8 w-8 text-danger-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Overdue</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.overdueEvents}</p>
+              <ExclamationTriangleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-danger-600" />
+              <div className="ml-2 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-500">Overdue</p>
+                <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white">{stats.overdueEvents}</p>
               </div>
             </div>
           </div>
@@ -294,11 +297,11 @@ const Events = () => {
 
       {/* Filters and Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
           >
             <option value="all">All Events</option>
             <option value="planning">Planning</option>
@@ -310,7 +313,7 @@ const Events = () => {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
           >
             <option value="createdAt">Date Created</option>
             <option value="startDate">Start Date</option>
@@ -319,15 +322,15 @@ const Events = () => {
           </select>
         </div>
 
-        <div className="text-sm text-gray-500">
+        <div className="text-xs sm:text-sm text-gray-500">
           {filteredEvents.length} of {events.length} events
         </div>
       </div>
 
       {/* Event Templates Grid */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Quick Start Templates</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Quick Start Templates</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {templates.map((template) => (
             <div
               key={template.id}
@@ -336,12 +339,12 @@ const Events = () => {
               }`}
               onClick={() => !template.isLocked && handleCreateEvent('template', template)}
             >
-              <div className="card-body text-center">
-                <div className="text-3xl mb-2">{template.icon}</div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+              <div className="card-body text-center p-3 sm:p-6">
+                <div className="text-2xl sm:text-3xl mb-2">{template.icon}</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-sm sm:text-base">
                   {template.title}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
                   {template.description}
                 </p>
                 <div className="flex items-center justify-between text-xs text-gray-500">
