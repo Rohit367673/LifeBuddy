@@ -38,6 +38,8 @@ app.use(cors({
     const allowedOrigins = [
           'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
     'https://life-buddy.vercel.app',
+'https://www.lifebuddy.space',
+
       'http://localhost:5173',
  
       process.env.FRONTEND_URL
