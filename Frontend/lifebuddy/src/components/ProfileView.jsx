@@ -29,21 +29,21 @@ const badgeDefinitions = {
     color: 'bg-yellow-500',
     textColor: 'text-yellow-500'
   },
-  'streak_7': {
+  'task_streak': {
     name: 'Week Warrior',
     description: '7-day consistency streak',
     image: badge3,
     color: 'bg-orange-500',
     textColor: 'text-orange-500'
   },
-  'streak_30': {
+  'mood_streak': {
     name: 'Monthly Master',
     description: '30-day consistency streak',
     image: badge7,
     color: 'bg-purple-500',
     textColor: 'text-purple-500'
   },
-  'mood_tracker': {
+  'first_mood': {
     name: 'Mindful',
     description: 'Tracked mood for 7 days',
     image: badge5,
@@ -57,12 +57,12 @@ const badgeDefinitions = {
     color: 'bg-blue-500',
     textColor: 'text-blue-500'
   },
-  'motivation_master': {
-    name: 'Motivation Master',
-    description: 'Read 50 motivational messages',
-    image: badge8,
-    color: 'bg-indigo-500',
-    textColor: 'text-indigo-500'
+  'first_event': {
+    name: 'Event Champion',
+    description: 'Created your first event',
+    image: badge4,
+    color: 'bg-green-500',
+    textColor: 'text-green-500'
   },
   'consistency_king': {
     name: 'Consistency King',
@@ -71,13 +71,90 @@ const badgeDefinitions = {
     color: 'bg-gradient-to-r from-purple-500 to-pink-500',
     textColor: 'text-purple-500'
   },
-  'achievement_hunter': {
-    name: 'R7 Spirit',
-    description: 'Unlocked 10 achievements',
+  'productivity_master': {
+    name: 'Productivity Master',
+    description: 'Completed 100 tasks',
+    image: badge8,
+    color: 'bg-indigo-500',
+    textColor: 'text-indigo-500'
+  },
+  'perfect_week': {
+    name: 'Perfect Week',
+    description: 'Completed all planned tasks in a week',
     image: badge4,
     color: 'bg-green-500',
     textColor: 'text-green-500'
   },
+  'early_bird': {
+    name: 'Early Bird',
+    description: 'Completed tasks before 9 AM for 5 days',
+    image: badge3,
+    color: 'bg-orange-500',
+    textColor: 'text-orange-500'
+  },
+  'night_owl': {
+    name: 'Night Owl',
+    description: 'Completed tasks after 10 PM for 5 days',
+    image: badge7,
+    color: 'bg-purple-500',
+    textColor: 'text-purple-500'
+  },
+  'social_butterfly': {
+    name: 'Social Butterfly',
+    description: 'Created 5 events with social activities',
+    image: badge6,
+    color: 'bg-blue-500',
+    textColor: 'text-blue-500'
+  },
+  'fitness_freak': {
+    name: 'Fitness Freak',
+    description: 'Completed 20 fitness-related tasks',
+    image: badge5,
+    color: 'bg-pink-500',
+    textColor: 'text-pink-500'
+  },
+  'bookworm': {
+    name: 'Bookworm',
+    description: 'Completed 10 learning-related tasks',
+    image: badge2,
+    color: 'bg-yellow-500',
+    textColor: 'text-yellow-500'
+  },
+  'creative_soul': {
+    name: 'Creative Soul',
+    description: 'Completed 15 creative tasks',
+    image: badge8,
+    color: 'bg-indigo-500',
+    textColor: 'text-indigo-500'
+  },
+  'organizer': {
+    name: 'Organizer',
+    description: 'Created 10 events with detailed checklists',
+    image: badge4,
+    color: 'bg-green-500',
+    textColor: 'text-green-500'
+  },
+  'goal_setter': {
+    name: 'Goal Setter',
+    description: 'Set and completed 5 major life goals',
+    image: badge9,
+    color: 'bg-gradient-to-r from-purple-500 to-pink-500',
+    textColor: 'text-purple-500'
+  },
+  'stress_manager': {
+    name: 'Stress Manager',
+    description: 'Logged mood for 50 days with stress management',
+    image: badge10,
+    color: 'bg-blue-500',
+    textColor: 'text-blue-500'
+  },
+  'event_completed': {
+    name: 'Event Champion',
+    description: 'Completed your first major life event',
+    image: badge6,
+    color: 'bg-blue-500',
+    textColor: 'text-blue-500'
+  }
 };
 
 function getLastNDaysLoginData(loginHistory, n = 35) {

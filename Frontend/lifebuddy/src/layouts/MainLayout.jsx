@@ -15,14 +15,18 @@ const MainLayout = () => {
 
   // Don't show layout for auth pages
   const isAuthPage = ['/login', '/signup', '/'].includes(location.pathname);
+  
+  // Prevent redirect loops by checking if we're already on login page
+  const isOnLoginPage = location.pathname === '/login';
 
   // Handle navigation to login when user is not authenticated
   useEffect(() => {
-    // Allow admin user to always access
-    if (!loading && (!user || !user.email) && !isAuthPage) {
+    // Only redirect if we're not loading and user is definitely not authenticated
+    if (!loading && (!user || !user.email) && !isAuthPage && !isOnLoginPage) {
+      console.log('Redirecting to login - user not authenticated');
       navigate('/login');
     }
-  }, [user, loading, isAuthPage, navigate]);
+  }, [user, loading, isAuthPage, isOnLoginPage, navigate]);
 
   // If loading, show loading spinner
   if (loading) {
@@ -36,21 +40,7 @@ const MainLayout = () => {
     );
   }
 
-  // Allow admin user to always access
-  if ((!user || !user.email) && !isAuthPage) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Redirecting to login...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If admin user, treat as authenticated
-  const isAdmin = user && user.email === 'rohit367673@gmail.com';
-
+  // If we're on an auth page, don't check authentication
   if (isAuthPage) {
     return (
       <>
@@ -83,6 +73,21 @@ const MainLayout = () => {
     );
   }
 
+  // Allow admin user to always access
+  if ((!user || !user.email) && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If admin user, treat as authenticated
+  const isAdmin = user && user.email === 'rohit367673@gmail.com';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -98,7 +103,7 @@ const MainLayout = () => {
       )}
       
       <main className="lg:pl-64 transition-all duration-300">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 mt-4 sm:mt-6 lg:mt-8">
+        <div className="p-8">
           {/* If admin, allow access to all features */}
           <Outlet />
         </div>

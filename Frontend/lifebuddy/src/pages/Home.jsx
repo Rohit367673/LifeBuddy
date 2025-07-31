@@ -71,20 +71,24 @@ const Home = () => {
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute left-1/2 top-0 w-[60vw] h-[60vw] -translate-x-1/2 bg-gradient-to-br from-purple-400 via-pink-300 to-yellow-200 opacity-30 blur-3xl animate-pulse" />
         </div>
-        <span className="inline-block bg-gradient-to-r from-purple-500 to-pink-400 rounded-full p-6 mb-6 animate-bounce shadow-lg">
-          <span className="text-4xl font-extrabold text-white tracking-widest select-none" style={{fontFamily: 'monospace'}}>LB</span>
-        </span>
+        <div className="inline-block bg-gradient-to-r from-purple-500 to-pink-400 rounded-full p-8 mb-6 animate-bounce shadow-lg">
+          <img 
+            src="/lifebuddy-high-resolution-logo-transparent.png" 
+            alt="LifeBuddy Logo" 
+            className="w-32 h-32 object-contain"
+          />
+        </div>
         <h1 className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500 drop-shadow-lg mb-4">
           LifeBuddy: Your AI Life Organizer
         </h1>
         <p className="text-xl sm:text-2xl text-gray-700 max-w-2xl mx-auto mb-8 font-medium">
           Supercharge your life with AI-powered planning, analytics, and motivation. Organize events, track progress, and unlock your best self.
         </p>
-        <div className="flex flex-wrap justify-center gap-4 mb-6">
-          <Link to="/signup" className="px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-bold text-xl shadow-xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
+        <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+          <Link to="/signup" className="px-6 sm:px-8 py-3 sm:py-4 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-bold text-lg sm:text-xl shadow-xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
             Get Started Free
           </Link>
-          <Link to="/login" className="px-8 py-4 rounded-2xl bg-white/80 text-purple-700 font-bold text-xl shadow hover:bg-white/90 border border-purple-200">
+          <Link to="/login" className="px-6 sm:px-8 py-3 sm:py-4 rounded-2xl bg-white/80 text-purple-700 font-bold text-lg sm:text-xl shadow hover:bg-white/90 border border-purple-200">
             Sign In
           </Link>
         </div>
@@ -141,9 +145,9 @@ const Home = () => {
 
       {/* CTA Section */}
       <section className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500">Ready to unlock your future?</h2>
-        <p className="text-lg text-gray-700 mb-8">Join thousands using LifeBuddy to organize, analyze, and achieve more with AI-powered tools.</p>
-        <Link to="/signup" className="px-12 py-5 rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-extrabold text-2xl shadow-2xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500">Ready to unlock your future?</h2>
+        <p className="text-base sm:text-lg text-gray-700 mb-8">Join thousands using LifeBuddy to organize, analyze, and achieve more with AI-powered tools.</p>
+        <Link to="/signup" className="inline-block px-6 sm:px-8 md:px-12 py-3 sm:py-4 md:py-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-400 text-white font-extrabold text-lg sm:text-xl md:text-2xl shadow-2xl hover:from-purple-600 hover:to-yellow-500 transition-all animate-bounce-once">
           Start Your Free Account
         </Link>
       </section>
@@ -152,7 +156,11 @@ const Home = () => {
       <footer className="max-w-7xl mx-auto px-6 py-12">
         <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-purple-600">LifeBuddy</span>
+            <img 
+              src="/lifebuddy-high-resolution-logo-transparent.png" 
+              alt="LifeBuddy Logo" 
+              className="w-12 h-12 object-contain"
+            />
             <span className="ml-2 text-sm text-gray-500">Your AI-powered life, organized</span>
           </div>
           <div className="flex space-x-6 text-sm text-gray-500">

@@ -22,7 +22,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
         transition={{ duration: 3, repeat: Infinity }}
       />
       
-      <div className="relative flex items-center justify-between p-6 bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30">
+      <div className="relative flex flex-col items-center justify-between p-4 sm:p-6 bg-white/40 backdrop-blur-sm rounded-2xl border border-white/30 gap-4">
         {steps.map((step, index) => {
           const isCompleted = currentStep > step.number;
           const isCurrent = currentStep === step.number;
@@ -32,7 +32,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
             <React.Fragment key={step.number}>
               {/* Step Container */}
               <motion.div 
-                className="flex items-center relative"
+                className="flex flex-col items-center relative w-full"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
@@ -58,7 +58,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                 {/* Step Circle */}
                 <motion.div 
                   className={`
-                    relative flex items-center justify-center w-16 h-16 rounded-2xl border-2 transition-all duration-500 group cursor-pointer
+                    relative flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl border-2 transition-all duration-500 group cursor-pointer
                     ${isCompleted 
                       ? `bg-gradient-to-br ${step.color} border-transparent text-white shadow-lg` 
                       : isCurrent 
@@ -88,9 +88,9 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                     transition={{ duration: 0.6, type: "spring" }}
                   >
                     {isCompleted ? (
-                      <Check className="w-7 h-7" />
+                      <Check className="w-5 h-5 sm:w-7 sm:h-7" />
                     ) : (
-                      <IconComponent className="w-7 h-7" />
+                      <IconComponent className="w-5 h-5 sm:w-7 sm:h-7" />
                     )}
                   </motion.div>
 
@@ -106,13 +106,13 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                 
                 {/* Step Info */}
                 <motion.div 
-                  className="ml-4"
+                  className="mt-2 text-center"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 + index * 0.1 }}
                 >
                   <motion.p 
-                    className={`font-semibold transition-all duration-300 ${
+                    className={`text-sm sm:text-base font-semibold transition-all duration-300 ${
                       isCurrent ? 'text-purple-600' : isCompleted ? 'text-slate-800' : 'text-slate-400'
                     }`}
                     animate={isCurrent ? { scale: [1, 1.05, 1] } : {}}
@@ -120,7 +120,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                   >
                     {step.title}
                   </motion.p>
-                  <p className={`text-sm transition-all duration-300 ${
+                  <p className={`text-xs sm:text-sm transition-all duration-300 ${
                     isCurrent ? 'text-purple-500' : isCompleted ? 'text-slate-600' : 'text-slate-400'
                   }`}>
                     {step.subtitle}
@@ -131,7 +131,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
               {/* Animated Connector Line */}
               {index < steps.length - 1 && (
                 <motion.div 
-                  className="flex-1 relative mx-6"
+                  className="hidden sm:flex flex-1 relative mx-6"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 + index * 0.1 }}

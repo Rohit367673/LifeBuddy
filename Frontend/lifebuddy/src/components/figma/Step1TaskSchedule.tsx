@@ -62,10 +62,10 @@ export function Step1TaskSchedule({ formData, updateFormData, onNext }: Step1Pro
             <Target className="w-6 h-6 text-white" />
           </motion.div>
           <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               Set Task Schedule
             </h2>
-            <p className="text-slate-600 mt-1">Define your task details and timeline to get started</p>
+            <p className="text-slate-600 mt-1 text-sm md:text-base">Define your task details and timeline to get started</p>
           </div>
         </motion.div>
       </motion.div>
@@ -106,7 +106,7 @@ export function Step1TaskSchedule({ formData, updateFormData, onNext }: Step1Pro
 
         {/* Date Fields */}
         <motion.div 
-          className="grid grid-cols-2 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6"
           variants={itemVariants}
         >
           {/* Start Date */}

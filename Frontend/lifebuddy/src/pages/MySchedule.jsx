@@ -17,19 +17,55 @@ export default function MySchedule() {
     fetchTodayTask();
   }, []);
 
+  // Force refresh when coming from productivity page
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const timestamp = urlParams.get('t');
+    if (timestamp) {
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Force a fresh fetch
+      setTimeout(() => {
+        fetchTodayTask();
+      }, 500);
+    }
+  }, []);
+
   const fetchTodayTask = async () => {
     setLoading(true);
     setMessage('');
+    console.log('🔍 Fetching today task...');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/today`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/today?t=${Date.now()}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'No task for today');
-      setTodayTask(data);
-      setNotificationPlatform(data.notificationPlatform || '');
+      
+      console.log('📡 API Response status:', res.status);
+      
+      if (res.ok) {
+        const data = await res.json();
+        console.log('✅ API returned data:', data);
+        setTodayTask(data);
+        setNotificationPlatform(data.notificationPlatform || '');
+      } else if (res.status === 404) {
+        console.log('❌ No active task found (404)');
+        setTodayTask(null);
+        setNotificationPlatform('');
+        setMessage('');
+      } else {
+        const data = await res.json();
+        console.log('❌ API error:', data);
+        throw new Error(data.message || 'Failed to fetch task');
+      }
     } catch (err) {
+      console.log('💥 Fetch error:', err.message);
       setTodayTask(null);
+      setNotificationPlatform('');
       setMessage(err.message);
     } finally {
       setLoading(false);
@@ -72,16 +108,50 @@ export default function MySchedule() {
   const endSchedule = async () => {
     setLoading(true);
     setMessage('');
+    console.log('🗑️ Ending schedule...');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/current`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/current?t=${Date.now()}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to end schedule');
-      setTodayTask(null);
-      setMessage('Schedule ended. You can now create a new schedule.');
+      
+      console.log('🗑️ Delete response status:', res.status);
+      
+      if (res.ok) {
+        console.log('✅ Schedule ended successfully');
+        // Immediately clear all state
+        setTodayTask(null);
+        setNotificationPlatform('');
+        setMessage('Schedule ended successfully. You can now create a new schedule.');
+        
+        // Force multiple refreshes to ensure data is cleared
+        setTimeout(() => {
+          console.log('🔄 First refresh...');
+          fetchTodayTask();
+        }, 1000);
+        
+        setTimeout(() => {
+          console.log('🔄 Second refresh...');
+          fetchTodayTask();
+        }, 3000);
+        
+        // Final page reload after 5 seconds
+        setTimeout(() => {
+          console.log('🔄 Final page reload...');
+          window.location.reload();
+        }, 5000);
+      } else {
+        const data = await res.json();
+        console.log('❌ Delete error:', data);
+        throw new Error(data.message || 'Failed to end schedule');
+      }
     } catch (err) {
+      console.log('💥 End schedule error:', err.message);
       setMessage(err.message);
     } finally {
       setShowEndConfirm(false);
@@ -227,12 +297,37 @@ export default function MySchedule() {
                   <CalendarIcon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-slate-700 mb-2">No active roadmap</h3>
                   <p className="text-slate-500">Create a new AI schedule to get started.</p>
-                  <a
-                    href="/productivity"
-                    className="inline-block mt-4 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all text-lg"
-                  >
-                    + Create New Schedule
-                  </a>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
+                    <button
+                      onClick={() => {
+                        // Force a fresh navigation to productivity page
+                        window.location.href = `/productivity?t=${Date.now()}`;
+                      }}
+                      className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all text-lg"
+                    >
+                      + Create New Schedule
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLoading(true);
+                        fetchTodayTask();
+                      }}
+                      className="inline-block px-4 py-3 bg-gray-500 text-white font-bold rounded-lg shadow-lg hover:bg-gray-600 transition-all text-sm"
+                    >
+                      🔄 Refresh
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('🧹 Clearing all cache...');
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        window.location.reload();
+                      }}
+                      className="inline-block px-4 py-3 bg-red-500 text-white font-bold rounded-lg shadow-lg hover:bg-red-600 transition-all text-sm"
+                    >
+                      🧹 Clear Cache
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">

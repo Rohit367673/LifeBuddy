@@ -40,7 +40,7 @@ export function Step2DeepDock({ formData, updateFormData, onNext, onPrev }: Step
 
   return (
     <motion.div 
-      className="space-y-8 min-h-[600px] max-h-[80vh] overflow-y-auto pb-8"
+      className="space-y-8"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -188,7 +188,7 @@ Examples:
 
       {/* Navigation */}
       <motion.div 
-        className="flex justify-between pt-6 mb-2 px-4"
+        className="flex justify-between pt-6"
         variants={itemVariants}
       >
         <motion.div

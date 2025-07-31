@@ -222,347 +222,217 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 mt-8">
-      {/* Welcome Section with Motivational Message */}
-      <motion.div
-        className="card glassmorphism-card"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-      >
-        <div className="card-body">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {getGreeting()}, {user?.displayName || 'there'}! 👋
-              </h1>
-              <p className="mt-2 text-gray-600 text-sm sm:text-base">
-                Let's make today productive. You have {stats.pendingTasks} tasks to complete.
-              </p>
+    <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen">
+      {/* Header Section */}
+      <header className="relative z-10 flex flex-col items-center justify-center pt-24 pb-16 text-center">
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute left-1/2 top-0 w-[60vw] h-[60vw] -translate-x-1/2 bg-gradient-to-br from-purple-400 via-pink-300 to-yellow-200 opacity-30 blur-3xl animate-pulse" />
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-700 via-pink-600 to-yellow-500 drop-shadow-lg mb-4">
+          {getGreeting()}, {user?.displayName || user?.firstName || 'there'}!
+        </h1>
+        <p className="text-xl sm:text-2xl text-gray-700 max-w-2xl mx-auto font-medium">
+          Here's your productivity overview for today
+        </p>
+      </header>
+
+      {/* Main Content */}
+      <section className="max-w-5xl mx-auto px-4 py-12">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Events</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalEvents}</p>
+                  </div>
+                  <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
+                    <CalendarIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Completed Tasks</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.completedTasks}</p>
+                    <PercentBadge percent={getPercentChange(stats.completedTasks, prevStats.completedTasks)} />
+                  </div>
+                  <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
+                    <CheckCircleIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Points</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalPoints}</p>
+                    <PercentBadge percent={getPercentChange(stats.totalPoints, prevStats.totalPoints)} />
+                  </div>
+                  <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl">
+                    <TrophyIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Mood Streak</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.moodStreak} days</p>
+                  </div>
+                  <div className="p-3 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl">
+                    <FaceSmileIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </motion.div>
             </div>
+
+            {/* Motivational Message */}
             {motivationalMessage && (
               <motion.div
-                className="w-full lg:w-auto lg:ml-6 p-3 sm:p-4 bg-gradient-to-r from-purple-200/60 to-blue-200/60 rounded-lg border border-purple-200 shadow-lg glassmorphism-card"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-xl"
               >
-                <div className="flex items-start space-x-2 sm:space-x-3">
-                  <SparklesIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 flex-shrink-0 mt-1 animate-pulse" />
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <SparklesIcon className="w-6 h-6" />
+                  </div>
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-purple-900 mb-1">Today's Inspiration</p>
-                    <p className="text-xs sm:text-sm text-purple-800 italic">"{motivationalMessage.content}"</p>
-                    {motivationalMessage.author && (
-                      <p className="text-xs text-purple-600 mt-1">— {motivationalMessage.author}</p>
-                    )}
+                    <h3 className="text-lg font-semibold mb-2">Today's Motivation</h3>
+                    <p className="text-white/90">{motivationalMessage}</p>
                   </div>
                 </div>
               </motion.div>
             )}
-          </div>
-        </div>
-      </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-        {/* Stat Card Example */}
-        <motion.div
-          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
-          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
-        >
-          <div className="card-body p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <motion.div
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-                </motion.div>
-              </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-500">Active Events</p>
-                <motion.p
-                  className="text-lg sm:text-2xl font-semibold text-gray-900"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {stats.activeEvents}
-                </motion.p>
-              </div>
+            {/* Recent Events and Upcoming Tasks */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Recent Events */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 text-purple-500" />
+                  Recent Events
+                </h3>
+                {recentEvents.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentEvents.map((event) => (
+                      <div key={event._id} className="flex items-center gap-3 p-3 bg-white/50 rounded-xl">
+                        <div className={`w-3 h-3 rounded-full ${getStatusColor(event.status)}`}></div>
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{event.title}</p>
+                          <p className="text-sm text-gray-600">{new Date(event.date).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No recent events</p>
+                )}
+              </motion.div>
+
+              {/* Upcoming Tasks */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <ClockIcon className="w-5 h-5 text-blue-500" />
+                  Upcoming Tasks
+                </h3>
+                {upcomingTasks.length > 0 ? (
+                  <div className="space-y-4">
+                    {upcomingTasks.map((task) => (
+                      <div key={task._id} className="flex items-center gap-3 p-3 bg-white/50 rounded-xl">
+                        <button
+                          onClick={() => markTaskComplete(task._id)}
+                          disabled={completingTaskId === task._id}
+                          className="w-5 h-5 border-2 border-gray-300 rounded-full hover:border-purple-500 transition-colors"
+                        >
+                          {task.completed && <CheckCircleIcon className="w-5 h-5 text-purple-500" />}
+                        </button>
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{task.title}</p>
+                          <p className="text-sm text-gray-600">{new Date(task.dueDate).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No upcoming tasks</p>
+                )}
+              </motion.div>
             </div>
-          </div>
-        </motion.div>
 
-        <motion.div
-          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
-          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
-        >
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <motion.div
-                  className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg animate-pulse"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <CheckCircleIcon className="h-8 w-8 text-white" />
-                </motion.div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Completed Tasks</p>
-                <motion.p
-                  className="text-2xl font-semibold text-gray-900 flex items-center"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {stats.completedTasks}
-                  <PercentBadge percent={getPercentChange(stats.completedTasks, prevStats.completedTasks)} />
-                </motion.p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
-          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
-        >
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <motion.div
-                  className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-pink-500 flex items-center justify-center shadow-lg"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <FaceSmileIcon className="h-8 w-8 text-white" />
-                </motion.div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Mood Streak</p>
-                <motion.p
-                  className="text-2xl font-semibold text-gray-900"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {stats.moodStreak} days
-                </motion.p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          className="card glassmorphism-card hover:shadow-2xl transition-all duration-300"
-          whileHover={{ scale: 1.04, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
-        >
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <motion.div
-                  className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-yellow-500 flex items-center justify-center shadow-lg animate-pulse"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <TrophyIcon className="h-8 w-8 text-white" />
-                </motion.div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total Points</p>
-                <motion.p
-                  className="text-2xl font-semibold text-gray-900 flex items-center"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {stats.totalPoints}
-                  <PercentBadge percent={getPercentChange(stats.totalPoints, prevStats.totalPoints)} />
-                </motion.p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Recent Events and Upcoming Tasks */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Events */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Events</h3>
-          </div>
-          <div className="card-body">
-            <div className="space-y-4">
-              {recentEvents.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No events yet. Create your first event to get started!</p>
-              ) : (
-                recentEvents.map((event) => (
-                  <div key={event._id} className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{event.title}</h4>
-                      <div className="flex items-center mt-1">
-                        <span className={`badge ${getStatusColor(event.status)}`}>
-                          {event.status.replace('-', ' ')}
-                        </span>
+            {/* Recent Achievements */}
+            {recentAchievements.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 }}
+                className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl"
+              >
+                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <TrophyIcon className="w-5 h-5 text-yellow-500" />
+                  Recent Achievements
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recentAchievements.map((achievement) => (
+                    <div key={achievement._id} className="flex items-center gap-3 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
+                      <div className="p-2 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg">
+                        <TrophyIcon className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{achievement.title}</p>
+                        <p className="text-sm text-gray-600">{achievement.description}</p>
                       </div>
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm text-gray-500">{event.progress}%</div>
-                      <div className="progress-bar mt-1">
-                        <div 
-                          className="progress-fill-primary" 
-                          style={{ width: `${event.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="mt-4">
-              <a href="/events" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                View all events →
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Upcoming Tasks */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="text-lg font-semibold text-gray-900">Upcoming Tasks</h3>
-          </div>
-          <div className="card-body">
-            <div className="space-y-4">
-              {upcomingTasks.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No upcoming tasks. Add some tasks to get organized!</p>
-              ) : (
-                upcomingTasks.map((task) => (
-                  <div key={task._id} className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className={`text-sm font-medium ${task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>{task.title}</h4>
-                      {task.event && (
-                        <p className="text-sm text-gray-500">{task.event}</p>
-                      )}
-                    </div>
-                    <div className="ml-4 flex items-center gap-2">
-                      <div className="text-sm text-gray-500">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</div>
-                     <button
-                       className={`ml-2 px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold hover:bg-green-600 transition-all ${completingTaskId === task._id ? 'opacity-60 cursor-wait' : ''}`}
-                       disabled={completingTaskId === task._id}
-                       onClick={() => markTaskComplete(task._id)}
-                     >
-                       {completingTaskId === task._id ? (
-                         <span className="inline-block w-4 h-4 border-2 border-white border-t-green-200 rounded-full animate-spin align-middle"></span>
-                       ) : (
-                         'Mark Complete'
-                       )}
-                     </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="mt-4">
-              <a href="/tools" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                View all tasks →
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Achievements */}
-      {recentAchievements.length > 0 && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Achievements</h3>
-          </div>
-          <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {recentAchievements.map((achievement) => (
-                <div key={achievement._id} className="flex items-center space-x-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
-                  <div className="flex-shrink-0">
-                    <span className="text-2xl">{achievement.icon}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-gray-900">{achievement.title}</h4>
-                    <p className="text-xs text-gray-600">{achievement.description}</p>
-                    <div className="flex items-center mt-1">
-                      <span className={`badge ${getBadgeColor(achievement.badge)}`}>
-                        {achievement.badge}
-                      </span>
-                      <span className="text-xs text-gray-500 ml-2">+{achievement.points} pts</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <a href="/achievements" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                View all achievements →
-              </a>
-            </div>
+              </motion.div>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <a
-              href="/events/new"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <CalendarIcon className="h-6 w-6 text-primary-600 mr-3" />
-              <span className="text-sm font-medium text-gray-900">New Event</span>
-            </a>
-            <a
-              href="/tools"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <CheckCircleIcon className="h-6 w-6 text-success-600 mr-3" />
-              <span className="text-sm font-medium text-gray-900">Add Task</span>
-            </a>
-            <a
-              href="/tools?tab=mood"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <FaceSmileIcon className="h-6 w-6 text-warning-600 mr-3" />
-              <span className="text-sm font-medium text-gray-900">Log Mood</span>
-            </a>
-            <a
-              href="/analytics"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <ClockIcon className="h-6 w-6 text-gray-600 mr-3" />
-              <span className="text-sm font-medium text-gray-900">View Analytics</span>
-            </a>
-          </div>
-        </div>
-      </div>
+        )}
+      </section>
     </div>
   );
 };

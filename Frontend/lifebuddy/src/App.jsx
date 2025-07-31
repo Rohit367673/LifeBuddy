@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import PublicProfile from './pages/PublicProfile';
 import Productivity from './pages/Productivity';
+import PremiumCalendar from './pages/PremiumCalendar';
 import MySchedule from './pages/MySchedule';
 
 function App() {
@@ -37,8 +38,8 @@ function App() {
 
                 {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
-                  <Route path="/store" element={<Store />} />
                   <Route path="/productivity" element={<Productivity />} />
+                  <Route path="/store" element={<Store />} />
                   <Route path="/my-schedule" element={<MySchedule />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/events" element={<Events />} />
