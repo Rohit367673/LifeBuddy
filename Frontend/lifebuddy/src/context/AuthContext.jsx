@@ -234,7 +234,24 @@ export const AuthProvider = ({ children }) => {
       console.log('Starting Google login...');
       console.log('Current auth state:', auth.currentUser);
       
-      // Try popup first, fallback to redirect
+      // Check if we're in a mobile browser (Instagram, Facebook, etc.)
+      const isMobileBrowser = /Instagram|FBAN|FBAV|Facebook|Line|Twitter|LinkedInApp|WhatsApp|TelegramWebApp/i.test(navigator.userAgent);
+      
+      if (isMobileBrowser) {
+        console.log('Detected mobile browser, using redirect method');
+        // Clear any existing redirect result first
+        try {
+          await getRedirectResult(auth);
+        } catch (error) {
+          console.log('Clearing existing redirect result:', error);
+        }
+        
+        await signInWithRedirect(auth, provider);
+        // The redirect will happen here, and the result will be handled in useEffect
+        return;
+      }
+      
+      // Try popup first, fallback to redirect for desktop
       try {
         console.log('Attempting popup login...');
         const result = await signInWithPopup(auth, provider);
@@ -268,6 +285,8 @@ export const AuthProvider = ({ children }) => {
   // Handle successful Google login (extracted for reuse)
   const handleSuccessfulGoogleLogin = async (firebaseUser) => {
     try {
+      console.log('Handling successful Google login for:', firebaseUser.email);
+      
       // Try to login to backend, if user doesn't exist, register them
       let response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
         method: 'POST',
@@ -282,6 +301,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.status === 404) {
         // User not found, register them
+        console.log('User not found, registering...');
         response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/register`, {
           method: 'POST',
           headers: {
@@ -296,6 +316,7 @@ export const AuthProvider = ({ children }) => {
             avatar: firebaseUser.photoURL,
           }),
         });
+        
         if (response.status === 409) {
           // User already exists, try login again
           response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
@@ -312,32 +333,32 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error('Failed to authenticate with backend: ' + errorText);
+        throw new Error(`Backend request failed: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Backend response:', data);
+      
       setToken(data.token);
       setFirebaseUser(firebaseUser);
       setUser(data.user); // Set user immediately for fast UI feedback
-      // Fetch the latest user profile (which will have the username if set)
-      await fetchUserProfile(data.token);
-      // setUser(data.user); // Remove this line, as fetchUserProfile sets the user
+      
       // If user has no username, show modal
       if (!data.user.username) {
         setPendingGoogleUser({ firebaseUser, token: data.token });
         setShowUsernameModal(true);
-        return;
+      } else {
+        // Fetch the latest user profile (which will have the username if set)
+        await fetchUserProfile(data.token);
       }
-      toast.success('Welcome to LifeBuddy!');
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 150);
+      
+      toast.success('Welcome back!');
+      return data;
     } catch (error) {
-      toast.error('Failed to complete Google login');
-      throw error;
-    } finally {
+      console.error('Error in handleSuccessfulGoogleLogin:', error);
+      toast.error('Failed to complete Google login. Please try again.');
       setLoading(false);
+      throw error;
     }
   };
 
@@ -481,14 +502,25 @@ export const AuthProvider = ({ children }) => {
         // Handle Firebase redirect result
         const handleRedirectResult = async () => {
           try {
+            console.log('Checking for redirect result...');
             const result = await getRedirectResult(auth);
             if (result) {
               console.log('Redirect result received:', result.user.email);
               await handleSuccessfulGoogleLogin(result.user);
               userSet = true;
+            } else {
+              console.log('No redirect result found');
             }
           } catch (error) {
             console.error('Error handling redirect result:', error);
+            // Don't let redirect errors break the auth flow
+            setUser(null);
+            // Clear any stale redirect state
+            try {
+              await getRedirectResult(auth);
+            } catch (clearError) {
+              console.log('Clearing redirect result:', clearError);
+            }
           }
         };
 

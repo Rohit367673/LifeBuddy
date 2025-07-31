@@ -48,7 +48,7 @@ const Profile = () => {
   const [calendarStatus, setCalendarStatus] = useState([]);
   const [friendMessage, setFriendMessage] = useState('');
 
-  // Badge definitions with images
+  // Badge definitions with images - updated to match backend achievement types
   const badgeDefinitions = {
     'first_login': {
       name: 'Welcome Aboard!',
@@ -64,21 +64,21 @@ const Profile = () => {
       color: 'bg-yellow-500',
       textColor: 'text-yellow-500'
     },
-    'streak_7': {
+    'task_streak': {
       name: 'Week Warrior',
       description: '7-day consistency streak',
       image: badge3,
       color: 'bg-orange-500',
       textColor: 'text-orange-500'
     },
-    'streak_30': {
+    'mood_streak': {
       name: 'Monthly Master',
       description: '30-day consistency streak',
       image: badge7,
       color: 'bg-purple-500',
       textColor: 'text-purple-500'
     },
-    'mood_tracker': {
+    'first_mood': {
       name: 'Mindful',
       description: 'Tracked mood for 7 days',
       image: badge5,
@@ -92,13 +92,12 @@ const Profile = () => {
       color: 'bg-blue-500',
       textColor: 'text-blue-500'
     },
-
-    'motivation_master': {
-      name: 'Motivation Master',
-      description: 'Read 50 motivational messages',
-      image: badge8,
-      color: 'bg-indigo-500',
-      textColor: 'text-indigo-500'
+    'first_event': {
+      name: 'Event Champion',
+      description: 'Created your first event',
+      image: badge4,
+      color: 'bg-green-500',
+      textColor: 'text-green-500'
     },
     'consistency_king': {
       name: 'Consistency King',
@@ -107,13 +106,90 @@ const Profile = () => {
       color: 'bg-gradient-to-r from-purple-500 to-pink-500',
       textColor: 'text-purple-500'
     },
-        'achievement_hunter': {
-      name: 'R7 Spirit',
-      description: 'Unlocked 10 achievements',
+    'productivity_master': {
+      name: 'Productivity Master',
+      description: 'Completed 100 tasks',
+      image: badge8,
+      color: 'bg-indigo-500',
+      textColor: 'text-indigo-500'
+    },
+    'perfect_week': {
+      name: 'Perfect Week',
+      description: 'Completed all planned tasks in a week',
       image: badge4,
       color: 'bg-green-500',
       textColor: 'text-green-500'
     },
+    'early_bird': {
+      name: 'Early Bird',
+      description: 'Completed tasks before 9 AM for 5 days',
+      image: badge3,
+      color: 'bg-orange-500',
+      textColor: 'text-orange-500'
+    },
+    'night_owl': {
+      name: 'Night Owl',
+      description: 'Completed tasks after 10 PM for 5 days',
+      image: badge7,
+      color: 'bg-purple-500',
+      textColor: 'text-purple-500'
+    },
+    'social_butterfly': {
+      name: 'Social Butterfly',
+      description: 'Created 5 events with social activities',
+      image: badge6,
+      color: 'bg-blue-500',
+      textColor: 'text-blue-500'
+    },
+    'fitness_freak': {
+      name: 'Fitness Freak',
+      description: 'Completed 20 fitness-related tasks',
+      image: badge5,
+      color: 'bg-pink-500',
+      textColor: 'text-pink-500'
+    },
+    'bookworm': {
+      name: 'Bookworm',
+      description: 'Completed 10 learning-related tasks',
+      image: badge2,
+      color: 'bg-yellow-500',
+      textColor: 'text-yellow-500'
+    },
+    'creative_soul': {
+      name: 'Creative Soul',
+      description: 'Completed 15 creative tasks',
+      image: badge8,
+      color: 'bg-indigo-500',
+      textColor: 'text-indigo-500'
+    },
+    'organizer': {
+      name: 'Organizer',
+      description: 'Created 10 events with detailed checklists',
+      image: badge4,
+      color: 'bg-green-500',
+      textColor: 'text-green-500'
+    },
+    'goal_setter': {
+      name: 'Goal Setter',
+      description: 'Set and completed 5 major life goals',
+      image: badge9,
+      color: 'bg-gradient-to-r from-purple-500 to-pink-500',
+      textColor: 'text-purple-500'
+    },
+    'stress_manager': {
+      name: 'Stress Manager',
+      description: 'Logged mood for 50 days with stress management',
+      image: badge10,
+      color: 'bg-blue-500',
+      textColor: 'text-blue-500'
+    },
+    'event_completed': {
+      name: 'Event Champion',
+      description: 'Completed your first major life event',
+      image: badge6,
+      color: 'bg-blue-500',
+      textColor: 'text-blue-500'
+    }
   };
 
   useEffect(() => {
@@ -180,6 +256,19 @@ const Profile = () => {
 
   const loadAchievements = async () => {
     try {
+      // First, initialize achievements if needed
+      const initResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/initialize`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await getFirebaseToken()}`
+        }
+      });
+
+      if (initResponse.ok) {
+        const initData = await initResponse.json();
+      }
+
+      // Then load achievements and stats
       const [achievementsResponse, statsResponse] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements`, {
           headers: {
@@ -259,6 +348,21 @@ const Profile = () => {
 
   const checkAndAwardAchievements = async () => {
     try {
+      // First initialize achievements
+      const initResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/initialize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getFirebaseToken()}`
+        }
+      });
+
+      if (initResponse.ok) {
+        const initData = await initResponse.json();
+        console.log('Achievements initialized:', initData);
+      }
+
+      // Then check for new achievements
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/check`, {
         method: 'POST',
         headers: {
@@ -280,11 +384,14 @@ const Profile = () => {
         const data = await response.json();
         if (data.newAchievements && data.newAchievements.length > 0) {
           toast.success(`🎉 Unlocked ${data.newAchievements.length} new achievement(s)!`);
-          await loadAchievements(); // Reload achievements
+        } else {
+          toast.success('No new achievements unlocked. Keep up the great work!');
         }
+        await loadAchievements(); // Reload achievements
       }
     } catch (error) {
       console.error('Error checking achievements:', error);
+      toast.error('Failed to check achievements');
     }
   };
 
@@ -330,9 +437,16 @@ const Profile = () => {
 
   // Get earned badges from achievements
   const getEarnedBadges = () => {
-    return achievements
-      .filter(achievement => achievement.isEarned)
+    const earnedBadges = achievements
+      .filter(achievement => {
+        // Use isEarned from backend if available, otherwise compute it
+        const isEarned = achievement.isEarned !== undefined ? 
+          achievement.isEarned : 
+          (achievement.progress && achievement.progress.current >= achievement.progress.target);
+        return isEarned;
+      })
       .map(achievement => achievement.type);
+    return earnedBadges;
   };
 
   // Utility to get last N days as [{date, loggedIn}] sorted oldest to newest
@@ -578,29 +692,30 @@ const Profile = () => {
   const totalActiveDays = Object.values(activityMap).filter(count => count > 0).length;
   const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
   
-  // Simple color function for monthly calendar
+  // GitHub-style color function for monthly calendar
   const getMonthlyActivityColor = (day) => {
     if (!day) return 'bg-gray-50 dark:bg-gray-900';
     if (day.completedCount === 0) return 'bg-gray-100 dark:bg-gray-800';
-    if (day.completedCount === 1) return 'bg-green-200 dark:bg-green-800';
-    if (day.completedCount === 2) return 'bg-green-400 dark:bg-green-600';
-    if (day.completedCount >= 3) return 'bg-green-600 dark:bg-green-400';
+    if (day.completedCount === 1) return 'bg-green-200 dark:bg-green-900';
+    if (day.completedCount === 2) return 'bg-green-300 dark:bg-green-800';
+    if (day.completedCount === 3) return 'bg-green-400 dark:bg-green-700';
+    if (day.completedCount >= 4) return 'bg-green-500 dark:bg-green-600';
     return 'bg-gray-100 dark:bg-gray-800';
   };
 
   return (
-    <div className="space-y-6 mt-8">
+    <div className="space-y-6 mt-10 w-full max-w-full px-2 sm:px-4 overflow-x-hidden ">
       {/* Username Prompt */}
       {!user?.username && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex flex-col items-center mb-4">
-          <h2 className="text-lg font-semibold mb-2">Choose your unique LifeBuddy ID</h2>
-          <form onSubmit={handleSetUsername} className="flex flex-col sm:flex-row gap-2 items-center w-full max-w-md">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex flex-col items-center mb-4 w-full max-w-full">
+          <h2 className="text-base font-semibold mb-2">Choose your unique LifeBuddy ID</h2>
+          <form onSubmit={handleSetUsername} className="flex flex-col sm:flex-row gap-2 items-center w-full max-w-xs">
             <input
               type="text"
               value={usernameInput}
               onChange={e => setUsernameInput(e.target.value)}
               placeholder="Enter a unique username (3-30 chars)"
-              className="border rounded px-3 py-2 w-full"
+              className="border rounded px-3 py-2 w-full text-sm"
               minLength={3}
               maxLength={30}
               pattern="[a-zA-Z0-9_]+"
@@ -609,139 +724,156 @@ const Profile = () => {
             />
             <button
               type="submit"
-              className="btn-primary px-4 py-2"
+              className="btn-primary px-4 py-2 w-full sm:w-auto"
               disabled={isSettingUsername}
             >
               {isSettingUsername ? 'Saving...' : 'Set Username'}
             </button>
           </form>
-          {usernameError && <div className="text-red-500 mt-2">{usernameError}</div>}
+          {usernameError && <div className="text-red-500 mt-2 text-sm">{usernameError}</div>}
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+        <div className="flex flex-row flex-wrap gap-2 w-full sm:w-auto overflow-x-auto pb-1">
           <button
             onClick={checkAndAwardAchievements}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm flex-shrink-0"
           >
             <TrophyIcon className="w-5 h-5" />
             Check Achievements
           </button>
           <button
+            onClick={async () => {
+              try {
+                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/initialize`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${await getFirebaseToken()}`
+                  }
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  toast.success(`Initialized ${data.newAchievements?.length || 0} achievements!`);
+                  await loadAchievements();
+                }
+              } catch (error) {
+                toast.error('Failed to initialize achievements');
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm flex-shrink-0"
+          >
+            <SparklesIcon className="w-5 h-5" />
+            Initialize Achievements
+          </button>
+          <button
             onClick={() => setShowShareModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm flex-shrink-0"
           >
             <ShareIcon className="w-5 h-5" />
             Share Profile
           </button>
         </div>
       </div>
-
       {/* Profile Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
         {/* Profile Card */}
-        <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <div className="lg:col-span-1 w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 w-full">
             <div className="text-center">
-              <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img src={user?.avatar || firebaseUser?.photoURL || '/default-profile.png'} alt="Profile" className="w-full h-full object-cover rounded-full" />
                 ) : (
                   <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
                 )}
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
                 {user?.displayName || user?.email}
                 {user?.email === 'rohit367673@gmail.com' && (user?.username === 'rohit' || user?.displayName?.toLowerCase() === 'rohit') && (
                   <span className="flex items-center gap-1 ml-2">
-                    {/* Verified Tick SVG */}
                     <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                     <span className="text-xs font-semibold text-blue-500">Owner</span>
                   </span>
                 )}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
+              <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">
                 @{user?.username || 'lifebuddy_user'}
               </p>
               {user?.email === 'rohit367673@gmail.com' && (
                 <p className="text-xs text-blue-500 font-semibold mt-1">Owner Email: {user.email}</p>
               )}
-              
               {personalQuote && (
-                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <p className="text-gray-700 dark:text-gray-300 italic">"{personalQuote}"</p>
+                <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <p className="text-gray-700 dark:text-gray-300 italic text-sm">"{personalQuote}"</p>
                 </div>
               )}
-
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="grid grid-cols-2 gap-2 mt-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">{currentStreak}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Current Streak</div>
+                  <div className="text-xl font-bold text-blue-500">{currentStreak}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Current Streak</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-500">{longestStreak}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Longest Streak</div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">{completionRate}%</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Completion Rate</div>
+                  <div className="text-xl font-bold text-purple-500">{longestStreak}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Longest Streak</div>
                 </div>
               </div>
-
+              <div className="mt-2">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-green-500">{completionRate}%</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Completion Rate</div>
+                </div>
+              </div>
               {/* Achievement Stats */}
-              <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg">
+              <div className="mt-3 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg">
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div>
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{achievementStats.totalAchievements || 0}</div>
-                    <div className="text-sm text-blue-600 dark:text-blue-400">Total</div>
+                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{achievementStats.totalAchievements || 0}</div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">Total</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{achievementStats.completedAchievements || 0}</div>
-                    <div className="text-sm text-green-600 dark:text-green-400">Completed</div>
+                    <div className="text-xl font-bold text-green-600 dark:text-green-400">{achievementStats.completedAchievements || 0}</div>
+                    <div className="text-xs text-green-600 dark:text-green-400">Completed</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{achievementStats.completionRate || 0}%</div>
-                    <div className="text-sm text-purple-600 dark:text-purple-400">Completion</div>
+                    <div className="text-xl font-bold text-purple-600 dark:text-purple-400">{achievementStats.completionRate || 0}%</div>
+                    <div className="text-xs text-purple-600 dark:text-purple-400">Completion</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           {/* User ID Search Bar */}
-          <div className="mt-8 bg-gray-50 dark:bg-gray-900 rounded-xl shadow p-4">
-            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><MagnifyingGlassIcon className="w-5 h-5" /> Search User by ID</h3>
-            <form onSubmit={handleSearch} className="flex gap-2 mb-2">
+          <div className="mt-6 bg-gray-50 dark:bg-gray-900 rounded-xl shadow p-3 w-full">
+            <h3 className="text-base font-semibold mb-2 flex items-center gap-2"><MagnifyingGlassIcon className="w-5 h-5" /> Search User by ID</h3>
+            <form onSubmit={handleSearch} className="flex gap-2 mb-2 w-full">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search by user ID (e.g. @username)"
-                className="border rounded px-3 py-2 w-full"
+                className="border rounded px-3 py-2 w-full text-sm"
                 minLength={2}
                 required
                 disabled={searchLoading}
               />
-              <button type="submit" className="btn-secondary px-4 py-2" disabled={searchLoading}>
+              <button type="submit" className="btn-secondary px-4 py-2 text-sm" disabled={searchLoading}>
                 {searchLoading ? 'Searching...' : 'Search'}
               </button>
             </form>
-            {searchError && <div className="text-danger-600 mb-2">{searchError}</div>}
+            {searchError && <div className="text-danger-600 mb-2 text-sm">{searchError}</div>}
             {searchResult && (
-              <div className="flex items-center gap-4 bg-white dark:bg-gray-800 rounded-lg p-4 shadow mt-2">
+              <div className="flex items-center gap-4 bg-white dark:bg-gray-800 rounded-lg p-3 shadow mt-2">
                 <img src={searchResult.avatar || '/default-profile.png'} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
                 <div className="flex-1">
-                  <div className="font-semibold">@{searchResult.username}</div>
-                  <div className="text-gray-500">{searchResult.displayName}</div>
+                  <div className="font-semibold text-sm">@{searchResult.username}</div>
+                  <div className="text-gray-500 text-xs">{searchResult.displayName}</div>
                 </div>
                 <a
                   href={`/profile/${searchResult.username}`}
-                  className="btn-primary px-3 py-1 text-sm"
+                  className="btn-primary px-3 py-1 text-xs"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -751,14 +883,14 @@ const Profile = () => {
             )}
             {/* Friends List */}
             {friends.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-semibold mb-2">Your Friends</h4>
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 text-sm">Your Friends</h4>
                 <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                   {friends.map(friend => (
                     <li key={friend._id} className="flex items-center gap-3 py-2">
                       <img src={friend.avatar || '/default-profile.png'} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
-                      <span className="font-medium">@{friend.username}</span>
-                      <span className="text-gray-500">{friend.displayName}</span>
+                      <span className="font-medium text-sm">@{friend.username}</span>
+                      <span className="text-gray-500 text-xs">{friend.displayName}</span>
                       <a
                         href={`/profile/${friend.username}`}
                         className="btn-secondary px-2 py-1 text-xs ml-auto"
@@ -774,172 +906,309 @@ const Profile = () => {
             )}
           </div>
         </div>
-
-        {/* Activity Calendar (LeetCode style) */}
-        <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+        {/* Activity Calendar */}
+        <div className="lg:col-span-2 w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 w-full">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               <CalendarIcon className="w-5 h-5" />
               Activity Calendar
             </h3>
-            <div className="mt-6">
-              <div className="font-semibold mb-4 text-lg text-gray-800 dark:text-gray-100">
-                {currentMonth} Activity
-              </div>
-              
-              {/* Monthly Calendar */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-                {/* Day headers */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-1">
-                      {day}
-                    </div>
-                  ))}
+            
+            {/* Activity Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  {totalSubmissions}
                 </div>
-                
-                {/* Calendar grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {calendarWeeks.map((week, weekIndex) => (
-                    week.map((day, dayIndex) => (
-                      <div
-                        key={`${weekIndex}-${dayIndex}`}
-                                                  className={`
-                            aspect-square rounded-lg border border-gray-200 dark:border-gray-700 
-                            transition-all duration-200 cursor-pointer relative
-                            ${getMonthlyActivityColor(day)}
-                            ${day?.isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-                            ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
-                          `}
-                        title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
-                      >
-                        {day && (
-                          <div className="flex flex-col items-center justify-center h-full">
-                            <span className={`text-xs font-medium ${
-                              day.isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 
-                              day.isPast ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
-                            }`}>
-                              {day.day}
-                            </span>
-                            {day.completedCount > 0 && (
-                              <span className="text-xs text-green-600 dark:text-green-400 font-bold">
-                                {day.completedCount}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ))}
-                </div>
-                
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-4 mt-4 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded"></div>
-                    <span>No activity</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-200 dark:bg-green-800 rounded"></div>
-                    <span>1 task</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-400 dark:bg-green-600 rounded"></div>
-                    <span>2 tasks</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-600 dark:bg-green-400 rounded"></div>
-                    <span>3+ tasks</span>
-                  </div>
+                <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  Tasks Completed
                 </div>
               </div>
-              
-              {/* Monthly Stats */}
-              <div className="grid grid-cols-3 gap-4 mt-6">
-                <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalSubmissions}</div>
-                  <div className="text-sm text-green-600 dark:text-green-400">Tasks Completed</div>
+              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
+                  {totalActiveDays}
                 </div>
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalActiveDays}</div>
-                  <div className="text-sm text-blue-600 dark:text-blue-400">Active Days</div>
+                <div className="text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium">
+                  Active Days
                 </div>
-                <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {totalActiveDays > 0 ? Math.round((totalActiveDays / new Date().getDate()) * 100) : 0}%
-                  </div>
-                  <div className="text-sm text-purple-600 dark:text-purple-400">Monthly Progress</div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  {currentMonth}
+                </div>
+                <div className="text-xs sm:text-sm text-purple-600 dark:text-purple-400 font-medium">
+                  Current Month
                 </div>
               </div>
             </div>
+
+            {/* Calendar Header */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {currentMonth} Activity
+              </h4>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
+                      {day}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-1">
+                {calendarWeeks.map((week, weekIndex) => (
+                  week.map((day, dayIndex) => (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`
+                        w-8 h-8 rounded-sm border border-gray-200 dark:border-gray-700 
+                        transition-all duration-200 cursor-pointer relative group
+                        ${getMonthlyActivityColor(day)}
+                        ${day?.isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+                        ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                      `}
+                      title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
+                    >
+                      {day && (
+                        <div className="flex items-center justify-center h-full">
+                          <span className={`text-xs font-medium ${
+                            day.isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 
+                            day.isPast ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
+                          }`}>
+                            {day.day}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ))}
+              </div>
+            </div>
+            
+            {/* Activity Legend */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded-sm"></div>
+                <span className="text-gray-500 dark:text-gray-400">No activity</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-200 dark:bg-green-900 rounded-sm"></div>
+                <span className="text-gray-500 dark:text-gray-400">1 task</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-300 dark:bg-green-800 rounded-sm"></div>
+                <span className="text-gray-500 dark:text-gray-400">2 tasks</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-400 dark:bg-green-700 rounded-sm"></div>
+                <span className="text-gray-500 dark:text-gray-400">3 tasks</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 dark:bg-green-600 rounded-sm"></div>
+                <span className="text-gray-500 dark:text-gray-400">4+ tasks</span>
+              </div>
+            </div>
+
+            {/* Login Streak Info */}
+            {loginHistory && loginHistory.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                      Login Streak
+                    </h5>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      {loginHistory.length} days logged in this month
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {loginHistory.length}
+                    </div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                      Days
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Badges Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 w-full">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <TrophyIcon className="w-5 h-5" />
           Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
         </h3>
         
-     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-  {Object.entries(badgeDefinitions).map(([badgeId, badge]) => {
-    const isEarned = earnedBadges.includes(badgeId);
-
-    return (
-      <div
-        key={badgeId}
-        className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
-          isEarned
-            ? 'border-yellow-300 bg-white dark:bg-gray-700 scale-105'
-            : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-50'
-        }`}
-      >
-        <div className="text-center">
-          <div
-            className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-            style={{ 
-              padding: '8px',
-              boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
-            }}
-          >
-            {/* Black circle background always */}
-            <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
-            <img
-              src={badge.image}
-              alt={badge.name}
-              className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
-              style={{ background: 'transparent' }}
-            />
-          </div>
-          <h4
-            className={`font-medium text-sm ${
-              isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
-            }`}
-          >
-            {badge.name}
-          </h4>
-          <p
-            className={`text-xs mt-1 ${
-              isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
-            }`}
-          >
-            {badge.description}
-          </p>
-          {isEarned && (
-            <div className="mt-2">
-              <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full">
-                Earned
-              </span>
+        {/* Mobile: Horizontal scrollable row, Desktop: Grid */}
+        <div className="md:hidden">
+          {/* Mobile horizontal scroll */}
+          <div className="overflow-x-auto pb-4 -mx-2 px-2">
+            <div className="flex gap-4 min-w-max">
+              {Object.entries(badgeDefinitions)
+                .sort(([badgeIdA, badgeA], [badgeIdB, badgeB]) => {
+                  const isEarnedA = earnedBadges.includes(badgeIdA);
+                  const isEarnedB = earnedBadges.includes(badgeIdB);
+                  if (isEarnedA && !isEarnedB) return -1;
+                  if (!isEarnedA && isEarnedB) return 1;
+                  return badgeA.name.localeCompare(badgeB.name);
+                })
+                .map(([badgeId, badge]) => {
+                  const isEarned = earnedBadges.includes(badgeId);
+                  return (
+                    <div
+                      key={badgeId}
+                      className={`
+                        flex-shrink-0 w-32 p-4 rounded-lg border-2 transition-all duration-300 transform hover:scale-105
+                        ${isEarned
+                          ? 'border-yellow-300 bg-white dark:bg-gray-700 shadow-lg'
+                          : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'
+                        }
+                      `}
+                    >
+                      <div className="text-center">
+                        <div
+                          className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
+                          style={{ 
+                            padding: '6px',
+                            boxShadow: isEarned ? `0 0 15px 3px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
+                          }}
+                        >
+                          {/* Black circle background always */}
+                          <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+                          <img
+                            src={badge.image}
+                            alt={badge.name}
+                            className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+                            style={{ background: 'transparent' }}
+                          />
+                        </div>
+                        <h4
+                          className={`font-semibold text-sm mb-1 line-clamp-2 ${
+                            isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
+                          }`}
+                        >
+                          {badge.name}
+                        </h4>
+                        <p
+                          className={`text-xs leading-tight line-clamp-2 ${
+                            isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
+                          }`}
+                        >
+                          {badge.description}
+                        </p>
+                        {isEarned && (
+                          <div className="mt-2">
+                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full font-medium">
+                              ✓ Earned
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
-          )}
+          </div>
+          {/* Mobile scroll indicator */}
+          <div className="text-center mt-2">
+            <div className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span>Swipe to see all badges</span>
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+            </div>
+          </div>
         </div>
-      </div>
-    );
-  })}
-</div>
-
+        
+        {/* Desktop: Grid layout */}
+        <div className="hidden md:block">
+          <div className="max-h-96 overflow-y-auto pr-2">
+            <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {Object.entries(badgeDefinitions)
+                .sort(([badgeIdA, badgeA], [badgeIdB, badgeB]) => {
+                  const isEarnedA = earnedBadges.includes(badgeIdA);
+                  const isEarnedB = earnedBadges.includes(badgeIdB);
+                  if (isEarnedA && !isEarnedB) return -1;
+                  if (!isEarnedA && isEarnedB) return 1;
+                  return badgeA.name.localeCompare(badgeB.name);
+                })
+                .map(([badgeId, badge]) => {
+                  const isEarned = earnedBadges.includes(badgeId);
+                  return (
+                    <div
+                      key={badgeId}
+                      className={`
+                        p-4 rounded-lg border-2 transition-all duration-300 transform hover:scale-105
+                        ${isEarned
+                          ? 'border-yellow-300 bg-white dark:bg-gray-700 shadow-lg'
+                          : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'
+                        }
+                      `}
+                    >
+                      <div className="text-center">
+                        <div
+                          className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
+                          style={{ 
+                            padding: '6px',
+                            boxShadow: isEarned ? `0 0 15px 3px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
+                          }}
+                        >
+                          {/* Black circle background always */}
+                          <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+                          <img
+                            src={badge.image}
+                            alt={badge.name}
+                            className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+                            style={{ background: 'transparent' }}
+                          />
+                        </div>
+                        <h4
+                          className={`font-semibold text-sm mb-1 ${
+                            isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
+                          }`}
+                        >
+                          {badge.name}
+                        </h4>
+                        <p
+                          className={`text-xs leading-tight ${
+                            isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
+                          }`}
+                        >
+                          {badge.description}
+                        </p>
+                        {isEarned && (
+                          <div className="mt-2">
+                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full font-medium">
+                              ✓ Earned
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+          {/* Desktop scroll indicator */}
+          <div className="text-center mt-4">
+            <div className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+              <span>Scroll to see all badges</span>
+              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Recent Achievements */}
@@ -1068,4 +1337,4 @@ const Profile = () => {
   );
 };
 
-export default Profile; 
+export default Profile;

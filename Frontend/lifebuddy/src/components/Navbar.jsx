@@ -62,9 +62,13 @@ const Navbar = ({ onMenuClick }) => {
             </button>
             
             <div className="hidden lg:flex lg:items-center lg:space-x-4">
-              <h1 className={`text-xl font-semibold ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>LifeBuddy</h1>
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/lifebuddy-high-resolution-logo-transparent.png" 
+                  alt="LifeBuddy Logo" 
+                  className="w-14 h-14 object-contain"
+                />
+              </div>
               <span className={`text-sm ${
                 isDarkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>Your life, organized</span>

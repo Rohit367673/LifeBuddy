@@ -448,4 +448,10 @@ achievementSchema.statics.getTargetProgress = function(criteria) {
   return values.length === 1 ? values[0] : 100;
 };
 
+// Virtual field to compute if achievement is earned
+achievementSchema.virtual('isEarned').get(function() {
+  if (!this.progress) return false;
+  return this.progress.current >= this.progress.target;
+});
+
 module.exports = mongoose.model('Achievement', achievementSchema); 

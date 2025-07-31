@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { FormData } from './TaskSchedulerForm';
-import { ChevronLeft, Calendar, Phone, Shield, Sparkles, Zap, Check, MessageCircle, Mail, Smartphone } from 'lucide-react';
+import { ChevronLeft, Calendar, Phone, Shield, Sparkles, Zap, Check } from 'lucide-react';
 
 interface Step3Props {
   formData: FormData;
@@ -18,11 +18,7 @@ interface Step3Props {
 export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Step3Props) {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState('email');
-  const [telegramConnected, setTelegramConnected] = useState(false);
-  const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const canSubmit = (selectedPlatform === 'telegram' && telegramConnected) || (formData.contactInfo?.trim() && formData.agreeToTerms);
+  const canSubmit = formData.contactNumber.trim() && formData.agreeToTerms;
 
   const countryCodes = [
     { code: '+1', country: 'US/CA', flag: '🇺🇸' },
@@ -43,47 +39,6 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
     onSubmit();
     setIsSubmitting(false);
   };
-
-  // Poll for Telegram connection after Connect Telegram is clicked
-  const startTelegramPolling = () => {
-    console.log('Starting Telegram polling...');
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = setInterval(async () => {
-      try {
-        console.log('Polling for Telegram connection...');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          console.log('Profile data:', data);
-          if (data.telegramChatId) {
-            console.log('Telegram connected! Chat ID:', data.telegramChatId);
-            setTelegramConnected(true);
-            setTelegramChatId(data.telegramChatId);
-            updateFormData({ contactInfo: data.telegramChatId });
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current);
-              pollingRef.current = null;
-            }
-          }
-        } else {
-          console.log('Failed to fetch profile:', res.status);
-        }
-      } catch (error) {
-        console.error('Error polling for Telegram:', error);
-      }
-    }, 2000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -108,7 +63,7 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
 
   return (
     <motion.div 
-      className="space-y-8 min-h-[600px] max-h-[80vh] overflow-y-auto pb-8"
+      className="space-y-8"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -143,192 +98,53 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
       </motion.div>
 
       <div className="space-y-8">
-        {/* Messaging Platform Selection */}
+        {/* Contact Number */}
         <motion.div 
           className="space-y-4"
           variants={itemVariants}
         >
           <Label className="text-slate-700 flex items-center gap-2">
-            <MessageCircle className="w-4 h-4 text-indigo-500" />
-            Choose Notification Platform
+            <Phone className="w-4 h-4 text-indigo-500" />
+            Contact Number
           </Label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { 
-                id: 'email', 
-                icon: Mail, 
-                title: 'Email', 
-                description: 'Receive daily tasks via email',
-                color: 'from-blue-500 to-cyan-500'
-              },
-              { 
-                id: 'whatsapp', 
-                icon: Smartphone, 
-                title: 'WhatsApp', 
-                description: 'Get notifications on WhatsApp (India-focused)',
-                color: 'from-green-500 to-emerald-500'
-              },
-              { 
-                id: 'telegram', 
-                icon: MessageCircle, 
-                title: 'Telegram', 
-                description: 'Receive messages on Telegram (Global)',
-                color: 'from-indigo-500 to-purple-500'
-              }
-            ].map((platform) => (
-              <motion.div
-                key={platform.id}
-                className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                  selectedPlatform === platform.id 
-                    ? 'border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-lg' 
-                    : 'border-slate-200 bg-white/80 hover:border-slate-300 hover:shadow-md'
-                }`}
-                onClick={() => {
-                  setSelectedPlatform(platform.id);
-                  updateFormData({ notificationPlatform: platform.id });
-                }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-gradient-to-r ${platform.color}`}>
-                    <platform.icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-800">{platform.title}</h3>
-                    <p className="text-xs text-slate-600">{platform.description}</p>
-                  </div>
-                </div>
-                {selectedPlatform === platform.id && (
-                  <motion.div
-                    className="absolute top-2 right-2 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <Check className="w-4 h-4 text-white" />
-                  </motion.div>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Contact Information */}
-        <motion.div 
-          className="space-y-4"
-          variants={itemVariants}
-        >
-          <Label className="text-slate-700 flex items-center gap-2">
-            {selectedPlatform === 'whatsapp' ? (
-              <Smartphone className="w-4 h-4 text-green-500" />
-            ) : selectedPlatform === 'telegram' ? (
-              <MessageCircle className="w-4 h-4 text-indigo-500" />
-            ) : (
-              <Mail className="w-4 h-4 text-blue-500" />
-            )}
-            {selectedPlatform === 'whatsapp' ? 'WhatsApp Number' : 
-             selectedPlatform === 'telegram' ? 'Telegram Chat ID' : 'Email Address'}
-          </Label>
-          {selectedPlatform === 'telegram' && (
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                className="btn-primary w-full py-3 text-lg"
-                onClick={async () => {
-                  // Fetch link token from backend
-                  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/telegram/link-token`, {
-                    method: 'GET',
-                    headers: {
-                      'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    const token = data.token;
-                    window.open(`https://t.me/lifebuddy_AI_bot?start=${token}`, '_blank');
-                    startTelegramPolling();
-                  } else {
-                    alert('Failed to get Telegram link token.');
-                  }
-                }}
-                disabled={telegramConnected}
-              >
-                {telegramConnected ? 'Telegram Connected!' : 'Connect Telegram'}
-              </button>
-              <div className="text-xs text-indigo-700 mt-2">
-                {telegramConnected ? (
-                  <span className="text-green-600 font-semibold">Connected! Your Telegram chat ID: <b>{telegramChatId}</b></span>
-                ) : (
-                  <>
-                    After clicking, send <b>/start</b> to the bot. Your account will be linked automatically.<br/>
-                    <span className="text-gray-500">Waiting for connection...</span>
-                  </>
-                )}
-              </div>
-              {telegramConnected && telegramChatId && (
-                <div className="mt-2">
-                  <label className="block text-xs text-gray-600 mb-1">Your Telegram Chat ID</label>
-                  <input
-                    type="text"
-                    value={telegramChatId}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 cursor-not-allowed"
-                  />
-                </div>
-              )}
-            </div>
-          )}
           <motion.div 
             className="flex gap-4"
-            animate={focusedField === 'contactInfo' ? { scale: 1.01 } : { scale: 1 }}
+            animate={focusedField === 'contactNumber' ? { scale: 1.01 } : { scale: 1 }}
             transition={{ type: "spring", stiffness: 400 }}
           >
-            {selectedPlatform === 'whatsapp' && (
-              <Select
-                value={formData.countryCode}
-                onValueChange={(value) => updateFormData({ countryCode: value })}
-              >
-                <SelectTrigger className="w-32 h-14 border-2 border-slate-200 focus:border-indigo-400 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {countryCodes.map((item) => (
-                    <SelectItem key={item.code} value={item.code}>
-                      <span className="flex items-center gap-2">
-                        <span>{item.flag}</span>
-                        <span>{item.code}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <motion.div className={`relative ${selectedPlatform === 'whatsapp' ? 'flex-1' : 'w-full'}`}>
+            <Select
+              value={formData.countryCode}
+              onValueChange={(value) => updateFormData({ countryCode: value })}
+            >
+              <SelectTrigger className="w-32 h-14 border-2 border-slate-200 focus:border-indigo-400 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {countryCodes.map((item) => (
+                  <SelectItem key={item.code} value={item.code}>
+                    <span className="flex items-center gap-2">
+                      <span>{item.flag}</span>
+                      <span>{item.code}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <motion.div className="flex-1 relative">
               <Input
-                type={selectedPlatform === 'email' ? 'email' : selectedPlatform === 'telegram' ? 'text' : 'text'}
-                placeholder={
-                  selectedPlatform === 'whatsapp' ? 'Enter your WhatsApp number' :
-                  selectedPlatform === 'telegram' ? 'Enter your Telegram chat ID (numeric, not @username)' :
-                  'Enter your email address'
-                }
-                value={formData.contactInfo || ''}
-                onChange={(e) => {
-                  let value = e.target.value;
-                  if (selectedPlatform === 'telegram') {
-                    // Only allow numbers
-                    value = value.replace(/[^0-9]/g, '');
-                  }
-                  updateFormData({ contactInfo: value });
-                }}
-                onFocus={() => setFocusedField('contactInfo')}
+                type="tel"
+                placeholder="Enter your phone number"
+                value={formData.contactNumber}
+                onChange={(e) => updateFormData({ contactNumber: e.target.value })}
+                onFocus={() => setFocusedField('contactNumber')}
                 onBlur={() => setFocusedField(null)}
                 className="h-14 text-lg border-2 border-slate-200 focus:border-indigo-400 focus:ring-indigo-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
               />
               <motion.div
                 className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-400/5 to-purple-400/5 pointer-events-none"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: focusedField === 'contactInfo' ? 1 : 0 }}
+                animate={{ opacity: focusedField === 'contactNumber' ? 1 : 0 }}
                 transition={{ duration: 0.3 }}
               />
             </motion.div>
@@ -403,7 +219,7 @@ export function Step3Contact({ formData, updateFormData, onSubmit, onPrev }: Ste
 
       {/* Navigation */}
       <motion.div 
-        className="flex justify-between pt-6 mb-2 px-4"
+        className="flex justify-between pt-6"
         variants={itemVariants}
       >
         <motion.div

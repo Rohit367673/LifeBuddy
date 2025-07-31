@@ -92,9 +92,13 @@ const Sidebar = ({ open, onClose }) => {
                   isDarkMode ? 'bg-gray-800' : 'bg-white'
                 }`}>
                   <div className="flex h-16 shrink-0 items-center justify-between">
-                    <h1 className={`text-xl font-semibold ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
-                    }`}>LifeBuddy</h1>
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/lifebuddy-high-resolution-logo-transparent.png" 
+                        alt="LifeBuddy Logo" 
+                        className="w-14 h-14 object-contain"
+                      />
+                    </div>
                     <button
                       onClick={onClose}
                       className={`p-2 rounded-md ${
@@ -212,9 +216,13 @@ const Sidebar = ({ open, onClose }) => {
           isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
         }`}>
           <div className="flex h-16 shrink-0 items-center">
-            <h1 className={`text-xl font-semibold ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>LifeBuddy</h1>
+            <div className="flex items-center gap-3">
+              <img 
+                src="/lifebuddy-high-resolution-logo-transparent.png" 
+                alt="LifeBuddy Logo" 
+                className="w-14 h-14 object-contain"
+              />
+            </div>
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">

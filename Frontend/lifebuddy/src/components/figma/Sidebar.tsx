@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card } from './ui/card';
-import { Lightbulb, Clock, Target, Zap, TrendingUp, Brain, Star } from 'lucide-react';
+import { Lightbulb, Clock, Target, Zap } from 'lucide-react';
 
 export function Sidebar() {
   const tips = [
@@ -23,12 +23,6 @@ export function Sidebar() {
       description: "Let our AI analyze your patterns and suggest optimal scheduling times.",
       color: "from-indigo-500 to-purple-500"
     }
-  ];
-
-  const stats = [
-    { label: "Tasks Completed", value: "2,847", icon: TrendingUp, color: "text-green-600" },
-    { label: "Time Saved", value: "156h", icon: Clock, color: "text-blue-600" },
-    { label: "AI Accuracy", value: "94%", icon: Brain, color: "text-purple-600" },
   ];
 
   return (

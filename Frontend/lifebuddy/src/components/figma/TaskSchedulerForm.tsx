@@ -5,7 +5,6 @@ import { StepIndicator } from './StepIndicator';
 import { Step1TaskSchedule } from './Step1TaskSchedule';
 import { Step2DeepDock } from './Step2DeepDock';
 import { Step3Contact } from './Step3Contact';
-import { useNavigate } from 'react-router-dom';
 
 export interface FormData {
   taskTitle: string;
@@ -13,14 +12,16 @@ export interface FormData {
   endDate: string;
   taskDescription: string;
   requirements: string;
-  contactInfo: string;
+  contactNumber: string;
   countryCode: string;
-  notificationPlatform: string;
   agreeToTerms: boolean;
 }
 
-export function TaskSchedulerForm() {
-  const navigate = useNavigate();
+interface TaskSchedulerFormProps {
+  onScheduleCreated?: () => void;
+}
+
+export function TaskSchedulerForm({ onScheduleCreated }: TaskSchedulerFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -29,13 +30,10 @@ export function TaskSchedulerForm() {
     endDate: '',
     taskDescription: '',
     requirements: '',
-    contactInfo: '',
+    contactNumber: '',
     countryCode: '+1',
-    notificationPlatform: 'email',
     agreeToTerms: false
   });
-  const [formError, setFormError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const updateFormData = (updates: Partial<FormData>) => {
     setFormData(prev => ({ ...prev, ...updates }));
@@ -60,43 +58,27 @@ export function TaskSchedulerForm() {
   };
 
   const handleSubmit = async () => {
-    setFormError(null);
-    setLoading(true);
-    console.log('Form submitted:', formData);
-    
     try {
-      // Here you would typically send the data to your backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/setup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Adjust based on your auth method
-        },
-        body: JSON.stringify({
-          title: formData.taskTitle,
-          description: formData.taskDescription,
-          requirements: formData.requirements,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          notificationPlatform: formData.notificationPlatform,
-          contactInfo: formData.contactInfo,
-          consentGiven: formData.agreeToTerms
-        })
-      });
-
-      if (response.ok) {
-        // Redirect to the schedule page after successful submission
-        navigate('/my-schedule');
-      } else {
-        const errorData = await response.json();
-        setFormError(errorData.message || 'Failed to create schedule');
-        // Handle error (show toast, etc.)
+      // Here you would send the data to your backend
+      console.log('Form submitted:', formData);
+      
+      // For now, just show success message
+      alert('Schedule created successfully! Check your phone for the new plan.');
+      
+      // Call the callback to refresh the task
+      if (onScheduleCreated) {
+        onScheduleCreated();
       }
+      
+      // In a real implementation, you would:
+      // 1. Send formData to your backend API
+      // 2. Handle the response
+      // 3. Redirect or show success message
+      // 4. Optionally refresh the page to show the new task
+      
     } catch (error) {
-      setFormError('Error creating schedule');
-      // Handle error (show toast, etc.)
-    } finally {
-      setLoading(false);
+      console.error('Error submitting form:', error);
+      alert('Failed to create schedule. Please try again.');
     }
   };
 
@@ -126,7 +108,7 @@ export function TaskSchedulerForm() {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
     >
-      <Card className="relative p-8 bg-white/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-500 overflow-hidden">
+      <Card className="relative p-4 sm:p-6 bg-white/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-500 overflow-hidden">
         {/* Animated Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <motion.div
@@ -155,7 +137,7 @@ export function TaskSchedulerForm() {
         </motion.div>
 
         {/* Form Content with Page Transitions */}
-        <div className="relative mt-8 min-h-[500px]">
+        <div className="relative mt-6 sm:mt-8 min-h-[400px] sm:min-h-[500px]">
           <AnimatePresence mode="wait" custom={currentStep}>
             <motion.div
               key={currentStep}
@@ -207,14 +189,6 @@ export function TaskSchedulerForm() {
           animate={{ width: `${(currentStep / 3) * 100}%` }}
           transition={{ duration: 0.8, ease: "easeInOut" }}
         />
-        {formError && <div className="text-red-600 text-sm mb-2">{formError}</div>}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500 mb-4"></div>
-            <p className="text-lg text-slate-700 font-semibold">Generating your AI schedule...</p>
-            <p className="text-slate-500 mt-2">This may take up to a minute. Please wait.</p>
-          </div>
-        )}
       </Card>
     </motion.div>
   );

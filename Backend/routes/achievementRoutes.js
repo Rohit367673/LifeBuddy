@@ -12,7 +12,7 @@ router.get('/', authenticateUser, async (req, res) => {
   try {
     const { category, earned } = req.query;
     
-    const query = { user: req.user.id };
+    const query = { user: req.user._id };
     
     if (category) {
       query.category = category;
@@ -39,7 +39,7 @@ router.get('/:id', authenticateUser, async (req, res) => {
   try {
     const achievement = await Achievement.findOne({
       _id: req.params.id,
-      user: req.user.id
+      user: req.user._id
     });
     
     if (!achievement) {
@@ -56,7 +56,7 @@ router.get('/:id', authenticateUser, async (req, res) => {
 // Get available achievements (not yet earned)
 router.get('/available/list', authenticateUser, async (req, res) => {
   try {
-    const userAchievements = await Achievement.find({ user: req.user.id });
+    const userAchievements = await Achievement.find({ user: req.user._id });
     const earnedTypes = userAchievements.map(a => a.type);
     
     const availableAchievements = Achievement.getAvailableAchievements()
@@ -72,7 +72,7 @@ router.get('/available/list', authenticateUser, async (req, res) => {
 // Get achievement statistics
 router.get('/stats/overview', authenticateUser, async (req, res) => {
   try {
-    const achievements = await Achievement.find({ user: req.user.id });
+    const achievements = await Achievement.find({ user: req.user._id });
     
     const totalAchievements = achievements.length;
     const earnedAchievements = achievements.filter(a => a.isEarned).length;
@@ -119,6 +119,56 @@ router.get('/stats/overview', authenticateUser, async (req, res) => {
   }
 });
 
+// Initialize achievements for a user (creates all available achievements with progress)
+router.post('/initialize', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get user stats
+    const userStats = await User.getUserStats(req.user._id);
+    
+    // Get all available achievements
+    const availableAchievements = Achievement.getAvailableAchievements();
+    
+    // Get existing user achievements
+    const existingAchievements = await Achievement.find({ user: req.user._id });
+    const existingTypes = existingAchievements.map(a => a.type);
+    
+    const newAchievements = [];
+    
+    // Create achievements that don't exist yet
+    for (const achievement of availableAchievements) {
+      if (!existingTypes.includes(achievement.type)) {
+        const progress = {
+          current: Achievement.getCurrentProgress(achievement.criteria, userStats),
+          target: Achievement.getTargetProgress(achievement.criteria)
+        };
+        
+        const newAchievement = new Achievement({
+          user: req.user._id,
+          ...achievement,
+          progress
+        });
+        
+        await newAchievement.save();
+        newAchievements.push(newAchievement);
+      }
+    }
+    
+    res.json({
+      message: `Initialized ${newAchievements.length} achievements`,
+      newAchievements,
+      totalAchievements: existingAchievements.length + newAchievements.length
+    });
+  } catch (error) {
+    console.error('Error initializing achievements:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Check and award achievements (triggered by other actions)
 router.post('/check', authenticateUser, async (req, res) => {
   try {
@@ -127,7 +177,7 @@ router.post('/check', authenticateUser, async (req, res) => {
     
     // If no stats provided, calculate them
     if (Object.keys(userStats).length === 0) {
-      const user = await User.findById(req.user.id);
+      const user = await User.findById(req.user._id);
       userStats.eventsCreated = user.stats?.totalEvents || 0;
       userStats.eventsCompleted = user.stats?.completedEvents || 0;
       userStats.tasksCompleted = user.stats?.completedTasks || 0;
@@ -135,7 +185,7 @@ router.post('/check', authenticateUser, async (req, res) => {
       // Add more stats as needed
     }
     
-    const newAchievements = await Achievement.checkAchievements(req.user.id, userStats);
+    const newAchievements = await Achievement.checkAchievements(req.user._id, userStats);
     
     res.json({
       newAchievements,
@@ -153,7 +203,7 @@ router.get('/recent/list', authenticateUser, async (req, res) => {
     const { limit = 5 } = req.query;
     
     const recentAchievements = await Achievement.find({
-      user: req.user.id,
+      user: req.user._id,
       'progress.current': { $gte: '$progress.target' } // Only earned achievements
     })
     .sort({ earnedAt: -1 })
@@ -169,7 +219,7 @@ router.get('/recent/list', authenticateUser, async (req, res) => {
 // Get achievement progress for all available achievements
 router.get('/progress/overview', authenticateUser, async (req, res) => {
   try {
-    const userAchievements = await Achievement.find({ user: req.user.id });
+    const userAchievements = await Achievement.find({ user: req.user._id });
     const earnedTypes = userAchievements.map(a => a.type);
     
     const availableAchievements = Achievement.getAvailableAchievements();
