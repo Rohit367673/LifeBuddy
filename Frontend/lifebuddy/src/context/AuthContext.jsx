@@ -11,6 +11,7 @@ import {
   signInWithPopup
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig';
+import { getApiUrl, logConfig } from '../utils/config';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import UsernameModal from '../components/UsernameModal';
@@ -47,8 +48,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Register user directly in backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/register-traditional`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/register-traditional`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,18 +65,17 @@ export const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to register user');
+        throw new Error(errorData.message || 'Registration failed');
       }
 
       const data = await response.json();
       setToken(data.token);
       setUser(data.user);
-      
-      toast.success('Account created successfully!');
+      toast.success('Registration successful!');
       return data;
     } catch (error) {
-      console.error('Traditional registration error:', error);
-      toast.error(error.message || 'Failed to create account');
+      console.error('Registration error:', error);
+      toast.error(error.message || 'Registration failed');
       throw error;
     } finally {
       setLoading(false);
@@ -88,8 +87,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Login directly to backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login-traditional`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/login-traditional`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,18 +100,17 @@ export const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to login');
+        throw new Error(errorData.message || 'Login failed');
       }
 
       const data = await response.json();
       setToken(data.token);
       setUser(data.user);
-      
-      toast.success('Welcome back!');
+      toast.success('Login successful!');
       return data;
     } catch (error) {
-      console.error('Traditional login error:', error);
-      toast.error(error.message || 'Failed to login');
+      console.error('Login error:', error);
+      toast.error(error.message || 'Login failed');
       throw error;
     } finally {
       setLoading(false);
@@ -136,7 +133,7 @@ export const AuthProvider = ({ children }) => {
       const firebaseToken = await firebaseUser.getIdToken();
       
       // Register user in backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/register`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +181,7 @@ export const AuthProvider = ({ children }) => {
       const firebaseToken = await firebaseUser.getIdToken();
       
       // Login to backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,6 +219,9 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      // Log configuration for debugging
+      logConfig();
+      
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
@@ -233,6 +233,7 @@ export const AuthProvider = ({ children }) => {
       
       console.log('Starting Google login...');
       console.log('Current auth state:', auth.currentUser);
+      console.log('API URL:', getApiUrl());
       
       // Check if we're in a mobile browser (Instagram, Facebook, etc.)
       const isMobileBrowser = /Instagram|FBAN|FBAV|Facebook|Line|Twitter|LinkedInApp|WhatsApp|TelegramWebApp/i.test(navigator.userAgent);
@@ -286,9 +287,13 @@ export const AuthProvider = ({ children }) => {
   const handleSuccessfulGoogleLogin = async (firebaseUser) => {
     try {
       console.log('Handling successful Google login for:', firebaseUser.email);
+      console.log('Firebase UID:', firebaseUser.uid);
+      
+      const apiUrl = getApiUrl();
+      console.log('Using API URL:', apiUrl);
       
       // Try to login to backend, if user doesn't exist, register them
-      let response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
+      let response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -299,10 +304,12 @@ export const AuthProvider = ({ children }) => {
         }),
       });
 
+      console.log('Login response status:', response.status);
+
       if (response.status === 404) {
         // User not found, register them
         console.log('User not found, registering...');
-        response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/register`, {
+        response = await fetch(`${apiUrl}/api/auth/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -317,9 +324,12 @@ export const AuthProvider = ({ children }) => {
           }),
         });
         
+        console.log('Register response status:', response.status);
+        
         if (response.status === 409) {
           // User already exists, try login again
-          response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/login`, {
+          console.log('User already exists, trying login again...');
+          response = await fetch(`${apiUrl}/api/auth/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -333,7 +343,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!response.ok) {
-        throw new Error(`Backend request failed: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Backend request failed:', response.status, errorData);
+        throw new Error(`Backend request failed: ${response.status} - ${errorData.message || 'Unknown error'}`);
       }
 
       const data = await response.json();
@@ -356,7 +368,7 @@ export const AuthProvider = ({ children }) => {
       return data;
     } catch (error) {
       console.error('Error in handleSuccessfulGoogleLogin:', error);
-      toast.error('Failed to complete Google login. Please try again.');
+      toast.error(`Failed to complete Google login: ${error.message}`);
       setLoading(false);
       throw error;
     }
@@ -367,7 +379,7 @@ export const AuthProvider = ({ children }) => {
     if (!pendingGoogleUser) return;
     try {
       setLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/set-username`, {
+      const res = await fetch(`${getApiUrl()}/api/users/set-username`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -422,7 +434,7 @@ export const AuthProvider = ({ children }) => {
   // Verify token
   const verifyToken = async (token) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/verify`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/verify`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -446,7 +458,7 @@ export const AuthProvider = ({ children }) => {
   // After login or signup, fetch the latest user profile
   const fetchUserProfile = async (token) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/profile`, {
+      const res = await fetch(`${getApiUrl()}/api/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
