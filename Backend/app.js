@@ -36,17 +36,26 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-          'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
-    'https://life-buddy.vercel.app',
-    'https://www.lifebuddy.space',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    process.env.FRONTEND_URL
+      'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
+      'https://life-buddy.vercel.app',
+      'https://www.lifebuddy.space',
+      'https://lifebuddy.space',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:3000',
+      'http://localhost:5000',
+      process.env.FRONTEND_URL
     ].filter(Boolean);
+    
+    // Also allow any localhost origin for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
