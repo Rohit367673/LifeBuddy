@@ -19,7 +19,7 @@ const Signup = () => {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const { register, loginWithGoogle, registerTraditional } = useAuth();
+  const { register, loginWithGoogle, registerTraditional, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -151,13 +151,21 @@ const Signup = () => {
     
     try {
       await loginWithGoogle();
-      // Navigation will be handled by the redirect result
+      // Navigation will be handled by useEffect below
     } catch (error) {
       console.error('Google signup error:', error);
       setErrors({ general: error.message });
       setLoading(false);
     }
   };
+
+  // Navigate to dashboard when user is authenticated
+  useEffect(() => {
+    if (user && user.email && !authLoading) {
+      console.log('✅ Signup page: User authenticated, navigating to dashboard');
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

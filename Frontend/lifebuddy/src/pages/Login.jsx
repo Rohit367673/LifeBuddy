@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
@@ -35,13 +35,21 @@ const Login = () => {
     
     try {
       await loginWithGoogle();
-      // Navigation will be handled by the redirect result
+      // Navigation will be handled by useEffect below
     } catch (error) {
       console.error('Google login error:', error);
       setErrors({ general: error.message });
       setLoading(false);
     }
   };
+
+  // Navigate to dashboard when user is authenticated
+  useEffect(() => {
+    if (user && user.email && !authLoading) {
+      console.log('✅ Login page: User authenticated, navigating to dashboard');
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
