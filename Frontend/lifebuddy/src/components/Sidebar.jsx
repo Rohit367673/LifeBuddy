@@ -96,7 +96,7 @@ const Sidebar = ({ open, onClose }) => {
                       <img 
                         src="/lifebuddy-high-resolution-logo-transparent.png" 
                         alt="LifeBuddy Logo" 
-                        className="w-14 h-14 object-contain"
+                        className="w-20 h-14 object-contain"
                       />
                     </div>
                     <button
@@ -220,7 +220,7 @@ const Sidebar = ({ open, onClose }) => {
               <img 
                 src="/lifebuddy-high-resolution-logo-transparent.png" 
                 alt="LifeBuddy Logo" 
-                className="w-14 h-14 object-contain"
+                className="w-20 h-14 object-contain"
               />
             </div>
           </div>

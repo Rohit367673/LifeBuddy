@@ -8,7 +8,8 @@ import {
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -129,12 +130,18 @@ const Navbar = ({ onMenuClick }) => {
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img
                     className="h-8 w-8 rounded-full"
-                    src={user?.avatar || firebaseUser?.photoURL || '/default-profile.png'}
+                    src={user?.avatar || firebaseUser?.photoURL}
                     alt={user?.displayName || firebaseUser?.displayName || 'User'}
+                    onError={(e) => {
+                      console.log('Navbar image failed to load:', e.target.src);
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
                   />
-                ) : (
-                  <img className="h-8 w-8 rounded-full" src="/default-profile.png" alt="Default Profile" />
-                )}
+                ) : null}
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ display: (user?.avatar || firebaseUser?.photoURL) ? 'none' : 'flex' }}>
+                  <UserIcon className="h-4 w-4 text-white" />
+                </div>
                 <span className="hidden sm:block text-left">
                   <span className={`block text-sm font-medium ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
