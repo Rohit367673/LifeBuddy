@@ -304,7 +304,7 @@ export default function Productivity() {
             <h3 className="text-lg font-semibold text-slate-800 mb-2">AI-Powered Planning</h3>
             <p className="text-slate-600 text-sm">Our AI analyzes your tasks and creates optimal schedules</p>
           </div>
-          
+
           <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 text-center">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mx-auto mb-4">
               <ClockIcon className="w-6 h-6 text-white" />

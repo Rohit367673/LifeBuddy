@@ -354,6 +354,8 @@ export const AuthProvider = ({ children }) => {
       setToken(data.token);
       setFirebaseUser(firebaseUser);
       setUser(data.user); // Set user immediately for fast UI feedback
+      console.log('✅ User state updated:', data.user);
+      console.log('✅ Token set:', data.token);
       
       // If user has no username, show modal
       if (!data.user.username) {
@@ -361,7 +363,9 @@ export const AuthProvider = ({ children }) => {
         setShowUsernameModal(true);
       } else {
         // Fetch the latest user profile (which will have the username if set)
+        console.log('🔍 Fetching user profile after successful login...');
         await fetchUserProfile(data.token);
+        console.log('✅ User profile fetched successfully');
       }
       
       toast.success('Welcome back!');
@@ -434,6 +438,7 @@ export const AuthProvider = ({ children }) => {
   // Verify token
   const verifyToken = async (token) => {
     try {
+      console.log('🔍 Verifying token:', token ? 'Token exists' : 'No token');
       const response = await fetch(`${getApiUrl()}/api/auth/verify`, {
         method: 'GET',
         headers: {
@@ -442,11 +447,15 @@ export const AuthProvider = ({ children }) => {
         },
       });
 
+      console.log('🔍 Token verification response status:', response.status);
+
       if (!response.ok) {
+        console.log('❌ Token verification failed');
         return false;
       }
 
       const data = await response.json();
+      console.log('✅ Token verification successful, user:', data.user);
       setUser(data.user);
       return true;
     } catch (error) {
@@ -458,12 +467,17 @@ export const AuthProvider = ({ children }) => {
   // After login or signup, fetch the latest user profile
   const fetchUserProfile = async (token) => {
     try {
+      console.log('🔍 Fetching user profile with token:', token ? 'Token exists' : 'No token');
       const res = await fetch(`${getApiUrl()}/api/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('🔍 User profile response status:', res.status);
       if (res.ok) {
         const data = await res.json();
+        console.log('✅ User profile data received:', data);
         setUser(data);
+      } else {
+        console.log('❌ User profile fetch failed:', res.status);
       }
     } catch (err) {
       console.error('Failed to fetch user profile after login:', err);
