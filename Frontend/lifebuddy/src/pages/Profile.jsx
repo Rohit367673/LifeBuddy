@@ -26,6 +26,46 @@ import badge8 from '../assets/svg/badge-8.svg';
 import badge9 from '../assets/svg/badge-9.svg';
 import badge10 from '../assets/svg/badge-10.svg';
 
+// Helper function to process Google avatar URL with multiple fallbacks
+const processAvatarUrl = (url) => {
+  if (!url) return null;
+  
+  // If it's a Google avatar URL, try different approaches
+  if (url.includes('googleusercontent.com')) {
+    // Try to remove any existing size parameters and use a standard size
+    const cleanUrl = url.split('=')[0];
+    // Try different size parameters
+    return `${cleanUrl}=s96-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a fallback URL
+const createFallbackUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    const cleanUrl = url.split('=')[0];
+    // Try a different size parameter
+    return `${cleanUrl}=s48-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a proxy URL for Google images
+const createProxyUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    // Use a proxy service to bypass CORS issues
+    return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=96&h=96&fit=cover&output=webp`;
+  }
+  
+  return url;
+};
+
 const Profile = () => {
   const { user, getFirebaseToken, firebaseUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
@@ -782,12 +822,45 @@ const Profile = () => {
         <div className="lg:col-span-1 w-full">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 w-full">
             <div className="text-center">
+              {console.log('Profile - User avatar:', user?.avatar, 'Firebase photoURL:', firebaseUser?.photoURL)}
               <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatar || firebaseUser?.photoURL ? (
-                  <img src={user?.avatar || firebaseUser?.photoURL || '/default-profile.png'} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                ) : (
-                  <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
-                )}
+                  <img
+                    src={processAvatarUrl(user?.avatar || firebaseUser?.photoURL)}
+                    alt="Profile"
+                    className="w-full h-full object-cover rounded-full"
+                    onError={(e) => {
+                      console.log('Profile image failed to load:', e.target.src);
+                      // Try fallback URL first
+                      const fallbackUrl = createFallbackUrl(user?.avatar || firebaseUser?.photoURL);
+                      if (fallbackUrl && fallbackUrl !== e.target.src) {
+                        e.target.src = fallbackUrl;
+                      } else {
+                        // Try proxy URL as last resort
+                        const proxyUrl = createProxyUrl(user?.avatar || firebaseUser?.photoURL);
+                        if (proxyUrl && proxyUrl !== e.target.src) {
+                          e.target.src = proxyUrl;
+                        } else {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }
+                      }
+                    }}
+                    onLoad={(e) => {
+                      console.log('Profile image loaded successfully:', e.target.src);
+                      e.target.nextSibling.style.display = 'none';
+                    }}
+                  />
+                ) : null}
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center" style={{ display: (user?.avatar || firebaseUser?.photoURL) ? 'none' : 'flex' }}>
+                  {user?.displayName ? (
+                    <span className="text-2xl font-bold text-white">
+                      {user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </span>
+                  ) : (
+                    <UserIcon className="w-8 h-8 text-white" />
+                  )}
+                </div>
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
                 {user?.displayName || user?.email}
