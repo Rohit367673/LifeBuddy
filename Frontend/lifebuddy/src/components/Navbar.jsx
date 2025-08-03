@@ -14,6 +14,46 @@ import {
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 
+// Helper function to process Google avatar URL with multiple fallbacks
+const processAvatarUrl = (url) => {
+  if (!url) return null;
+  
+  // If it's a Google avatar URL, try different approaches
+  if (url.includes('googleusercontent.com')) {
+    // Try to remove any existing size parameters and use a standard size
+    const cleanUrl = url.split('=')[0];
+    // Try different size parameters
+    return `${cleanUrl}=s96-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a fallback URL
+const createFallbackUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    const cleanUrl = url.split('=')[0];
+    // Try a different size parameter
+    return `${cleanUrl}=s48-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a proxy URL for Google images
+const createProxyUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    // Use a proxy service to bypass CORS issues
+    return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=96&h=96&fit=cover&output=webp`;
+  }
+  
+  return url;
+};
+
 const Navbar = ({ onMenuClick }) => {
   const { user, firebaseUser, logout } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
@@ -127,20 +167,47 @@ const Navbar = ({ onMenuClick }) => {
                   : 'hover:bg-gray-100'
               } p-1`}>
                 <span className="sr-only">Open user menu</span>
+                {console.log('Navbar - User avatar:', user?.avatar, 'Firebase photoURL:', firebaseUser?.photoURL)}
+                {console.log('Navbar - Processed avatar URL:', processAvatarUrl(user?.avatar || firebaseUser?.photoURL))}
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img
                     className="h-8 w-8 rounded-full"
-                    src={user?.avatar || firebaseUser?.photoURL}
+                    src={processAvatarUrl(user?.avatar || firebaseUser?.photoURL)}
                     alt={user?.displayName || firebaseUser?.displayName || 'User'}
                     onError={(e) => {
                       console.log('Navbar image failed to load:', e.target.src);
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
+                      // Try fallback URL first
+                      const fallbackUrl = createFallbackUrl(user?.avatar || firebaseUser?.photoURL);
+                      console.log('Navbar - Trying fallback URL:', fallbackUrl);
+                      if (fallbackUrl && fallbackUrl !== e.target.src) {
+                        e.target.src = fallbackUrl;
+                      } else {
+                        // Try proxy URL as last resort
+                        const proxyUrl = createProxyUrl(user?.avatar || firebaseUser?.photoURL);
+                        console.log('Navbar - Trying proxy URL:', proxyUrl);
+                        if (proxyUrl && proxyUrl !== e.target.src) {
+                          e.target.src = proxyUrl;
+                        } else {
+                          console.log('Navbar - All image loading attempts failed, showing fallback');
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }
+                      }
+                    }}
+                    onLoad={(e) => {
+                      console.log('Navbar image loaded successfully:', e.target.src);
+                      e.target.nextSibling.style.display = 'none';
                     }}
                   />
                 ) : null}
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ display: (user?.avatar || firebaseUser?.photoURL) ? 'none' : 'flex' }}>
-                  <UserIcon className="h-4 w-4 text-white" />
+                  {user?.displayName ? (
+                    <span className="text-xs font-semibold text-white">
+                      {user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </span>
+                  ) : (
+                    <UserIcon className="h-4 w-4 text-white" />
+                  )}
                 </div>
                 <span className="hidden sm:block text-left">
                   <span className={`block text-sm font-medium ${

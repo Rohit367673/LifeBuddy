@@ -45,6 +45,7 @@ const Login = () => {
 
   // Navigate to dashboard when user is authenticated
   useEffect(() => {
+    console.log('🔍 Login page useEffect - User:', user?.email, 'AuthLoading:', authLoading);
     if (user && user.email && !authLoading) {
       console.log('✅ Login page: User authenticated, navigating to dashboard');
       navigate('/dashboard');

@@ -261,6 +261,7 @@ export const AuthProvider = ({ children }) => {
         // Handle successful popup login
         const firebaseUser = result.user;
         await handleSuccessfulGoogleLogin(firebaseUser);
+        setLoading(false);
         
       } catch (popupError) {
         console.log('Popup failed, trying redirect:', popupError);
@@ -369,6 +370,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       toast.success('Welcome back!');
+      setLoading(false);
       return data;
     } catch (error) {
       console.error('Error in handleSuccessfulGoogleLogin:', error);
