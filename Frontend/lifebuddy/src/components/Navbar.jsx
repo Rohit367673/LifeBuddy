@@ -167,35 +167,28 @@ const Navbar = ({ onMenuClick }) => {
                   : 'hover:bg-gray-100'
               } p-1`}>
                 <span className="sr-only">Open user menu</span>
-                {console.log('Navbar - User avatar:', user?.avatar, 'Firebase photoURL:', firebaseUser?.photoURL)}
-                {console.log('Navbar - Processed avatar URL:', processAvatarUrl(user?.avatar || firebaseUser?.photoURL))}
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img
                     className="h-8 w-8 rounded-full"
                     src={processAvatarUrl(user?.avatar || firebaseUser?.photoURL)}
                     alt={user?.displayName || firebaseUser?.displayName || 'User'}
                     onError={(e) => {
-                      console.log('Navbar image failed to load:', e.target.src);
                       // Try fallback URL first
                       const fallbackUrl = createFallbackUrl(user?.avatar || firebaseUser?.photoURL);
-                      console.log('Navbar - Trying fallback URL:', fallbackUrl);
                       if (fallbackUrl && fallbackUrl !== e.target.src) {
                         e.target.src = fallbackUrl;
                       } else {
                         // Try proxy URL as last resort
                         const proxyUrl = createProxyUrl(user?.avatar || firebaseUser?.photoURL);
-                        console.log('Navbar - Trying proxy URL:', proxyUrl);
                         if (proxyUrl && proxyUrl !== e.target.src) {
                           e.target.src = proxyUrl;
                         } else {
-                          console.log('Navbar - All image loading attempts failed, showing fallback');
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'flex';
                         }
                       }
                     }}
                     onLoad={(e) => {
-                      console.log('Navbar image loaded successfully:', e.target.src);
                       e.target.nextSibling.style.display = 'none';
                     }}
                   />

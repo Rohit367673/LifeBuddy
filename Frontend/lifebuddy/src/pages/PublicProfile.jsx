@@ -11,6 +11,46 @@ import badge8 from '../assets/svg/badge-8.svg';
 import badge9 from '../assets/svg/badge-9.svg';
 import badge10 from '../assets/svg/badge-10.svg';
 
+// Helper function to process Google avatar URL with multiple fallbacks
+const processAvatarUrl = (url) => {
+  if (!url) return null;
+  
+  // If it's a Google avatar URL, try different approaches
+  if (url.includes('googleusercontent.com')) {
+    // Try to remove any existing size parameters and use a standard size
+    const cleanUrl = url.split('=')[0];
+    // Try different size parameters
+    return `${cleanUrl}=s96-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a fallback URL
+const createFallbackUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    const cleanUrl = url.split('=')[0];
+    // Try a different size parameter
+    return `${cleanUrl}=s48-c`;
+  }
+  
+  return url;
+};
+
+// Helper function to create a proxy URL for Google images
+const createProxyUrl = (url) => {
+  if (!url) return null;
+  
+  if (url.includes('googleusercontent.com')) {
+    // Use a proxy service to bypass CORS issues
+    return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=96&h=96&fit=cover&output=webp`;
+  }
+  
+  return url;
+};
+
 const badgeDefinitions = {
   'first_login': {
     name: 'Welcome Aboard!',
@@ -298,10 +338,40 @@ const PublicProfile = () => {
             <div className="text-center">
               <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
                 {profile.avatar ? (
-                  <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                ) : (
-                  <img src="/default-profile.png" alt="Default Profile" className="w-full h-full object-cover rounded-full" />
-                )}
+                  <img 
+                    src={processAvatarUrl(profile.avatar)} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover rounded-full"
+                    onError={(e) => {
+                      // Try fallback URL first
+                      const fallbackUrl = createFallbackUrl(profile.avatar);
+                      if (fallbackUrl && fallbackUrl !== e.target.src) {
+                        e.target.src = fallbackUrl;
+                      } else {
+                        // Try proxy URL as last resort
+                        const proxyUrl = createProxyUrl(profile.avatar);
+                        if (proxyUrl && proxyUrl !== e.target.src) {
+                          e.target.src = proxyUrl;
+                        } else {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }
+                      }
+                    }}
+                    onLoad={(e) => {
+                      e.target.nextSibling.style.display = 'none';
+                    }}
+                  />
+                ) : null}
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center" style={{ display: profile.avatar ? 'none' : 'flex' }}>
+                  {profile.displayName ? (
+                    <span className="text-2xl font-bold text-white">
+                      {profile.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </span>
+                  ) : (
+                    <UserIcon className="w-8 h-8 text-white" />
+                  )}
+                </div>
               </div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center justify-center gap-2">
                 {profile.displayName}
@@ -368,32 +438,120 @@ const PublicProfile = () => {
               <CalendarIcon className="w-5 h-5" />
               Activity Calendar
             </h3>
-            <div className="mt-6">
-              <div className="font-semibold mb-2 text-sm text-gray-700">Activity Calendar</div>
-              <div className="overflow-x-auto">
-                <div className="flex gap-1">
-                  {weeks.map((week, wi) => (
-                    <div key={wi} className="flex flex-col gap-1">
-                      {week.map((day, di) => (
-                        <div
-                          key={di}
-                          className={`w-4 h-4 rounded-sm border border-gray-200 transition-colors duration-200
-                            ${!day ? 'bg-transparent' :
-                              day.loggedIn ? 'bg-green-500' :
-                              'bg-gray-200'}
-                          `}
-                          title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : ''}` : ''}
-                          style={{ minWidth: 16, minHeight: 16 }}
-                        />
-                      ))}
-                    </div>
-                  ))}
+            {/* Activity Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-blue-600">
+                  {totalTasks || 0}
                 </div>
-                <div className="flex justify-between mt-1 text-xs text-gray-400">
-                  <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                <div className="text-xs sm:text-sm text-blue-600 font-medium">
+                  Tasks Completed
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-green-600">
+                  {loginHistory?.length || 0}
+                </div>
+                <div className="text-xs sm:text-sm text-green-600 font-medium">
+                  Active Days
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-purple-600">
+                  {new Date().getMonth() + 1}
+                </div>
+                <div className="text-xs sm:text-sm text-purple-600 font-medium">
+                  Current Month
                 </div>
               </div>
             </div>
+
+            {/* Calendar Header */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                {new Date().toLocaleString('default', { month: 'long' })} Activity
+              </h4>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center">
+                    <div className="text-xs font-medium text-gray-500 py-1">
+                      {day}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-1">
+                {weeks.map((week, weekIndex) => (
+                  week.map((day, dayIndex) => (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`
+                        w-8 h-8 rounded-sm border border-gray-200 
+                        transition-all duration-200 cursor-pointer relative group
+                        ${!day ? 'bg-gray-50' : 
+                          day.loggedIn ? 'bg-green-500' : 'bg-gray-200'}
+                      `}
+                      title={day ? `${day.date}: ${day.loggedIn ? 'Checked in' : 'No activity'}` : 'No data'}
+                    >
+                      {day && (
+                        <div className="flex items-center justify-center h-full">
+                          <span className="text-xs font-medium text-gray-700">
+                            {new Date(day.date).getDate()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ))}
+              </div>
+            </div>
+            
+            {/* Activity Legend */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-gray-100 rounded-sm"></div>
+                <span className="text-gray-500">No activity</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-200 rounded-sm"></div>
+                <span className="text-gray-500">1 login</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 rounded-sm"></div>
+                <span className="text-gray-500">Checked in</span>
+              </div>
+            </div>
+
+            {/* Login Streak Info */}
+            {loginHistory && loginHistory.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-sm font-semibold text-blue-700">
+                      Login Streak
+                    </h5>
+                    <p className="text-xs text-blue-600">
+                      {loginHistory.length} days logged in this month
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-blue-600">
+                      {loginHistory.length}
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      Days
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -403,59 +561,70 @@ const PublicProfile = () => {
           <TrophyIcon className="w-5 h-5" />
           Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(badgeDefinitions).map(([badgeId, badge]) => {
-            const isEarned = earnedBadges.includes(badgeId);
-            return (
-              <div
-                key={badgeId}
-                className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
-                  isEarned
-                    ? 'border-yellow-300 bg-white scale-105'
-                    : 'border-gray-100 bg-gray-50 opacity-50'
-                }`}
-              >
-                <div className="text-center">
+        <div className="max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Sort earned badges first */}
+            {Object.entries(badgeDefinitions)
+              .sort(([aId, a], [bId, b]) => {
+                const aEarned = earnedBadges.includes(aId);
+                const bEarned = earnedBadges.includes(bId);
+                if (aEarned && !bEarned) return -1;
+                if (!aEarned && bEarned) return 1;
+                return 0;
+              })
+              .map(([badgeId, badge]) => {
+                const isEarned = earnedBadges.includes(badgeId);
+                return (
                   <div
-                    className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-                    style={{ 
-                      padding: '8px',
-                      boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
-                    }}
-                  >
-                    <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
-                    <img
-                      src={badge.image}
-                      alt={badge.name}
-                      className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
-                      style={{ background: 'transparent' }}
-                    />
-                  </div>
-                  <h4
-                    className={`font-medium text-sm ${
-                      isEarned ? 'text-gray-900' : 'text-gray-500'
+                    key={badgeId}
+                    className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
+                      isEarned
+                        ? 'border-yellow-300 bg-white scale-105'
+                        : 'border-gray-100 bg-gray-50 opacity-50'
                     }`}
                   >
-                    {badge.name}
-                  </h4>
-                  <p
-                    className={`text-xs mt-1 ${
-                      isEarned ? 'text-gray-600' : 'text-gray-400'
-                    }`}
-                  >
-                    {badge.description}
-                  </p>
-                  {isEarned && (
-                    <div className="mt-2">
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        Earned
-                      </span>
+                    <div className="text-center">
+                      <div
+                        className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
+                        style={{ 
+                          padding: '8px',
+                          boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
+                        }}
+                      >
+                        <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+                        <img
+                          src={badge.image}
+                          alt={badge.name}
+                          className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+                          style={{ background: 'transparent' }}
+                        />
+                      </div>
+                      <h4
+                        className={`font-medium text-sm ${
+                          isEarned ? 'text-gray-900' : 'text-gray-500'
+                        }`}
+                      >
+                        {badge.name}
+                      </h4>
+                      <p
+                        className={`text-xs mt-1 ${
+                          isEarned ? 'text-gray-600' : 'text-gray-400'
+                        }`}
+                      >
+                        {badge.description}
+                      </p>
+                      {isEarned && (
+                        <div className="mt-2">
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            Earned
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  </div>
+                );
+              })}
+          </div>
         </div>
       </div>
       {/* Recent Achievements */}
