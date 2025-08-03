@@ -69,7 +69,7 @@ const MainLayout = () => {
           <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <div className="lg:pl-64">
             <main className="py-10">
-              <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-6">
+              <div className="w-full">
                 <Outlet />
               </div>
             </main>
@@ -169,12 +169,13 @@ const MainLayout = () => {
         />
       )}
       
-      <main className="lg:pl-64 transition-all duration-300">
-        <div className="p-8">
-          {/* If admin, allow access to all features */}
-          <Outlet />
-        </div>
-      </main>
+      <div className="lg:pl-64">
+        <main className="py-10">
+          <div className="w-full">
+            <Outlet />
+          </div>
+        </main>
+      </div>
 
       <Toaster 
         position="top-right"

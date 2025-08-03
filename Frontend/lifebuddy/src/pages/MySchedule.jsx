@@ -180,7 +180,7 @@ export default function MySchedule() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
       >
-        <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="w-full px-2 py-6">
           <motion.div 
             className="flex items-center justify-center gap-3"
             initial={{ scale: 0.8, opacity: 0 }}
@@ -213,7 +213,7 @@ export default function MySchedule() {
 
       {/* Main Layout */}
       <motion.div 
-        className="max-w-7xl mx-auto p-6"
+                    className="w-full p-6"
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}

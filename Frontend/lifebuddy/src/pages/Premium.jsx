@@ -125,7 +125,7 @@ const Premium = () => {
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white">
         <div className="absolute inset-0 bg-black/10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="relative w-full py-20">
           <div className="text-center">
             {/* Animated Badge */}
             <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-8 animate-pulse">
@@ -160,7 +160,7 @@ const Premium = () => {
 
       {/* Current Usage (if free user) */}
       {subscription?.plan === 'free' && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="w-full py-12">
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Your Current Usage</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -200,7 +200,7 @@ const Premium = () => {
       )}
 
       {/* Premium Benefits Showcase */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
+              <div className="w-full py-8 sm:py-16">
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Why Upgrade to Premium?</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
@@ -292,7 +292,7 @@ const Premium = () => {
 
       {/* Testimonials */}
       <div className="bg-white py-8 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full">
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Loved by Productivity Enthusiasts</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-6 sm:mb-8">
@@ -320,7 +320,7 @@ const Premium = () => {
       </div>
 
       {/* Pricing Plans */}
-      <div id="pricing" ref={pricingRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
+              <div id="pricing" ref={pricingRef} className="w-full py-8 sm:py-16">
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Choose Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           {plans.map((plan) => {
@@ -447,7 +447,7 @@ const Premium = () => {
 
       {/* FAQ Section */}
       <div className="bg-gray-50 py-8 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full">
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 text-center mb-8 sm:mb-12">Frequently Asked Questions</h2>
           
           <div className="space-y-4 sm:space-y-6">
