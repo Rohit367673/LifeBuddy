@@ -822,7 +822,6 @@ const Profile = () => {
         <div className="lg:col-span-1 w-full">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 w-full">
             <div className="text-center">
-              {console.log('Profile - User avatar:', user?.avatar, 'Firebase photoURL:', firebaseUser?.photoURL)}
               <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
                 {user?.avatar || firebaseUser?.photoURL ? (
                   <img
@@ -830,7 +829,6 @@ const Profile = () => {
                     alt="Profile"
                     className="w-full h-full object-cover rounded-full"
                     onError={(e) => {
-                      console.log('Profile image failed to load:', e.target.src);
                       // Try fallback URL first
                       const fallbackUrl = createFallbackUrl(user?.avatar || firebaseUser?.photoURL);
                       if (fallbackUrl && fallbackUrl !== e.target.src) {
@@ -847,7 +845,6 @@ const Profile = () => {
                       }
                     }}
                     onLoad={(e) => {
-                      console.log('Profile image loaded successfully:', e.target.src);
                       e.target.nextSibling.style.display = 'none';
                     }}
                   />
@@ -939,7 +936,41 @@ const Profile = () => {
             {searchError && <div className="text-danger-600 mb-2 text-sm">{searchError}</div>}
             {searchResult && (
               <div className="flex items-center gap-4 bg-white dark:bg-gray-800 rounded-lg p-3 shadow mt-2">
-                <img src={searchResult.avatar || '/default-profile.png'} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  {searchResult.avatar ? (
+                    <img 
+                      src={processAvatarUrl(searchResult.avatar)} 
+                      alt="avatar" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const fallbackUrl = createFallbackUrl(searchResult.avatar);
+                        if (fallbackUrl && fallbackUrl !== e.target.src) {
+                          e.target.src = fallbackUrl;
+                        } else {
+                          const proxyUrl = createProxyUrl(searchResult.avatar);
+                          if (proxyUrl && proxyUrl !== e.target.src) {
+                            e.target.src = proxyUrl;
+                          } else {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }
+                        }
+                      }}
+                      onLoad={(e) => {
+                        e.target.nextSibling.style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ display: searchResult.avatar ? 'none' : 'flex' }}>
+                    {searchResult.displayName ? (
+                      <span className="text-xs font-semibold text-white">
+                        {searchResult.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </span>
+                    ) : (
+                      <UserIcon className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                </div>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">@{searchResult.username}</div>
                   <div className="text-gray-500 text-xs">{searchResult.displayName}</div>
@@ -961,7 +992,41 @@ const Profile = () => {
                 <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                   {friends.map(friend => (
                     <li key={friend._id} className="flex items-center gap-3 py-2">
-                      <img src={friend.avatar || '/default-profile.png'} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                        {friend.avatar ? (
+                          <img 
+                            src={processAvatarUrl(friend.avatar)} 
+                            alt="avatar" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const fallbackUrl = createFallbackUrl(friend.avatar);
+                              if (fallbackUrl && fallbackUrl !== e.target.src) {
+                                e.target.src = fallbackUrl;
+                              } else {
+                                const proxyUrl = createProxyUrl(friend.avatar);
+                                if (proxyUrl && proxyUrl !== e.target.src) {
+                                  e.target.src = proxyUrl;
+                                } else {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }
+                              }
+                            }}
+                            onLoad={(e) => {
+                              e.target.nextSibling.style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center" style={{ display: friend.avatar ? 'none' : 'flex' }}>
+                          {friend.displayName ? (
+                            <span className="text-xs font-semibold text-white">
+                              {friend.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                            </span>
+                          ) : (
+                            <UserIcon className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                      </div>
                       <span className="font-medium text-sm">@{friend.username}</span>
                       <span className="text-gray-500 text-xs">{friend.displayName}</span>
                       <a

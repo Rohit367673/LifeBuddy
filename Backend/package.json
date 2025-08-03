@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "auto-restart": "node auto-restart.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
