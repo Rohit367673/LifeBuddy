@@ -31,7 +31,13 @@ const achievementSchema = new mongoose.Schema({
       'consistency_king',
       'stress_manager',
       'productivity_master',
-      'first_login'
+      'first_login',
+      'mood_explorer',
+      'event_planner',
+      'streak_master',
+      'birthday_planner_pro',
+      'budget_master',
+      'checklist_champion'
     ]
   },
   title: {
