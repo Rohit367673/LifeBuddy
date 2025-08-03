@@ -744,7 +744,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="space-y-6 mt-10 w-full max-w-full px-2 sm:px-4 overflow-x-hidden ">
+    <div className="space-y-6 mt-10 w-full max-w-full overflow-x-hidden">
       {/* Username Prompt */}
       {!user?.username && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex flex-col items-center mb-4 w-full max-w-full">
@@ -783,29 +783,6 @@ const Profile = () => {
           >
             <TrophyIcon className="w-5 h-5" />
             Check Achievements
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/achievements/initialize`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${await getFirebaseToken()}`
-                  }
-                });
-                if (response.ok) {
-                  const data = await response.json();
-                  toast.success(`Initialized ${data.newAchievements?.length || 0} achievements!`);
-                  await loadAchievements();
-                }
-              } catch (error) {
-                toast.error('Failed to initialize achievements');
-              }
-            }}
-            className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm flex-shrink-0"
-          >
-            <SparklesIcon className="w-5 h-5" />
-            Initialize Achievements
           </button>
           <button
             onClick={() => setShowShareModal(true)}
