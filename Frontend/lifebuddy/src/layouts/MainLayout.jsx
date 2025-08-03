@@ -69,7 +69,7 @@ const MainLayout = () => {
           <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <div className="lg:pl-64">
             <main className="py-10">
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="mx-auto max-w-7xl px-2 sm:px-4 lg:px-6">
                 <Outlet />
               </div>
             </main>

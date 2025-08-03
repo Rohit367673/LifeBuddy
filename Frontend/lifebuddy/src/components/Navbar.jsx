@@ -85,7 +85,7 @@ const Navbar = ({ onMenuClick }) => {
         ? 'bg-gray-800 border-gray-700 lg:border-l lg:border-l-gray-700' 
         : 'bg-white border-gray-200 lg:border-l lg:border-l-gray-200'
     } lg:border-b-0 lg:pl-64`}>
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className="px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between h-16">
           {/* Left side */}
           <div className="flex items-center">
