@@ -30,7 +30,7 @@ const Events = () => {
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [modalType, setModalType] = useState('template'); // 'template', 'custom', 'edit'
+  const [modalType, setModalType] = useState('template');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('createdAt');
@@ -48,6 +48,7 @@ const Events = () => {
   });
 
   useEffect(() => {
+    console.log('🎯 Events page mounted');
     loadEvents();
     loadTemplates();
     loadStats();
@@ -55,17 +56,24 @@ const Events = () => {
 
   const loadEvents = async () => {
     try {
+      console.log('🔄 Loading events...');
+      const token = await getFirebaseToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
         headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
+          'Authorization': `Bearer ${token}`
         }
       });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Events loaded:', data.events?.length || 0);
         setEvents(data.events || []);
+      } else {
+        console.error('❌ Failed to load events:', response.status);
+        toast.error('Failed to load events');
       }
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error('❌ Error loading events:', error);
       toast.error('Failed to load events');
     } finally {
       setLoading(false);
@@ -74,37 +82,51 @@ const Events = () => {
 
   const loadTemplates = async () => {
     try {
+      console.log('🔄 Loading templates...');
+      const token = await getFirebaseToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/templates`, {
         headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
+          'Authorization': `Bearer ${token}`
         }
       });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Templates loaded:', data.templates?.length || 0);
         setTemplates(data.templates || []);
+      } else {
+        console.error('❌ Failed to load templates:', response.status);
       }
     } catch (error) {
-      console.error('Error loading templates:', error);
+      console.error('❌ Error loading templates:', error);
     }
   };
 
   const loadStats = async () => {
     try {
+      console.log('🔄 Loading stats...');
+      const token = await getFirebaseToken();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/stats/overview`, {
         headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
+          'Authorization': `Bearer ${token}`
         }
       });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Stats loaded:', data);
         setStats(data);
+      } else {
+        console.error('❌ Failed to load stats:', response.status);
       }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('❌ Error loading stats:', error);
     }
   };
 
   const handleCreateEvent = (type, template = null) => {
+    console.log('🎯 Creating event:', type, template);
+    
     // Check if user can create more events
     const eventLimit = checkUsageLimit('activeEvents');
     if (eventLimit.isLimitReached && !hasFeature('unlimitedEvents')) {
@@ -118,6 +140,8 @@ const Events = () => {
   };
 
   const handleEditEvent = (event) => {
+    console.log('🎯 Editing event:', event.title);
+    
     if (!hasFeature('advancedEventEditing')) {
       showUpgradePrompt('advancedEventEditing', 'Upgrade to premium for advanced event editing features!');
       return;
@@ -128,11 +152,14 @@ const Events = () => {
   };
 
   const handleViewEvent = (event) => {
+    console.log('🎯 Viewing event:', event.title);
     setSelectedEvent(event);
     setShowDetail(true);
   };
 
   const handleDeleteEvent = async (eventId) => {
+    console.log('🎯 Deleting event:', eventId);
+    
     if (!hasFeature('advancedEventManagement')) {
       showUpgradePrompt('advancedEventManagement', 'Upgrade to premium for advanced event management!');
       return;
@@ -140,10 +167,11 @@ const Events = () => {
 
     if (window.confirm('Are you sure you want to delete this event?')) {
       try {
+        const token = await getFirebaseToken();
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}`, {
           method: 'DELETE',
           headers: {
-            'Authorization': `Bearer ${await getFirebaseToken()}`
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -154,19 +182,21 @@ const Events = () => {
           toast.error('Failed to delete event');
         }
       } catch (error) {
-        console.error('Error deleting event:', error);
+        console.error('❌ Error deleting event:', error);
         toast.error('Failed to delete event');
       }
     }
   };
 
   const handleModalClose = () => {
+    console.log('🎯 Closing modal');
     setShowModal(false);
     setSelectedEvent(null);
     setSelectedTemplate(null);
   };
 
   const handleModalSuccess = () => {
+    console.log('🎯 Modal success, reloading data');
     loadEvents();
     loadStats();
   };
@@ -225,6 +255,13 @@ const Events = () => {
 
   const filteredEvents = getFilteredEvents();
   const eventLimit = checkUsageLimit('activeEvents');
+
+  console.log('🎯 Rendering Events page:', {
+    eventsCount: events.length,
+    templatesCount: templates.length,
+    filteredEventsCount: filteredEvents.length,
+    stats
+  });
 
   return (
     <div className="space-y-6 mt-8">
@@ -410,74 +447,13 @@ const Events = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.map((event) => (
-              <div key={event._id} className="card">
-                <div className="card-body">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl">{event.icon}</span>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {event.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {event.eventType}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => handleViewEvent(event)}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      {hasFeature('advancedEventEditing') && (
-                        <button
-                          onClick={() => handleEditEvent(event)}
-                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                      {hasFeature('advancedEventManagement') && (
-                        <button
-                          onClick={() => handleDeleteEvent(event._id)}
-                          className="p-1 text-gray-400 hover:text-red-600"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Progress</span>
-                      <span className="text-sm font-medium">{event.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${event.progress}%` }}
-                      ></div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(event.status)}`}>
-                        {event.status.replace('-', ' ')}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(event.priority)}`}>
-                        {event.priority}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>${event.budget.toLocaleString()}</span>
-                      <span>{new Date(event.startDate).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <EventCard
+                key={event._id}
+                event={event}
+                onView={handleViewEvent}
+                onEdit={hasFeature('advancedEventEditing') ? handleEditEvent : null}
+                onDelete={hasFeature('advancedEventManagement') ? handleDeleteEvent : null}
+              />
             ))}
           </div>
         )}
