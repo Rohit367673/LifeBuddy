@@ -331,9 +331,9 @@ const Premium = () => {
             {testimonials.map((testimonial, index) => (
               <TestimonialCard key={index} {...testimonial} />
             ))}
-          </div>
-        </div>
-      </div>
+                  </div>
+                </div>
+              </div>
 
       {/* Pricing Section */}
       <div ref={pricingRef} className="py-16 bg-white dark:bg-gray-800">
@@ -371,10 +371,10 @@ const Premium = () => {
             <p className="text-lg text-gray-600 dark:text-gray-300">
               Everything you need to know about LifeBuddy Premium
             </p>
-          </div>
+                  </div>
           <FAQAccordion faqs={faqs} />
-        </div>
-      </div>
+                  </div>
+                </div>
 
       {/* CTA Section */}
       <div className="py-16 bg-gradient-to-r from-blue-600 to-purple-600">
@@ -386,23 +386,23 @@ const Premium = () => {
             Join thousands of users who've already upgraded to Premium
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
+                  <button
               onClick={() => handleSubscribe('monthly')}
               className="btn btn-white btn-lg"
             >
               <StarIcon className="h-5 w-5 mr-2" />
               Start Monthly Plan
-            </button>
-            <button
+                  </button>
+                    <button
               onClick={() => handleSubscribe('yearly')}
               className="btn btn-outline-white btn-lg"
             >
               <GiftIcon className="h-5 w-5 mr-2" />
               Save with Yearly
-            </button>
-          </div>
+                    </button>
+              </div>
         </div>
-      </div>
+              </div>
 
       {/* Modals */}
       {showSubscribeModal && (
@@ -425,22 +425,22 @@ const Premium = () => {
               Enjoy all premium features for 7 days, no credit card required.
             </p>
             <div className="flex gap-4">
-              <button
+                  <button
                 onClick={handleStartTrial}
                 disabled={loading}
                 className="btn btn-primary flex-1"
-              >
+                  >
                 {loading ? 'Starting...' : 'Start Trial'}
-              </button>
-              <button
+                  </button>
+                  <button
                 onClick={() => setShowTrialModal(false)}
                 className="btn btn-outline flex-1"
-              >
-                Cancel
-              </button>
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
       )}
     </div>
   );

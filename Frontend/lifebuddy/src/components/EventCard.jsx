@@ -5,7 +5,8 @@ import {
   CheckCircleIcon,
   ClockIcon,
   CalendarIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 
 const EventCard = ({ event, onView, onEdit, onDelete }) => {
@@ -44,7 +45,31 @@ const EventCard = ({ event, onView, onEdit, onDelete }) => {
     return { total, completed };
   };
 
+  const formatLocation = (location) => {
+    if (!location) return null;
+    
+    // If location is a string, return it as is
+    if (typeof location === 'string') {
+      return location;
+    }
+    
+    // If location is an object, format it
+    if (typeof location === 'object') {
+      const parts = [];
+      if (location.address) parts.push(location.address);
+      if (location.city) parts.push(location.city);
+      if (location.state) parts.push(location.state);
+      if (location.country) parts.push(location.country);
+      
+      return parts.join(', ');
+    }
+    
+    // Fallback: convert to string
+    return String(location);
+  };
+
   const { total, completed } = getChecklistStats();
+  const formattedLocation = formatLocation(event.location);
 
   return (
     <div className="card hover:shadow-lg transition-all duration-200">
@@ -72,20 +97,24 @@ const EventCard = ({ event, onView, onEdit, onDelete }) => {
             >
               <EyeIcon className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => onEdit(event)}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="Edit Event"
-            >
-              <PencilIcon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onDelete(event._id)}
-              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-              title="Delete Event"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(event)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Edit Event"
+              >
+                <PencilIcon className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(event._id)}
+                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                title="Delete Event"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
         {/* Badge for template/custom */}
@@ -156,10 +185,10 @@ const EventCard = ({ event, onView, onEdit, onDelete }) => {
               </>
             )}
           </div>
-          {event.location && (
+          {formattedLocation && (
             <div className="flex items-center space-x-2">
-              <ClockIcon className="h-4 w-4" />
-              <span>{event.location}</span>
+              <MapPinIcon className="h-4 w-4" />
+              <span>{formattedLocation}</span>
             </div>
           )}
         </div>
