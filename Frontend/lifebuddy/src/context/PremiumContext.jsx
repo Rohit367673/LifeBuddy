@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 const PremiumContext = createContext();
 
@@ -72,21 +73,27 @@ export const PremiumProvider = ({ children }) => {
     }
   };
 
-  // Subscribe to premium plan
-  const subscribe = async (plan) => {
+  // Subscribe to premium plan with payment data
+  const subscribe = async (plan, paymentData = null) => {
     try {
-      // In a real app, you'd integrate with Stripe here
+      const requestBody = {
+        plan,
+        paymentData: paymentData || {
+          method: 'mock',
+          transactionId: 'MOCK_' + Date.now(),
+          amount: plan === 'monthly' ? 9.99 : 99.99,
+          currency: 'USD',
+          status: 'completed'
+        }
+      };
+
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/subscribe`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          plan,
-          stripeCustomerId: 'mock_customer_id',
-          stripeSubscriptionId: 'mock_subscription_id'
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
@@ -107,55 +114,165 @@ export const PremiumProvider = ({ children }) => {
     }
   };
 
-  // Check if user has premium feature
+  // Check if user has a specific feature
   const hasFeature = (feature) => {
-    return features[feature] || false;
+    if (!subscription) return false;
+    
+    // Free users have limited access
+    if (subscription.plan === 'free') {
+      const freeFeatures = [
+        'basicEvents',
+        'basicTasks', 
+        'basicMood',
+        'communitySupport'
+      ];
+      return freeFeatures.includes(feature);
+    }
+    
+    // Premium users have all features
+    return subscription.plan === 'monthly' || subscription.plan === 'yearly' || subscription.status === 'trial';
   };
 
   // Check usage limits
   const checkUsageLimit = (limitType) => {
     const limits = {
-      activeEvents: { free: 2, current: usage.activeEvents || 0 },
-      dailyTasks: { free: 10, current: usage.dailyTasks || 0 },
-      moodEntries: { free: 7, current: usage.moodEntries || 0 }
+      activeEvents: { free: 2, premium: Infinity },
+      dailyTasks: { free: 10, premium: Infinity },
+      moodEntries: { free: 7, premium: Infinity },
+      templates: { free: 3, premium: Infinity }
     };
 
     const limit = limits[limitType];
+    if (!limit) return { current: 0, limit: Infinity, percentage: 0 };
+
+    const current = usage[limitType] || 0;
+    const maxLimit = subscription?.plan === 'free' ? limit.free : limit.premium;
+    const percentage = Math.min((current / maxLimit) * 100, 100);
+
     return {
-      current: limit.current,
-      limit: limit.free,
-      isLimited: subscription?.plan === 'free' && limit.current >= limit.free,
-      remaining: limit.free - limit.current
+      current,
+      limit: maxLimit,
+      percentage,
+      isLimitReached: current >= maxLimit
     };
   };
 
-  // Show upgrade prompt
+  // Show upgrade prompt for locked features
   const showUpgradePrompt = (feature, message = 'Upgrade to premium for unlimited access') => {
-    toast.error(message, {
-      duration: 5000,
-      action: {
-        label: 'Upgrade',
-        onClick: () => window.location.href = '/premium'
-      }
-    });
-  };
-
-  // Get subscription plans
-  const getPlans = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/plans`);
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.error('Error fetching plans:', error);
+    if (!hasFeature(feature)) {
+      toast.error(message, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => window.location.href = '/premium'
+        }
+      });
+      return true;
     }
-    return [];
+    return false;
   };
 
+  // Get available plans
+  const getPlans = async () => {
+    return [
+      {
+        id: 'free',
+        name: 'Free',
+        price: 0,
+        period: 'forever',
+        description: 'Perfect for getting started',
+        features: [
+          'Up to 2 active events',
+          'Basic task management',
+          'Simple mood tracking',
+          'Community support',
+          'Basic templates'
+        ],
+        limitations: [
+          'Limited event templates',
+          'No advanced analytics',
+          'No AI insights',
+          'No premium support'
+        ],
+        buttonText: 'Current Plan',
+        buttonVariant: 'secondary',
+        popular: false
+      },
+      {
+        id: 'monthly',
+        name: 'Monthly',
+        price: 9.99,
+        period: 'month',
+        description: 'Most popular choice',
+        features: [
+          'Unlimited events',
+          'All premium templates',
+          'AI-powered insights',
+          'Advanced analytics',
+          'Priority support',
+          'Export to PDF',
+          'Calendar sync',
+          'Custom checklists'
+        ],
+        limitations: [],
+        buttonText: 'Start Monthly',
+        buttonVariant: 'primary',
+        popular: true,
+        savings: null
+      },
+      {
+        id: 'yearly',
+        name: 'Yearly',
+        price: 99.99,
+        period: 'year',
+        description: 'Best value - save 17%',
+        features: [
+          'Everything in Monthly',
+          'Early access to new features',
+          'Exclusive templates',
+          'Advanced reporting',
+          'Team collaboration',
+          'API access',
+          'White-label options'
+        ],
+        limitations: [],
+        buttonText: 'Start Yearly',
+        buttonVariant: 'primary',
+        popular: false,
+        savings: 'Save $19.89'
+      }
+    ];
+  };
+
+  // Feature gate component
+  const FeatureGate = ({ feature, children, fallback = null, message = 'Upgrade to premium to access this feature' }) => {
+    if (!hasFeature(feature)) {
+      return fallback || (
+        <div className="text-center py-8">
+          <div className="text-gray-500 dark:text-gray-400 mb-4">
+            <LockClosedIcon className="h-12 w-12 mx-auto mb-2" />
+            <p>{message}</p>
+          </div>
+          <button
+            onClick={() => window.location.href = '/premium'}
+            className="btn btn-primary"
+          >
+            Upgrade to Premium
+          </button>
+        </div>
+      );
+    }
+    return children;
+  };
+
+  // Update subscription status when user changes
   useEffect(() => {
     if (user && token) {
       fetchSubscriptionStatus();
+    } else {
+      setSubscription(null);
+      setFeatures({});
+      setUsage({});
+      setLoading(false);
     }
   }, [user, token]);
 
@@ -166,10 +283,11 @@ export const PremiumProvider = ({ children }) => {
     loading,
     hasFeature,
     checkUsageLimit,
+    showUpgradePrompt,
     startTrial,
     subscribe,
-    showUpgradePrompt,
     getPlans,
+    FeatureGate,
     fetchSubscriptionStatus
   };
 

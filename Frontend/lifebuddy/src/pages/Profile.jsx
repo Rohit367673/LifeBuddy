@@ -427,7 +427,7 @@ const Profile = () => {
         } else {
           toast.success('No new achievements unlocked. Keep up the great work!');
         }
-        await loadAchievements(); // Reload achievements
+          await loadAchievements(); // Reload achievements
       }
     } catch (error) {
       console.error('Error checking achievements:', error);
@@ -833,8 +833,8 @@ const Profile = () => {
                     </span>
                   ) : (
                     <UserIcon className="w-8 h-8 text-white" />
-                  )}
-                </div>
+                )}
+              </div>
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center justify-center gap-2">
                 {user?.displayName || user?.email}
@@ -1062,76 +1062,76 @@ const Profile = () => {
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 {currentMonth} Activity
               </h4>
-            </div>
-
+              </div>
+              
             {/* Calendar Grid */}
             <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
               {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                   <div key={day} className="text-center">
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
                       {day}
                     </div>
-                  </div>
-                ))}
-              </div>
-              
+                    </div>
+                  ))}
+                </div>
+                
               {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarWeeks.map((week, weekIndex) => (
-                  week.map((day, dayIndex) => (
-                    <div
-                      key={`${weekIndex}-${dayIndex}`}
-                      className={`
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarWeeks.map((week, weekIndex) => (
+                    week.map((day, dayIndex) => (
+                      <div
+                        key={`${weekIndex}-${dayIndex}`}
+                                                  className={`
                         w-8 h-8 rounded-sm border border-gray-200 dark:border-gray-700 
                         transition-all duration-200 cursor-pointer relative group
-                        ${getMonthlyActivityColor(day)}
+                            ${getMonthlyActivityColor(day)}
                         ${day?.isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
-                        ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
-                      `}
-                      title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
-                    >
-                      {day && (
+                            ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                          `}
+                        title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
+                      >
+                        {day && (
                         <div className="flex items-center justify-center h-full">
-                          <span className={`text-xs font-medium ${
-                            day.isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 
-                            day.isPast ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
-                          }`}>
-                            {day.day}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ))}
+                            <span className={`text-xs font-medium ${
+                              day.isToday ? 'text-blue-600 dark:text-blue-400 font-bold' : 
+                              day.isPast ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
+                            }`}>
+                              {day.day}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ))}
               </div>
-            </div>
-            
+                </div>
+                
             {/* Activity Legend */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs">
-              <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded-sm"></div>
                 <span className="text-gray-500 dark:text-gray-400">No activity</span>
-              </div>
-              <div className="flex items-center gap-1">
+                  </div>
+                  <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-green-200 dark:bg-green-900 rounded-sm"></div>
                 <span className="text-gray-500 dark:text-gray-400">1 task</span>
-              </div>
-              <div className="flex items-center gap-1">
+                  </div>
+                  <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-green-300 dark:bg-green-800 rounded-sm"></div>
                 <span className="text-gray-500 dark:text-gray-400">2 tasks</span>
-              </div>
-              <div className="flex items-center gap-1">
+                  </div>
+                  <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-green-400 dark:bg-green-700 rounded-sm"></div>
                 <span className="text-gray-500 dark:text-gray-400">3 tasks</span>
-              </div>
+                  </div>
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-green-500 dark:bg-green-600 rounded-sm"></div>
                 <span className="text-gray-500 dark:text-gray-400">4+ tasks</span>
+                </div>
               </div>
-            </div>
-
+              
             {/* Login Streak Info */}
             {loginHistory && loginHistory.length > 0 && (
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -1143,17 +1143,17 @@ const Profile = () => {
                     <p className="text-xs text-blue-600 dark:text-blue-400">
                       {loginHistory.length} days logged in this month
                     </p>
-                  </div>
+                </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                       {loginHistory.length}
-                    </div>
+                </div>
                     <div className="text-xs text-blue-600 dark:text-blue-400">
                       Days
-                    </div>
                   </div>
                 </div>
               </div>
+            </div>
             )}
           </div>
         </div>
@@ -1180,10 +1180,10 @@ const Profile = () => {
                   return badgeA.name.localeCompare(badgeB.name);
                 })
                 .map(([badgeId, badge]) => {
-                  const isEarned = earnedBadges.includes(badgeId);
-                  return (
-                    <div
-                      key={badgeId}
+    const isEarned = earnedBadges.includes(badgeId);
+    return (
+      <div
+        key={badgeId}
                       className={`
                         flex-shrink-0 w-32 p-4 rounded-lg border-2 transition-all duration-300 transform hover:scale-105
                         ${isEarned
@@ -1191,49 +1191,49 @@ const Profile = () => {
                           : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'
                         }
                       `}
-                    >
-                      <div className="text-center">
-                        <div
+      >
+        <div className="text-center">
+          <div
                           className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-                          style={{ 
+            style={{ 
                             padding: '6px',
                             boxShadow: isEarned ? `0 0 15px 3px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
-                          }}
-                        >
-                          {/* Black circle background always */}
-                          <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
-                          <img
-                            src={badge.image}
-                            alt={badge.name}
-                            className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
-                            style={{ background: 'transparent' }}
-                          />
-                        </div>
-                        <h4
+            }}
+          >
+            {/* Black circle background always */}
+            <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+            <img
+              src={badge.image}
+              alt={badge.name}
+              className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+              style={{ background: 'transparent' }}
+            />
+          </div>
+          <h4
                           className={`font-semibold text-sm mb-1 line-clamp-2 ${
-                            isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
-                          }`}
-                        >
-                          {badge.name}
-                        </h4>
-                        <p
+              isEarned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
+            }`}
+          >
+            {badge.name}
+          </h4>
+          <p
                           className={`text-xs leading-tight line-clamp-2 ${
-                            isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
-                          }`}
-                        >
-                          {badge.description}
-                        </p>
-                        {isEarned && (
-                          <div className="mt-2">
+              isEarned ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'
+            }`}
+          >
+            {badge.description}
+          </p>
+          {isEarned && (
+            <div className="mt-2">
                             <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full font-medium">
                               ✓ Earned
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })}
             </div>
           </div>
           {/* Mobile scroll indicator */}
@@ -1244,8 +1244,8 @@ const Profile = () => {
               <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
             </div>
           </div>
-        </div>
-        
+</div>
+
         {/* Desktop: Grid layout */}
         <div className="hidden md:block">
           <div className="max-h-96 overflow-y-auto pr-2">
@@ -1452,4 +1452,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Profile; 

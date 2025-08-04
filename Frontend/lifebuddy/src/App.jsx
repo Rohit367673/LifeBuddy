@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { PremiumProvider } from './context/PremiumContext';
 import Premium from './pages/Premium';
+import SubscribeSuccess from './pages/SubscribeSuccess';
 import Store from './pages/Store';
 import MainLayout from './layouts/MainLayout';
 import Home from './pages/Home';
@@ -34,6 +35,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/premium" element={<Premium />} />
+                <Route path="/subscribe-success" element={<SubscribeSuccess />} />
                 <Route path="/profile/:identifier" element={<PublicProfile />} />
 
                 {/* Main layout with nested routes */}

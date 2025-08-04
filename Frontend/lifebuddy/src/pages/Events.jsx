@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { usePremium } from '../context/PremiumContext';
 import { 
   PlusIcon,
   CalendarIcon,
@@ -22,6 +23,7 @@ import toast from 'react-hot-toast';
 const Events = () => {
   const { user, getFirebaseToken } = useAuth();
   const { isDarkMode } = useTheme();
+  const { hasFeature, showUpgradePrompt, checkUsageLimit } = usePremium();
   const [events, setEvents] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,12 +105,23 @@ const Events = () => {
   };
 
   const handleCreateEvent = (type, template = null) => {
+    // Check if user can create more events
+    const eventLimit = checkUsageLimit('activeEvents');
+    if (eventLimit.isLimitReached && !hasFeature('unlimitedEvents')) {
+      showUpgradePrompt('unlimitedEvents', 'You\'ve reached your event limit. Upgrade to premium for unlimited events!');
+      return;
+    }
+
     setModalType(type);
     setSelectedTemplate(template);
     setShowModal(true);
   };
 
   const handleEditEvent = (event) => {
+    if (!hasFeature('advancedEventEditing')) {
+      showUpgradePrompt('advancedEventEditing', 'Upgrade to premium for advanced event editing features!');
+      return;
+    }
     setSelectedEvent(event);
     setModalType('edit');
     setShowModal(true);
@@ -120,22 +133,30 @@ const Events = () => {
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (!window.confirm('Are you sure you want to delete this event?')) return;
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
+    if (!hasFeature('advancedEventManagement')) {
+      showUpgradePrompt('advancedEventManagement', 'Upgrade to premium for advanced event management!');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${await getFirebaseToken()}`
+          }
+        });
+
+        if (response.ok) {
+          toast.success('Event deleted successfully');
+          loadEvents();
+        } else {
+          toast.error('Failed to delete event');
         }
-      });
-      if (response.ok) {
-        toast.success('Event deleted');
-        loadEvents(); // Reload events after delete
-      } else {
+      } catch (error) {
+        console.error('Error deleting event:', error);
         toast.error('Failed to delete event');
       }
-    } catch (error) {
-      toast.error('Error deleting event');
     }
   };
 
@@ -143,56 +164,43 @@ const Events = () => {
     setShowModal(false);
     setSelectedEvent(null);
     setSelectedTemplate(null);
-    setModalType('template');
   };
 
   const handleModalSuccess = () => {
-    // Always reload events after modal actions
     loadEvents();
-    setShowModal(false);
-    setShowDetail(false);
-    setSelectedEvent(null);
-    setSelectedTemplate(null);
-    setModalType('template');
+    loadStats();
   };
 
   const getFilteredEvents = () => {
-    let filtered = [...events];
+    let filtered = events;
 
-    // Apply status filter robustly
     if (filter !== 'all') {
-      filtered = filtered.filter(event => {
-        // Fallback: treat missing/unknown status as 'planning'
-        const status = event.status || 'planning';
-        return status === filter;
-      });
+      filtered = filtered.filter(event => event.status === filter);
     }
 
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'createdAt':
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        case 'startDate':
-          return new Date(a.startDate) - new Date(b.startDate);
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
-        case 'progress':
-          return b.progress - a.progress;
-        default:
-          return 0;
-      }
-    });
+    switch (sortBy) {
+      case 'startDate':
+        filtered.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        break;
+      case 'priority':
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+        break;
+      case 'progress':
+        filtered.sort((a, b) => b.progress - a.progress);
+        break;
+      default:
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
     return filtered;
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-green-100 text-green-800';
+      case 'in-progress': return 'bg-blue-100 text-blue-800';
+      case 'planning': return 'bg-yellow-100 text-yellow-800';
       case 'archived': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -216,6 +224,7 @@ const Events = () => {
   }
 
   const filteredEvents = getFilteredEvents();
+  const eventLimit = checkUsageLimit('activeEvents');
 
   return (
     <div className="space-y-6 mt-8">
@@ -226,14 +235,6 @@ const Events = () => {
           <p className="text-gray-600 dark:text-gray-400">Plan and organize your life events</p>
         </div>
         <div className="flex space-x-2">
-          {/* Remove Custom Event button */}
-          {/* <button
-            onClick={() => handleCreateEvent('custom')}
-            className="btn btn-primary"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Custom Event
-          </button> */}
           <button
             onClick={() => handleCreateEvent('template')}
             className="btn btn-primary"
@@ -243,6 +244,29 @@ const Events = () => {
           </button>
         </div>
       </div>
+
+      {/* Usage Limit Warning for Free Users */}
+      {!hasFeature('unlimitedEvents') && eventLimit.percentage > 80 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-2" />
+            <div>
+              <p className="text-yellow-800 dark:text-yellow-200 font-medium">
+                Event Limit Warning
+              </p>
+              <p className="text-yellow-700 dark:text-yellow-300 text-sm">
+                You've used {eventLimit.current} of {eventLimit.limit} events. 
+                <button 
+                  onClick={() => window.location.href = '/premium'}
+                  className="text-blue-600 dark:text-blue-400 underline ml-1"
+                >
+                  Upgrade to premium for unlimited events!
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -407,18 +431,22 @@ const Events = () => {
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleEditEvent(event)}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(event._id)}
-                        className="p-1 text-gray-400 hover:text-red-600"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {hasFeature('advancedEventEditing') && (
+                        <button
+                          onClick={() => handleEditEvent(event)}
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      {hasFeature('advancedEventManagement') && (
+                        <button
+                          onClick={() => handleDeleteEvent(event._id)}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
