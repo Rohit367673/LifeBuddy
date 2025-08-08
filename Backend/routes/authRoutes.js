@@ -62,7 +62,7 @@ router.post('/register-traditional', authRateLimiter, async (req, res) => {
         email: user.email
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 
     // Return user data (without sensitive info)
@@ -164,7 +164,7 @@ router.post('/login-traditional', authRateLimiter, async (req, res) => {
         email: user.email
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 
     // Return user data
@@ -248,7 +248,7 @@ router.post('/register', authRateLimiter, async (req, res) => {
         userId: user._id 
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 
     // Return user data (without sensitive info)
@@ -346,7 +346,7 @@ router.post('/login', authRateLimiter, async (req, res) => {
         userId: user._id 
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 
     // Return user data
@@ -473,7 +473,7 @@ router.post('/refresh', authRateLimiter, async (req, res) => {
         userId: user._id 
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );
 
     res.json({

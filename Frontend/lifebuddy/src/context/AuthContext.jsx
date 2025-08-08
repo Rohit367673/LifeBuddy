@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
+  const tokenExpiryTimeoutRef = useRef(null);
   const navigate = useNavigate();
 
   // Get authentication token (ALWAYS use backend JWT, never Google ID token)
@@ -79,6 +80,56 @@ export const AuthProvider = ({ children }) => {
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Decode JWT safely (no external dependency)
+  const decodeJwt = (jwtToken) => {
+    try {
+      const base64Url = jwtToken.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const clearAutoLogoutTimer = () => {
+    if (tokenExpiryTimeoutRef.current) {
+      clearTimeout(tokenExpiryTimeoutRef.current);
+      tokenExpiryTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleAutoLogout = (jwtToken) => {
+    clearAutoLogoutTimer();
+    if (!jwtToken) return;
+    const decoded = decodeJwt(jwtToken);
+    if (!decoded || !decoded.exp) return;
+    const expiresAtMs = decoded.exp * 1000;
+    const timeLeftMs = expiresAtMs - Date.now();
+    if (timeLeftMs <= 0) {
+      // Already expired
+      handleSessionExpired();
+      return;
+    }
+    tokenExpiryTimeoutRef.current = setTimeout(() => {
+      handleSessionExpired();
+    }, timeLeftMs);
+  };
+
+  const handleSessionExpired = async () => {
+    try {
+      toast.error('Your session has expired. Please log in again.');
+      await logout();
+    } catch (_) {
+      // ignore
     }
   };
 
@@ -416,6 +467,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
+      clearAutoLogoutTimer();
       
       // Sign out from Firebase if user is logged in with Firebase
       if (firebaseUser) {
@@ -578,9 +630,11 @@ export const AuthProvider = ({ children }) => {
     if (token) {
       localStorage.setItem('token', token);
       console.log('Token saved to localStorage:', token);
+      scheduleAutoLogout(token);
     } else {
       localStorage.removeItem('token');
       console.log('Token removed from localStorage');
+      clearAutoLogoutTimer();
     }
   }, [token]);
 

@@ -168,7 +168,7 @@ const Premium = () => {
     {
       id: 'monthly',
       name: 'Monthly',
-      price: 9.99,
+      price: 199,
       period: 'month',
       description: 'Most popular choice',
       features: [
@@ -190,23 +190,23 @@ const Premium = () => {
     {
       id: 'yearly',
       name: 'Yearly',
-      price: 99.99,
+      price: 1990,
       period: 'year',
-      description: 'Best value - save 17%',
+      description: 'Best value - save 20%',
       features: [
         'Everything in Monthly',
         'Early access to new features',
         'Exclusive templates',
         'Advanced reporting',
-        'Team collaboration',
-        'API access',
-        'White-label options'
+        'Priority Feedback',
+        'Unlimited Event Templates',
+        'Unlimited AI scheduling'
       ],
       limitations: [],
       buttonText: 'Start Yearly',
       buttonVariant: 'primary',
       popular: false,
-      savings: 'Save $19.89'
+      savings: 'Save 477 Rs'
     }
   ];
 

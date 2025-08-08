@@ -26,6 +26,22 @@ import badge8 from '../assets/svg/badge-8.svg';
 import badge9 from '../assets/svg/badge-9.svg';
 import badge10 from '../assets/svg/badge-10.svg';
 
+import badge11 from '../assets/svg/badge-11.svg';
+import badge12 from '../assets/svg/badge-12.svg';
+import badge13 from '../assets/svg/badge-13.svg';
+import badge14 from '../assets/svg/badge-14.svg';
+import badge15 from '../assets/svg/badge-15.svg';
+import badge16 from '../assets/svg/badge-16.svg';
+import badge17 from '../assets/svg/badge-17.svg';
+import badge18 from '../assets/svg/badge-18.svg';
+import badge19 from '../assets/svg/badge-19.svg';
+import badge20 from '../assets/svg/badge-20.svg';
+import badge1 from '../assets/svg/badge-1.svg';
+
+
+
+
+
 // Helper function to process Google avatar URL with multiple fallbacks
 const processAvatarUrl = (url) => {
   if (!url) return null;
@@ -156,77 +172,77 @@ const Profile = () => {
     'perfect_week': {
       name: 'Perfect Week',
       description: 'Completed all planned tasks in a week',
-      image: badge4,
+      image: badge13,
       color: 'bg-green-500',
       textColor: 'text-green-500'
     },
     'early_bird': {
       name: 'Early Bird',
       description: 'Completed tasks before 9 AM for 5 days',
-      image: badge3,
+      image: badge14,
       color: 'bg-orange-500',
       textColor: 'text-orange-500'
     },
     'night_owl': {
       name: 'Night Owl',
       description: 'Completed tasks after 10 PM for 5 days',
-      image: badge7,
+      image: badge15,
       color: 'bg-purple-500',
       textColor: 'text-purple-500'
     },
     'social_butterfly': {
       name: 'Social Butterfly',
       description: 'Created 5 events with social activities',
-      image: badge6,
+      image: badge16,
       color: 'bg-blue-500',
       textColor: 'text-blue-500'
     },
     'fitness_freak': {
       name: 'Fitness Freak',
       description: 'Completed 20 fitness-related tasks',
-      image: badge5,
+      image: badge17,
       color: 'bg-pink-500',
       textColor: 'text-pink-500'
     },
     'bookworm': {
       name: 'Bookworm',
       description: 'Completed 10 learning-related tasks',
-      image: badge2,
+      image: badge12,
       color: 'bg-yellow-500',
       textColor: 'text-yellow-500'
     },
     'creative_soul': {
       name: 'Creative Soul',
       description: 'Completed 15 creative tasks',
-      image: badge8,
+      image: badge11,
       color: 'bg-indigo-500',
       textColor: 'text-indigo-500'
     },
     'organizer': {
       name: 'Organizer',
       description: 'Created 10 events with detailed checklists',
-      image: badge4,
+      image: badge20,
       color: 'bg-green-500',
       textColor: 'text-green-500'
     },
     'goal_setter': {
       name: 'Goal Setter',
       description: 'Set and completed 5 major life goals',
-      image: badge9,
+      image: badge1,
       color: 'bg-gradient-to-r from-purple-500 to-pink-500',
       textColor: 'text-purple-500'
     },
     'stress_manager': {
       name: 'Stress Manager',
       description: 'Logged mood for 50 days with stress management',
-      image: badge10,
+      image: badge19,
       color: 'bg-blue-500',
       textColor: 'text-blue-500'
     },
     'event_completed': {
       name: 'Event Champion',
       description: 'Completed your first major life event',
-      image: badge6,
+      image: badge18,
       color: 'bg-blue-500',
       textColor: 'text-blue-500'
     }
