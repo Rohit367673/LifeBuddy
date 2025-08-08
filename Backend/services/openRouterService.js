@@ -1,13 +1,14 @@
 const fetch = require('node-fetch');
 const { TelegramService } = require('./messagingService');
 
-const OPENROUTER_API_KEY = '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';
+// Read API key from environment, never hardcode
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'mistralai/mixtral-8x7b-instruct';
+const MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mixtral-8x7b-instruct';
 
 // Debug logging
 console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
-console.log('OpenRouter API Key (first 10 chars):', OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 10) + '...' : 'NOT SET');
+console.log('OpenRouter API Key (first 8 chars):', OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 8) + '...' : 'NOT SET');
 
 
 async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperature = 0.7) {
@@ -20,7 +21,10 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        // Recommended by OpenRouter to help attribution and avoid some 401s in certain setups
+        'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space',
+        'X-Title': process.env.OPENROUTER_TITLE || 'LifeBuddy'
       },
       body: JSON.stringify({
         model: MODEL,
