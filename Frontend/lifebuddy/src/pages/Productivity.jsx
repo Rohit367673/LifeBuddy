@@ -2,7 +2,7 @@ import { CheckCircleIcon, CalendarIcon, SparklesIcon, ClockIcon, LightBulbIcon, 
 import { useAuth } from '../context/AuthContext';
 import { usePremium } from '../context/PremiumContext';
 import { Link, useNavigate } from 'react-router-dom';
-import PremiumCalendar from './PremiumCalendar';
+// import PremiumCalendar from './PremiumCalendar';
 import React, { useState, useEffect } from 'react';
 
 export default function Productivity() {
@@ -29,26 +29,19 @@ export default function Productivity() {
     agreeToTerms: false
   });
 
-  useEffect(() => {
-    // If user is premium/admin, check for ongoing schedule and redirect if present
-    if ((isAdmin || isPremium) && !premiumLoading) {
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/premium-tasks/today`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.taskId) {
-            navigate('/my-schedule');
-          }
-        });
-    }
-    // eslint-disable-next-line
-  }, [isAdmin, isPremium, premiumLoading]);
+  // UI helpers (no functional changes)
+  const getDurationDays = () => {
+    if (!formData.startDate || !formData.endDate) return null;
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    return diff > 0 ? diff : null;
+  };
 
-  // If premium user, show PremiumCalendar
-  if ((isAdmin || isPremium) && !premiumLoading) {
-    return <PremiumCalendar />;
-  }
+  // Note: Show the redesigned Productivity page for all users (no auto-redirect)
+  // If needed later, we can restore a gentle banner that links to My Schedule when a task exists.
+
+  // Always render the redesigned Productivity page regardless of subscription
 
   const updateFormData = (updates) => {
     setFormData(prev => ({ ...prev, ...updates }));
@@ -84,7 +77,7 @@ export default function Productivity() {
   ];
 
   return (
-    <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen">
+    <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen pb-24 sm:pb-0">
       {/* Hero Section */}
       <header className="relative z-10 flex flex-col items-center justify-center pt-24 pb-16 text-center">
         <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -102,62 +95,65 @@ export default function Productivity() {
       </header>
 
       {/* Main Form Section */}
-              <section className="w-full py-12">
-          <div className="w-full">
-          <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8">
-            {/* Step Progress */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-800">Create Your Schedule</h2>
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span>Step {currentStep} of 3</span>
+      <section className="w-full py-8 sm:py-12">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+          {/* Left: Form */}
+          <div className="lg:col-span-8">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-6 sm:p-8">
+              {/* Step Progress (sticky for better UX) */}
+              <div className="mb-6 sm:mb-8 sticky top-0 sm:top-4 z-10 bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Create Your Schedule</h2>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500">
+                    <span>Step {currentStep} of 3</span>
+                  </div>
+                </div>
+                {/* Progress Bar */}
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${(currentStep / 3) * 100}%` }}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={(currentStep / 3) * 100}
+                    role="progressbar"
+                  />
+                </div>
+                {/* Step Indicators */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  {steps.map((step) => {
+                    const StepIcon = step.icon;
+                    const isActive = currentStep === step.id;
+                    const isCompleted = currentStep > step.id;
+                    return (
+                      <div key={step.id} className="flex items-center gap-3">
+                        <div
+                          className={`flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 transition-all duration-300 ${
+                            isCompleted
+                              ? 'bg-green-500 border-green-500 text-white'
+                              : isActive
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-500 text-white shadow-lg'
+                                : 'bg-white border-slate-300 text-slate-400'
+                          }`}
+                        >
+                          {isCompleted ? (
+                            <CheckCircleIcon className="w-5 h-5" />
+                          ) : (
+                            <StepIcon className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className={`font-semibold text-sm ${isActive || isCompleted ? 'text-slate-800' : 'text-slate-500'}`}>{step.title}</h3>
+                          <p className="text-xs text-slate-400">{step.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-200 rounded-full h-2 mb-6">
-                <div 
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(currentStep / 3) * 100}%` }}
-                />
-              </div>
 
-              {/* Step Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {steps.map((step, index) => {
-                  const StepIcon = step.icon;
-                  const isActive = currentStep === step.id;
-                  const isCompleted = currentStep > step.id;
-                  
-                  return (
-                    <div key={step.id} className="flex items-center gap-3">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
-                        isCompleted 
-                          ? 'bg-green-500 border-green-500 text-white' 
-                          : isActive 
-                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-500 text-white shadow-lg' 
-                            : 'bg-white border-slate-300 text-slate-400'
-                      }`}>
-                        {isCompleted ? (
-                          <CheckCircleIcon className="w-5 h-5" />
-                        ) : (
-                          <StepIcon className="w-5 h-5" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className={`font-semibold text-sm ${isActive || isCompleted ? 'text-slate-800' : 'text-slate-500'}`}>
-                          {step.title}
-                        </h3>
-                        <p className="text-xs text-slate-400">{step.description}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Step Content */}
-            {currentStep === 1 && (
+              {/* Step Content */}
+              {currentStep === 1 && (
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
@@ -198,7 +194,8 @@ export default function Productivity() {
                   </div>
                 </div>
 
-                <div className="pt-6">
+                  {/* Sticky action bar for mobile to always show Continue */}
+                <div className="hidden sm:block pt-6">
                   <button 
                     onClick={nextStep}
                     disabled={!taskTitle || !formData.startDate || !formData.endDate}
@@ -208,10 +205,20 @@ export default function Productivity() {
                     <ArrowRightIcon className="w-5 h-5" />
                   </button>
                 </div>
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-t border-slate-200">
+                  <button
+                    onClick={nextStep}
+                    disabled={!taskTitle || !formData.startDate || !formData.endDate}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 disabled:cursor-not-allowed"
+                  >
+                    Continue to Details
+                    <ArrowRightIcon className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             )}
 
-            {currentStep === 2 && (
+              {currentStep === 2 && (
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -243,7 +250,7 @@ export default function Productivity() {
                   />
                 </div>
 
-                <div className="flex gap-4 pt-6">
+                <div className="hidden sm:flex gap-4 pt-6">
                   <button 
                     onClick={prevStep}
                     className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
@@ -258,10 +265,25 @@ export default function Productivity() {
                     <ArrowRightIcon className="w-5 h-5" />
                   </button>
                 </div>
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-top border-slate-200 flex gap-3">
+                  <button 
+                    onClick={prevStep}
+                    className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  >
+                    ← Back
+                  </button>
+                  <button 
+                    onClick={nextStep}
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  >
+                    Continue to Contact
+                    <ArrowRightIcon className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             )}
 
-            {currentStep === 3 && (
+              {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">Email Address</label>
@@ -274,7 +296,7 @@ export default function Productivity() {
                   />
                 </div>
 
-                <div className="flex gap-4 pt-6">
+                <div className="hidden sm:flex gap-4 pt-6">
                   <button 
                     onClick={prevStep}
                     className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
@@ -288,9 +310,49 @@ export default function Productivity() {
                     Create Schedule
                   </button>
                 </div>
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-t border-slate-200 flex gap-3">
+                  <button 
+                    onClick={prevStep}
+                    className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  >
+                    ← Back
+                  </button>
+                  <button 
+                    onClick={handleSubmit}
+                    className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  >
+                    Create Schedule
+                  </button>
+                </div>
               </div>
             )}
+            </div>
           </div>
+          {/* Right: Helpful aside (no functional changes) */}
+          <aside className="lg:col-span-4 space-y-6">
+            <div className="bg-white/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl p-5">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-3">Plan Summary</h3>
+              <div className="space-y-2 text-sm text-slate-600">
+                <div className="flex justify-between"><span>Title</span><span className="font-medium text-slate-800">{taskTitle || '—'}</span></div>
+                <div className="flex justify-between"><span>Start</span><span className="font-medium text-slate-800">{formData.startDate || '—'}</span></div>
+                <div className="flex justify-between"><span>End</span><span className="font-medium text-slate-800">{formData.endDate || '—'}</span></div>
+                <div className="flex justify-between"><span>Duration</span><span className="font-medium text-slate-800">{getDurationDays() ? `${getDurationDays()} day(s)` : '—'}</span></div>
+                <div className="flex justify-between"><span>Notify via</span><span className="font-medium capitalize text-slate-800">{formData.notificationPlatform || '—'}</span></div>
+              </div>
+            </div>
+            <div className="bg-white/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl p-5">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-3">Tips</h3>
+              <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+                <li>Choose clear, concise task titles</li>
+                <li>Set realistic start and end dates</li>
+                <li>Use Requirements to share constraints</li>
+              </ul>
+            </div>
+            <div className="bg-white/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl p-5">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-2">Need Help?</h3>
+              <p className="text-sm text-slate-600">We’ll deliver your schedule to your selected platform once you submit.</p>
+            </div>
+          </aside>
         </div>
       </section>
 

@@ -64,7 +64,7 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial }) => {
           {/* Price */}
           <div className="mb-4">
             <div className="text-3xl font-bold text-gray-900 dark:text-white">
-              ${plan.price}
+              {plan.price} Rs
               {plan.period !== 'forever' && (
                 <span className="text-lg text-gray-500 dark:text-gray-400">
                   /{plan.period}
