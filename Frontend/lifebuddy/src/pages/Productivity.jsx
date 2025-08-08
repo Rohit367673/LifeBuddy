@@ -154,7 +154,7 @@ export default function Productivity() {
 
               {/* Step Content */}
               {currentStep === 1 && (
-              <div className="space-y-6">
+                <div className="space-y-6 pb-24 sm:pb-0">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export default function Productivity() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-3">Start Date</label>
                     <input 
@@ -219,7 +219,7 @@ export default function Productivity() {
             )}
 
               {currentStep === 2 && (
-              <div className="space-y-6">
+                <div className="space-y-6 pb-24 sm:pb-0">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <DocumentTextIcon className="w-5 h-5 text-blue-500" />
@@ -284,7 +284,7 @@ export default function Productivity() {
             )}
 
               {currentStep === 3 && (
-              <div className="space-y-6">
+                <div className="space-y-6 pb-24 sm:pb-0">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">Email Address</label>
                   <input 
