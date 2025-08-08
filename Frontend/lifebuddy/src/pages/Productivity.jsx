@@ -4,9 +4,10 @@ import { usePremium } from '../context/PremiumContext';
 import { Link, useNavigate } from 'react-router-dom';
 // import PremiumCalendar from './PremiumCalendar';
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '../utils/config';
 
 export default function Productivity() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { subscription, loading: premiumLoading } = usePremium();
   const isAdmin = user && user.email === 'rohit367673@gmail.com';
   const isPremium = subscription && subscription.plan && subscription.plan !== 'free';
@@ -59,13 +60,60 @@ export default function Productivity() {
     }
   };
 
+  const buildContactInfo = () => {
+    const platform = formData.notificationPlatform;
+    if (platform === 'email') return formData.emailAddress?.trim();
+    if (platform === 'whatsapp') {
+      const digits = String(formData.whatsappNumber || '').replace(/\D/g, '');
+      const code = String(formData.countryCode || '+1').trim();
+      return `${code}${digits}`;
+    }
+    if (platform === 'telegram') return String(formData.telegramChatId || '').trim();
+    return '';
+  };
+
+  const canSubmit = () => {
+    if (!taskTitle || !formData.startDate || !formData.endDate) return false;
+    if (!formData.agreeToTerms) return false;
+    const contactInfo = buildContactInfo();
+    if (!formData.notificationPlatform || !contactInfo) return false;
+    return true;
+  };
+
   const handleSubmit = async () => {
     try {
-      console.log('Submitting form data:', { taskTitle, ...formData });
-      alert('Schedule created successfully! Check your phone for the new plan.');
+      const contactInfo = buildContactInfo();
+      const payload = {
+        title: taskTitle,
+        description: formData.taskDescription || '',
+        requirements: formData.requirements || '',
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        consentGiven: !!formData.agreeToTerms,
+        notificationPlatform: formData.notificationPlatform,
+        contactInfo,
+      };
+
+      const res = await fetch(`${getApiUrl()}/api/premium-tasks/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to create schedule');
+      }
+      const data = await res.json();
+      console.log('Schedule created:', data);
+      alert('Schedule created successfully! We will send your plan to your selected platform.');
+      navigate('/myschedule');
     } catch (error) {
       console.error('Error submitting form:', error);
-      alert('Failed to create schedule. Please try again.');
+      alert(error.message || 'Failed to create schedule. Please try again.');
     }
   };
 
@@ -285,47 +333,124 @@ export default function Productivity() {
 
               {currentStep === 3 && (
                 <div className="space-y-6 pb-24 sm:pb-0">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">Email Address</label>
-                  <input 
-                    type="email" 
-                    value={formData.emailAddress}
-                    onChange={(e) => updateFormData({ emailAddress: e.target.value })}
-                    placeholder="Enter your email address"
-                    className="w-full h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-6"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                      <PhoneIcon className="w-5 h-5 text-green-500" />
+                      Preferred Platform
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {['email','whatsapp','telegram'].map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => updateFormData({ notificationPlatform: p })}
+                          className={`h-12 rounded-xl border-2 transition-all text-sm font-semibold capitalize ${
+                            formData.notificationPlatform === p
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent shadow-lg'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="hidden sm:flex gap-4 pt-6">
-                  <button 
-                    onClick={prevStep}
-                    className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
-                  >
-                    ← Back
-                  </button>
-                  <button 
-                    onClick={handleSubmit}
-                    className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
-                  >
-                    Create Schedule
-                  </button>
+                  {formData.notificationPlatform === 'email' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">Email Address</label>
+                      <input
+                        type="email"
+                        value={formData.emailAddress}
+                        onChange={(e) => updateFormData({ emailAddress: e.target.value })}
+                        placeholder="Enter your email address"
+                        className="w-full h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-6"
+                      />
+                    </div>
+                  )}
+
+                  {formData.notificationPlatform === 'whatsapp' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">WhatsApp Number</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          value={formData.countryCode}
+                          onChange={(e) => updateFormData({ countryCode: e.target.value })}
+                          placeholder="+1"
+                          className="col-span-1 h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-4"
+                        />
+                        <input
+                          type="tel"
+                          value={formData.whatsappNumber}
+                          onChange={(e) => updateFormData({ whatsappNumber: e.target.value })}
+                          placeholder="Phone number"
+                          className="col-span-2 h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-4"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">Include your country code. Example: +91 9876543210</p>
+                    </div>
+                  )}
+
+                  {formData.notificationPlatform === 'telegram' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-3">Telegram Chat ID or Username</label>
+                      <input
+                        type="text"
+                        value={formData.telegramChatId}
+                        onChange={(e) => updateFormData({ telegramChatId: e.target.value })}
+                        placeholder="e.g., 123456789 or username"
+                        className="w-full h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-6"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">Make sure you have started a chat with our Telegram bot to receive messages.</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-3 pt-2">
+                    <input
+                      id="consent"
+                      type="checkbox"
+                      checked={formData.agreeToTerms}
+                      onChange={(e) => updateFormData({ agreeToTerms: e.target.checked })}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <label htmlFor="consent" className="text-sm text-slate-600">
+                      I agree to receive my AI-generated schedule via the selected platform and consent to messaging for this task.
+                    </label>
+                  </div>
+
+                  <div className="hidden sm:flex gap-4 pt-6">
+                    <button
+                      onClick={prevStep}
+                      className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!canSubmit()}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                    >
+                      Create Schedule
+                    </button>
+                  </div>
+                  <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-t border-slate-200 flex gap-3">
+                    <button
+                      onClick={prevStep}
+                      className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!canSubmit()}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:cursor-not-allowed"
+                    >
+                      Create Schedule
+                    </button>
+                  </div>
                 </div>
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-t border-slate-200 flex gap-3">
-                  <button 
-                    onClick={prevStep}
-                    className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300"
-                  >
-                    ← Back
-                  </button>
-                  <button 
-                    onClick={handleSubmit}
-                    className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
-                  >
-                    Create Schedule
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
             </div>
           </div>
           {/* Right: Helpful aside (no functional changes) */}
