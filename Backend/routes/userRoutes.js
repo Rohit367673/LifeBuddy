@@ -6,6 +6,7 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const Achievement = require('../models/Achievement');
 const jwt = require('jsonwebtoken');
 const { MessagingService } = require('../services/messagingService');
+const { exportUserTrainingData, fineTuneUserModel, exportUserSFT, runLocalLoraTraining } = require('../services/trainingService');
 
 const router = express.Router();
 
@@ -451,6 +452,44 @@ router.get('/friends', authenticateUser, async (req, res) => {
     res.json(user.friends || []);
   } catch (error) {
     console.error('List friends error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Export user training dataset (JSONL-style messages array)
+router.get('/training/export', authenticateUser, async (req, res) => {
+  try {
+    const items = await exportUserTrainingData(req.user._id);
+    res.json({ items, count: items.length });
+  } catch (err) {
+    console.error('Export training data error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Trigger fine-tuning job for current user
+router.post('/training/fine-tune', authenticateUser, async (req, res) => {
+  try {
+    if (process.env.TRAINING_MODE === 'openai') {
+      const job = await fineTuneUserModel(req.user._id);
+      return res.json({ message: 'OpenAI fine-tune started', job });
+    }
+    // Default: local LoRA flow (requires GPU host)
+    const result = await runLocalLoraTraining({ userId: req.user._id });
+    res.json({ message: 'Local LoRA training finished', result });
+  } catch (err) {
+    console.error('Fine-tune start error:', err);
+    res.status(500).json({ message: err.message || 'Internal server error' });
+  }
+});
+
+// Export SFT JSONL
+router.get('/training/sft', authenticateUser, async (req, res) => {
+  try {
+    const result = await exportUserSFT(req.user._id);
+    res.json(result);
+  } catch (err) {
+    console.error('Export SFT error:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

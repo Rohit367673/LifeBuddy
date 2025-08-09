@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const { TelegramService } = require('./messagingService');
+// Avoid importing TelegramService at top-level to prevent circular dependency; require inside test block only
 
 // Read API key from environment, never hardcode
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
@@ -50,7 +50,7 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
   }
 }
 
-async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate) {
+async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext = {}) {
   // Calculate number of days (max 31 for a month)
   const days = Math.min(31, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1);
 
@@ -58,6 +58,8 @@ async function generateScheduleWithOpenRouter(title, requirements, startDate, en
   let prompt = `You are LifeBuddy, an AI scheduling and planning assistant.
 
 Today's topic is: "${title}"
+
+User context: ${JSON.stringify(userContext)}
 
 User requirements:
 ${requirements ? requirements : 'N/A'}
@@ -116,7 +118,7 @@ Day 2:
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      response = await generateMessageWithOpenRouter(prompt, 6000, 0.9); // More tokens, higher creativity
+       response = await generateMessageWithOpenRouter(prompt, 6000, 0.9); // More tokens, higher creativity
       console.log('OpenRouter raw response (attempt', attempt, '):', response);
     } catch (error) {
       console.error('Failed to generate AI content:', error);
@@ -230,7 +232,8 @@ if (require.main === module) {
         console.log('Motivation:', day.motivation);
         console.log('---');
       });
-      // Send to Telegram
+      // Send to Telegram (require here to avoid circular import at runtime)
+      const { TelegramService } = require('./messagingService');
       const telegram = new TelegramService();
       const chatId = '6644184480';
       for (const day of schedule) {
