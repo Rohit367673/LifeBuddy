@@ -12,6 +12,7 @@ export default function Productivity() {
   const isAdmin = user && user.email === 'rohit367673@gmail.com';
   const isPremium = subscription && subscription.plan && subscription.plan !== 'free';
   const navigate = useNavigate();
+  const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'lifebuddy_AI_bot';
 
   // Step management
   const [currentStep, setCurrentStep] = useState(1);
@@ -114,6 +115,48 @@ export default function Productivity() {
     } catch (error) {
       console.error('Error submitting form:', error);
       alert(error.message || 'Failed to create schedule. Please try again.');
+    }
+  };
+
+  const connectTelegram = async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/users/telegram/link-token`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error('Failed to get Telegram link token');
+      const data = await res.json();
+      const linkToken = data.token;
+      const url = `https://t.me/${telegramBotUsername}?start=${encodeURIComponent(linkToken)}`;
+      // Try tg:// scheme for installed app; fallback to web
+      const tgUrl = `tg://resolve?domain=${telegramBotUsername}&start=${encodeURIComponent(linkToken)}`;
+      // Open in new tab/window
+      window.open(url, '_blank', 'noopener,noreferrer');
+      // Also attempt app deep link
+      setTimeout(() => {
+        window.location.href = tgUrl;
+      }, 300);
+    } catch (err) {
+      console.error('connectTelegram error:', err);
+      alert('Could not open Telegram link. Please try again.');
+    }
+  };
+
+  const fetchTelegramChatId = async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/users/profile`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error('Failed to fetch profile');
+      const profile = await res.json();
+      if (profile.telegramChatId) {
+        updateFormData({ telegramChatId: String(profile.telegramChatId) });
+        alert('Telegram connected! Chat ID fetched successfully.');
+      } else {
+        alert('Telegram not connected yet. Please press Connect Telegram and start the bot, then try Check Connection again.');
+      }
+    } catch (err) {
+      console.error('fetchTelegramChatId error:', err);
+      alert('Failed to check Telegram connection.');
     }
   };
 
@@ -402,7 +445,23 @@ export default function Productivity() {
                         placeholder="e.g., 123456789 or username"
                         className="w-full h-12 border-2 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 bg-white/80 backdrop-blur-sm rounded-xl transition-all duration-300 shadow-sm hover:shadow-md px-6"
                       />
-                      <p className="mt-2 text-xs text-slate-500">Make sure you have started a chat with our Telegram bot to receive messages.</p>
+                      <div className="mt-3 flex flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={connectTelegram}
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl transition-all"
+                        >
+                          Connect Telegram
+                        </button>
+                        <button
+                          type="button"
+                          onClick={fetchTelegramChatId}
+                          className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-3 px-6 rounded-xl transition-all"
+                        >
+                          Check Connection
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">Tap Connect, press Start in Telegram, then return and tap Check Connection. Your Chat ID will fill automatically.</p>
                     </div>
                   )}
 
