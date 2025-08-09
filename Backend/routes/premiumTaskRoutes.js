@@ -6,6 +6,7 @@ const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
 const { generateScheduleWithOpenRouter } = require('../services/openRouterService');
+const ScheduleInteraction = require('../models/ScheduleInteraction');
 
 // Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
 const requirePremium = checkPremiumFeature('premiumMotivationalMessages');
@@ -60,10 +61,18 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       });
     }
 
-    // Generate schedule using OpenRouter
+    // Generate schedule using OpenRouter with user context for personalization
     let schedule;
     try {
-      schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate);
+      const ctxUser = await User.findById(req.user._id).lean();
+      const userContext = {
+        userId: String(ctxUser._id),
+        username: ctxUser.username,
+        timezone: ctxUser.preferences?.timezone || 'UTC',
+        subscription: ctxUser.subscription?.plan || 'free',
+        notificationPlatform: ctxUser.notificationPlatform || 'email'
+      };
+      schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
     } catch (err) {
       return res.status(500).json({ message: err.message || 'Failed to generate schedule from OpenRouter.' });
     }
@@ -94,6 +103,30 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
   } catch (err) {
     console.error('Premium task setup error:', err);
     res.status(500).json({ message: err.message || 'Internal server error.' });
+  }
+});
+
+// Record a schedule interaction (accepted, skipped, rescheduled, completed, snoozed)
+router.post('/:id/interactions', authenticateUser, requirePremium, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, metadata = {} } = req.body;
+    if (!['accepted', 'skipped', 'rescheduled', 'completed', 'snoozed'].includes(action)) {
+      return res.status(400).json({ message: 'Invalid action' });
+    }
+    const task = await PremiumTask.findOne({ _id: id, user: req.user._id });
+    if (!task) return res.status(404).json({ message: 'Task not found.' });
+    const record = new ScheduleInteraction({
+      user: req.user._id,
+      premiumTask: task._id,
+      action,
+      metadata,
+    });
+    await record.save();
+    res.json({ message: 'Interaction recorded', interactionId: record._id });
+  } catch (err) {
+    console.error('Record interaction error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
   }
 });
 
@@ -161,6 +194,22 @@ router.post('/:id/mark', authenticateUser, requirePremium, async (req, res) => {
     });
   } catch (err) {
     console.error('Mark subtask error:', err);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// Lightweight event capture for accept/skip/snooze/reschedule/complete
+router.post('/:id/event', authenticateUser, requirePremium, async (req, res) => {
+  try {
+    const { action, metadata } = req.body;
+    if (!['accepted', 'skipped', 'rescheduled', 'completed', 'snoozed'].includes(action)) {
+      return res.status(400).json({ message: 'Invalid action' });
+    }
+    const rec = new ScheduleInteraction({ user: req.user._id, premiumTask: req.params.id, action, metadata });
+    await rec.save();
+    res.json({ message: 'Captured', id: rec._id });
+  } catch (err) {
+    console.error('Event capture error:', err);
     res.status(500).json({ message: 'Internal server error.' });
   }
 });

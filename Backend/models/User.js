@@ -348,6 +348,11 @@ const userSchema = new mongoose.Schema({
     maxlength: 50,
     default: ''
   },
+  // Personalized AI model (fine-tuned) per user
+  fineTunedModel: {
+    type: String,
+    default: ''
+  },
   // Remove FCM token field
   // fcmToken: { type: String },
 }, {
