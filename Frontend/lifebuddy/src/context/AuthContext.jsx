@@ -8,7 +8,8 @@ import {
   signInWithRedirect,
   getRedirectResult,
   updateProfile,
-  signInWithPopup
+  signInWithPopup,
+  sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig';
 import { getApiUrl, logConfig } from '../utils/config';
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const tokenExpiryTimeoutRef = useRef(null);
@@ -168,7 +170,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register user with Firebase and backend
+  // Register user with Firebase, send verification email, then wait to finalize
   const register = async (email, password, displayName) => {
     try {
       setLoading(true);
@@ -179,43 +181,144 @@ export const AuthProvider = ({ children }) => {
       
       // Update profile with display name
       await updateProfile(firebaseUser, { displayName });
-      
-      // Get Firebase token
-      const firebaseToken = await firebaseUser.getIdToken();
-      
-      // Register user in backend
-      const response = await fetch(`${getApiUrl()}/api/auth/register`, {
+
+      // Send OTP verification email via backend
+      const response = await fetch(`${getApiUrl()}/api/auth/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          firebaseUid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: displayName,
+          email: email,
+          firebaseUid: firebaseUser.uid
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to register user in backend');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send OTP');
       }
 
-      const data = await response.json();
-      setToken(data.token);
       setFirebaseUser(firebaseUser);
-      setUser(data.user); // Set user immediately for fast UI feedback
-      fetchUserProfile(data.token); // Update with latest info in background
-      console.log('AuthContext: user set after login/register:', data.user);
-      console.log('AuthContext: firebaseUser set after login/register:', firebaseUser);
-      
-      toast.success('Account created successfully!');
-      return data;
+      setAwaitingEmailVerification(true);
+      toast.success('OTP sent to your email. Please check your inbox and enter the 6-digit code.');
+      return { verificationSent: true };
     } catch (error) {
       console.error('Registration error:', error);
       toast.error(error.message || 'Failed to create account');
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Verify OTP code
+  const verifyOTP = async (otpCode) => {
+    try {
+      setLoading(true);
+      const fu = auth.currentUser;
+      if (!fu) throw new Error('No authenticated user. Please login again.');
+
+      const response = await fetch(`${getApiUrl()}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: fu.email,
+          firebaseUid: fu.uid,
+          otp: otpCode
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Invalid OTP code');
+      }
+
+      // Mark email as verified in Firebase
+      await fu.reload();
+      toast.success('Email verified successfully!');
+      return true;
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      toast.error(error.message || 'OTP verification failed');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // After the user verifies their email, finalize backend registration and optionally set avatar
+  const finalizeEmailRegistration = async (displayName, avatar = '') => {
+    try {
+      setLoading(true);
+      const fu = auth.currentUser;
+      if (!fu) throw new Error('No authenticated user. Please login again.');
+      await fu.reload();
+      if (!fu.emailVerified) {
+        throw new Error('Email not verified yet. Please verify via the link in your inbox.');
+      }
+
+      const response = await fetch(`${getApiUrl()}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firebaseUid: fu.uid,
+          email: fu.email,
+          displayName: displayName || fu.displayName || (fu.email ? fu.email.split('@')[0] : 'User'),
+          avatar: avatar || fu.photoURL || ''
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to register user in backend');
+      }
+
+      const data = await response.json();
+      setToken(data.token);
+      setFirebaseUser(fu);
+      setUser(data.user);
+      fetchUserProfile(data.token);
+      setAwaitingEmailVerification(false);
+      toast.success('Account verified and created successfully!');
+      return data;
+    } catch (error) {
+      console.error('Finalize registration error:', error);
+      toast.error(error.message || 'Failed to complete registration');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend OTP verification email
+  const resendVerificationEmail = async () => {
+    try {
+      const fu = auth.currentUser;
+      if (!fu) throw new Error('Not signed in.');
+      
+      const response = await fetch(`${getApiUrl()}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: fu.email,
+          firebaseUid: fu.uid
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to resend OTP');
+      }
+
+      toast.success('OTP re-sent to your email.');
+    } catch (err) {
+      toast.error(err.message || 'Could not resend OTP');
+      throw err;
     }
   };
 
@@ -652,14 +755,18 @@ export const AuthProvider = ({ children }) => {
     firebaseUser,
     loading,
     token,
+    awaitingEmailVerification,
     getFirebaseToken,
     register,
+    finalizeEmailRegistration,
     registerTraditional,
     login,
     loginTraditional,
     loginWithGoogle,
     logout,
     verifyToken,
+    resendVerificationEmail,
+    verifyOTP,
   };
 
   return (

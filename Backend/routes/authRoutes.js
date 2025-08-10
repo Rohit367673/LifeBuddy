@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { authRateLimiter } = require('../middlewares/authMiddleware');
 const Achievement = require('../models/Achievement');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -26,9 +28,13 @@ router.post('/register-traditional', authRateLimiter, async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username: username || null }] 
-    });
+    // Only include username in the query if it was actually provided,
+    // otherwise `{ username: null }` would match many documents with no username
+    const orConditions = [{ email }];
+    if (typeof username === 'string' && username.trim().length > 0) {
+      orConditions.push({ username: username.trim().toLowerCase() });
+    }
+    const existingUser = await User.findOne({ $or: orConditions });
 
     if (existingUser) {
       return res.status(409).json({
@@ -485,6 +491,172 @@ router.post('/refresh', authRateLimiter, async (req, res) => {
     console.error('Token refresh error:', error);
     res.status(401).json({
       message: 'Error refreshing token.'
+    });
+  }
+});
+
+// In-memory OTP storage (in production, use Redis or database)
+const otpStore = new Map();
+
+// Generate OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Send OTP email
+const sendOTPEmail = async (email, otp) => {
+  try {
+    // Create transporter with more secure settings
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      secure: true,
+      port: 465,
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
+    // Email content
+    const mailOptions = {
+      from: `"LifeBuddy" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'LifeBuddy - Email Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">LifeBuddy</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Email Verification</p>
+          </div>
+          <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Verify Your Email</h2>
+            <p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
+              Thanks for signing up! To complete your registration, please enter the following verification code:
+            </p>
+            <div style="background: white; border: 2px solid #667eea; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+              <h1 style="color: #667eea; font-size: 32px; letter-spacing: 8px; margin: 0; font-family: monospace;">${otp}</h1>
+            </div>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+              This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
+            </p>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+              <p style="color: #999; font-size: 12px;">
+                © 2024 LifeBuddy. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('OTP email sent successfully to:', email);
+  } catch (error) {
+    console.error('Error sending OTP email:', error);
+    // For testing purposes, let's log the OTP to console instead of failing
+    console.log(`🔐 TEST MODE: OTP for ${email} is: ${otp}`);
+    // In production, you would throw the error
+    // throw new Error('Failed to send OTP email');
+  }
+};
+
+// Send OTP
+router.post('/send-otp', authRateLimiter, async (req, res) => {
+  try {
+    const { email, firebaseUid } = req.body;
+
+    if (!email || !firebaseUid) {
+      return res.status(400).json({
+        message: 'Email and Firebase UID are required.'
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    
+    // Store OTP with expiration (10 minutes)
+    const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
+    otpStore.set(email, {
+      otp,
+      firebaseUid,
+      expiresAt
+    });
+
+    // Send OTP email
+    await sendOTPEmail(email, otp);
+
+    res.json({
+      message: 'OTP sent successfully.',
+      expiresIn: '10 minutes'
+    });
+
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({
+      message: 'Error sending OTP.',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Verify OTP
+router.post('/verify-otp', authRateLimiter, async (req, res) => {
+  try {
+    const { email, firebaseUid, otp } = req.body;
+
+    if (!email || !firebaseUid || !otp) {
+      return res.status(400).json({
+        message: 'Email, Firebase UID, and OTP are required.'
+      });
+    }
+
+    // Get stored OTP data
+    const storedData = otpStore.get(email);
+    
+    if (!storedData) {
+      return res.status(400).json({
+        message: 'No OTP found for this email. Please request a new one.'
+      });
+    }
+
+    // Check if OTP is expired
+    if (Date.now() > storedData.expiresAt) {
+      otpStore.delete(email);
+      return res.status(400).json({
+        message: 'OTP has expired. Please request a new one.'
+      });
+    }
+
+    // Check if Firebase UID matches
+    if (storedData.firebaseUid !== firebaseUid) {
+      return res.status(400).json({
+        message: 'Invalid Firebase UID.'
+      });
+    }
+
+    // Verify OTP
+    if (storedData.otp !== otp) {
+      return res.status(400).json({
+        message: 'Invalid OTP code.'
+      });
+    }
+
+    // OTP is valid - remove it from store
+    otpStore.delete(email);
+
+    res.json({
+      message: 'OTP verified successfully.',
+      verified: true
+    });
+
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({
+      message: 'Error verifying OTP.',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });

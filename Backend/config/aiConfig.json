@@ -1,0 +1,30 @@
+{
+  "model": "openai/gpt-oss-20b",
+  "response": {
+    "tone": "encouraging, expert but friendly",
+    "audience": "motivated adult learners and professionals",
+    "readingLevel": "clear and practical",
+    "minWordsPerDay": 400
+  },
+  "scheduleFormat": {
+    "titlePrefix": "Day N:",
+    "sections": [
+      { "key": "dayTitle", "label": "✨ Day Title", "required": true },
+      { "key": "keyPoints", "label": "📚 Key Points", "required": true, "minItems": 5 },
+      { "key": "example", "label": "📝 Examples/Analogies", "required": true, "minItems": 2 },
+      { "key": "resources", "label": "🔗 Resources", "required": true, "minItems": 3 },
+      { "key": "tips", "label": "💡 Tips", "required": true, "minItems": 2 },
+      { "key": "duration", "label": "🕐 Duration", "required": true },
+      { "key": "motivation", "label": "🧠 Motivation", "required": true }
+    ],
+    "linkFormat": "[Name](URL)",
+    "constraints": [
+      "Start each day with 'Day N:'",
+      "At least {{minWordsPerDay}} words per day",
+      "Do not add extra intro or summary outside the sections",
+      "Avoid repeating the same content across days"
+    ]
+  }
+}
+
+

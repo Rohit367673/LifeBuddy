@@ -79,3 +79,37 @@ Frontend env:
 
 ## 10) Next
 - Frontend capture everywhere; admin training dashboard; per‑user adapter inference service; privacy/consent UI.
+
+## 11) Mistral AI Integration (Alternative to Fine-tuning)
+
+### Context-Based Personalization
+- **Mistral AI Service**: Integration with Mistral AI's hosted models for cost-effective AI responses
+- **Smart Prompt Engineering**: Dynamic prompts that include user profile, learning style, and interaction history
+- **Topic-Specific Specialization**: Dedicated AI assistants for coding, fitness, education, and productivity
+
+### User Profile Enhancement
+- **AI Profile Fields**: Added learning style, experience level, communication preferences, and goals
+- **Context-Aware Responses**: AI considers user's background and previous interactions
+- **Personalized Recommendations**: Tailored advice based on user's specific needs and preferences
+
+### Frontend AI Chat Interface
+- **Topic Selection**: Choose between general, coding, fitness, education, and productivity
+- **Real-time Chat**: Interactive chat interface with message history and user context
+- **Responsive Design**: Mobile-friendly chat interface with smooth animations
+- **Context Display**: Show user's AI profile and recent interaction history
+
+### Backend Implementation
+- **MistralService**: Handles API calls to Mistral AI with personalized prompts
+- **AI Chat Routes**: Dedicated endpoints for different topic areas
+- **Context Injection**: Automatically includes user profile and interaction history
+- **Interaction Logging**: Records all AI chat interactions for future personalization
+
+### Environment Variables
+- **MISTRAL_API_KEY**: Your Mistral AI API key
+- **MISTRAL_MODEL**: Model to use (default: mistral-large-latest)
+
+### Usage
+- Navigate to `/ai-chat` in the app
+- Select a topic area (coding, fitness, education, productivity, or general)
+- Chat with the AI and get personalized responses
+- AI learns from your interactions to provide better advice over time

@@ -4,9 +4,7 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   firebaseUid: {
     type: String,
-    required: false,
-    unique: true,
-    sparse: true
+    required: false
   },
   password: {
     type: String,
@@ -352,6 +350,36 @@ const userSchema = new mongoose.Schema({
   fineTunedModel: {
     type: String,
     default: ''
+  },
+  // AI Personalization fields
+  aiProfile: {
+    learningStyle: {
+      type: String,
+      enum: ['visual', 'auditory', 'kinesthetic', 'reading', 'mixed'],
+      default: 'mixed'
+    },
+    experienceLevel: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced', 'expert'],
+      default: 'beginner'
+    },
+    communicationStyle: {
+      type: String,
+      enum: ['direct', 'encouraging', 'detailed', 'concise', 'casual'],
+      default: 'encouraging'
+    },
+    goals: {
+      type: [String],
+      default: ['General improvement']
+    },
+    interests: {
+      type: [String],
+      default: []
+    },
+    allowTrainingUse: {
+      type: Boolean,
+      default: true
+    }
   },
   // Remove FCM token field
   // fcmToken: { type: String },
