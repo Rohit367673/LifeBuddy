@@ -4,7 +4,12 @@ const fetch = require('node-fetch');
 // Read API key from environment, never hardcode
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mixtral-8x7b-instruct';
+// Prefer config file, fallback to env, fallback to sensible default
+let MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b';
+try {
+  const cfg = require('../config/aiConfig.json');
+  if (cfg?.model) MODEL = cfg.model;
+} catch (_) {}
 
 // Debug logging
 console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
@@ -54,8 +59,18 @@ async function generateScheduleWithOpenRouter(title, requirements, startDate, en
   // Calculate number of days (max 31 for a month)
   const days = Math.min(31, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1);
 
+  // Load style/format rules from config if available
+  let aiCfg = {};
+  try { aiCfg = require('../config/aiConfig.json'); } catch (_) {}
+  const minWords = aiCfg?.response?.minWordsPerDay || 400;
+  const tone = aiCfg?.response?.tone || 'encouraging, expert but friendly';
+  const audience = aiCfg?.response?.audience || 'motivated adult learners and professionals';
+  const sections = aiCfg?.scheduleFormat?.sections?.map(s => `${s.label}`) || [
+    '✨ Day Title', '📚 Key Points', '📝 Examples/Analogies', '🔗 Resources', '💡 Tips', '🕐 Duration', '🧠 Motivation'
+  ];
+
   // ChatGPT-style, detailed, structured prompt with explicit example and length requirement
-  let prompt = `You are LifeBuddy, an AI scheduling and planning assistant.
+  let prompt = `You are LifeBuddy, an AI scheduling and planning assistant with a ${tone} tone for ${audience}.
 
 Today's topic is: "${title}"
 
@@ -64,14 +79,8 @@ User context: ${JSON.stringify(userContext)}
 User requirements:
 ${requirements ? requirements : 'N/A'}
 
-For each day, generate a very long, detailed learning plan (at least 400 words) with these sections:
-1. ✨ Day Title
-2. 📚 Key Points or Subtopics (at least 5, each with a 1–2 sentence explanation)
-3. 📝 Examples/Analogies (at least 2, each detailed)
-4. 🔗 Resources (at least 3, with links)
-5. 💡 Tips (at least 2, actionable and practical)
-6. 🕐 Duration for each section (in minutes)
-7. 🧠 Motivation
+For each day, generate a detailed plan with at least ${minWords} words and these sections exactly:
+${sections.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 IMPORTANT: You must start each day with 'Day N:' (e.g., Day 1:, Day 2:). Do not omit this label. If you do not include this label, your response will be rejected. Each section must be present and detailed.
 

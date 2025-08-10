@@ -160,12 +160,12 @@ export const PremiumProvider = ({ children }) => {
   // Show upgrade prompt for locked features
   const showUpgradePrompt = (feature, message = 'Upgrade to premium for unlimited access') => {
     if (!hasFeature(feature)) {
-      toast.error(message, {
-        action: {
-          label: 'Upgrade',
-          onClick: () => window.location.href = '/premium'
-        }
-      });
+    toast.error(message, {
+      action: {
+        label: 'Upgrade',
+        onClick: () => window.location.href = '/premium'
+      }
+    });
       return true;
     }
     return false;

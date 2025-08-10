@@ -455,7 +455,7 @@ const PublicProfile = () => {
                 <div className="text-xs sm:text-sm text-green-600 font-medium">
                   Active Days
                 </div>
-              </div>
+                    </div>
               <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-purple-600">
                   {new Date().getMonth() + 1}
@@ -562,7 +562,7 @@ const PublicProfile = () => {
           Badges & Achievements ({earnedBadges.length}/{Object.keys(badgeDefinitions).length})
         </h3>
         <div className="max-h-96 overflow-y-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Sort earned badges first */}
             {Object.entries(badgeDefinitions)
               .sort(([aId, a], [bId, b]) => {
@@ -573,57 +573,57 @@ const PublicProfile = () => {
                 return 0;
               })
               .map(([badgeId, badge]) => {
-                const isEarned = earnedBadges.includes(badgeId);
-                return (
+            const isEarned = earnedBadges.includes(badgeId);
+            return (
+              <div
+                key={badgeId}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
+                  isEarned
+                    ? 'border-yellow-300 bg-white scale-105'
+                    : 'border-gray-100 bg-gray-50 opacity-50'
+                }`}
+              >
+                <div className="text-center">
                   <div
-                    key={badgeId}
-                    className={`p-4 rounded-lg border-2 transition-all duration-300 transform ${
-                      isEarned
-                        ? 'border-yellow-300 bg-white scale-105'
-                        : 'border-gray-100 bg-gray-50 opacity-50'
+                    className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
+                    style={{ 
+                      padding: '8px',
+                      boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
+                    }}
+                  >
+                    <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
+                    <img
+                      src={badge.image}
+                      alt={badge.name}
+                      className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
+                      style={{ background: 'transparent' }}
+                    />
+                  </div>
+                  <h4
+                    className={`font-medium text-sm ${
+                      isEarned ? 'text-gray-900' : 'text-gray-500'
                     }`}
                   >
-                    <div className="text-center">
-                      <div
-                        className={`w-20 h-20 mx-auto mb-2 rounded-full flex items-center justify-center shadow transition-all duration-300 aspect-square overflow-hidden relative`}
-                        style={{ 
-                          padding: '8px',
-                          boxShadow: isEarned ? `0 0 10px 2px ${badge.color?.includes('bg-gradient') ? '#fff' : badge.color?.replace('bg-', '').replace('-500', '') || '#FFD700'}` : undefined
-                        }}
-                      >
-                        <div className="absolute inset-0 w-full h-full rounded-full bg-black z-0"></div>
-                        <img
-                          src={badge.image}
-                          alt={badge.name}
-                          className={`w-full h-full object-contain aspect-square z-10 ${isEarned ? '' : 'grayscale opacity-50'}`}
-                          style={{ background: 'transparent' }}
-                        />
-                      </div>
-                      <h4
-                        className={`font-medium text-sm ${
-                          isEarned ? 'text-gray-900' : 'text-gray-500'
-                        }`}
-                      >
-                        {badge.name}
-                      </h4>
-                      <p
-                        className={`text-xs mt-1 ${
-                          isEarned ? 'text-gray-600' : 'text-gray-400'
-                        }`}
-                      >
-                        {badge.description}
-                      </p>
-                      {isEarned && (
-                        <div className="mt-2">
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            Earned
-                          </span>
-                        </div>
-                      )}
+                    {badge.name}
+                  </h4>
+                  <p
+                    className={`text-xs mt-1 ${
+                      isEarned ? 'text-gray-600' : 'text-gray-400'
+                    }`}
+                  >
+                    {badge.description}
+                  </p>
+                  {isEarned && (
+                    <div className="mt-2">
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        Earned
+                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              </div>
+            );
+          })}
           </div>
         </div>
       </div>

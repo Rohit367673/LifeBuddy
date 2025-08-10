@@ -6,6 +6,7 @@ const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
 const { generateScheduleWithOpenRouter } = require('../services/openRouterService');
+const MistralService = require('../services/mistralService');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
 
 // Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
@@ -33,7 +34,42 @@ async function sendDailyTaskNotification(userId, task, dayNumber) {
   }
 }
 
-// Create a new premium task and trigger DeepSeek schedule generation
+// Helper: Generate schedule via OpenRouter, fallback to Mistral
+async function generateScheduleWithFallback(title, requirements, startDate, endDate, userContext) {
+  try {
+    // Try OpenRouter first
+    const schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
+    return { schedule, source: 'OpenRouter' };
+  } catch (openRouterError) {
+    console.log('⚠️ OpenRouter failed, falling back to Mistral AI:', openRouterError.message);
+    // If Mistral key is available, use it; otherwise propagate the OpenRouter error
+    if (process.env.MISTRAL_API_KEY) {
+      const content = await MistralService.generateScheduleWithMistral(title, requirements, startDate, endDate, userContext);
+      // Convert long-form content into structured days in a minimal compatible shape
+      const days = Math.min(31, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1);
+      const schedule = Array.from({ length: days }, (_, idx) => ({
+        date: new Date(new Date(startDate).getTime() + idx * 24*60*60*1000),
+        subtask: idx === 0 ? `Kickoff: ${title}` : `Day ${idx + 1} Plan`,
+        notes: idx === 0 ? content : '',
+        resources: [],
+        exercises: [],
+        tips: '',
+        duration: '',
+        motivation: '',
+        day: idx + 1,
+        status: 'pending',
+        prerequisiteMet: idx === 0,
+        quiz: null,
+        quizAnswered: false,
+        quizCorrect: false,
+      }));
+      return { schedule, source: 'Mistral AI' };
+    }
+    throw openRouterError;
+  }
+}
+
+// Create a new premium task and trigger schedule generation
 router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
   try {
     const { 
@@ -61,20 +97,29 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       });
     }
 
-    // Generate schedule using OpenRouter with user context for personalization
-    let schedule;
+    // Build user context
+    const ctxUser = await User.findById(req.user._id).lean();
+    const userContext = {
+      userId: String(ctxUser._id),
+      username: ctxUser.username,
+      timezone: ctxUser.preferences?.timezone || 'UTC',
+      subscription: ctxUser.subscription?.plan || 'free',
+      notificationPlatform: ctxUser.notificationPlatform || 'email'
+    };
+
+    // Generate schedule with fallback
+    let schedule, scheduleSource;
     try {
-      const ctxUser = await User.findById(req.user._id).lean();
-      const userContext = {
-        userId: String(ctxUser._id),
-        username: ctxUser.username,
-        timezone: ctxUser.preferences?.timezone || 'UTC',
-        subscription: ctxUser.subscription?.plan || 'free',
-        notificationPlatform: ctxUser.notificationPlatform || 'email'
-      };
-      schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
+      const result = await generateScheduleWithFallback(title, requirements, startDate, endDate, userContext);
+      schedule = result.schedule;
+      scheduleSource = result.source;
+      console.log(`✅ Schedule generated with ${scheduleSource}`);
     } catch (err) {
-      return res.status(500).json({ message: err.message || 'Failed to generate schedule from OpenRouter.' });
+      console.error('❌ All AI services failed:', err.message);
+      return res.status(500).json({ 
+        message: `Failed to generate schedule: ${err.message}`,
+        suggestion: 'Please check your API keys or try again later.'
+      });
     }
 
     // Save to DB
@@ -87,7 +132,8 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       endDate,
       generatedSchedule: schedule,
       consentGiven: true,
-      currentDay: 1 // Track current day
+      currentDay: 1,
+      scheduleSource
     });
     await premiumTask.save();
 
@@ -95,14 +141,18 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
     await sendDailyTaskNotification(req.user._id, premiumTask, 1);
 
     res.json({ 
-      message: 'Premium task created with DeepSeek schedule!', 
+      message: `Premium task created with ${scheduleSource} schedule!`, 
       task: premiumTask,
       nextDay: 2,
-      notificationPlatform
+      scheduleSource
     });
-  } catch (err) {
-    console.error('Premium task setup error:', err);
-    res.status(500).json({ message: err.message || 'Internal server error.' });
+
+  } catch (error) {
+    console.error('Error creating premium task:', error);
+    res.status(500).json({ 
+      message: error.message || 'Internal server error',
+      suggestion: 'Please check your API configuration and try again.'
+    });
   }
 });
 
@@ -162,7 +212,6 @@ router.post('/:id/mark', authenticateUser, requirePremium, async (req, res) => {
       if (task.stats.currentStreak > task.stats.bestStreak) {
         task.stats.bestStreak = task.stats.currentStreak;
       }
-      
       // Send next day notification if completed
       const nextDay = dayNumber + 1;
       const nextSubtask = task.generatedSchedule.find(s => s.day === nextDay);
@@ -173,12 +222,18 @@ router.post('/:id/mark', authenticateUser, requirePremium, async (req, res) => {
     } else if (status === 'skipped') {
       task.stats.skipped += 1;
       task.stats.currentStreak = 0; // streak broken
-      
-      // Regenerate schedule if skipped
-      const newSchedule = await generateScheduleWithOpenRouter(task.title, task.requirements, task.startDate, task.endDate);
-      task.generatedSchedule = newSchedule;
+      // Regenerate schedule via fallback
+      const ctxUser = await User.findById(req.user._id).lean();
+      const userContext = {
+        userId: String(ctxUser._id),
+        username: ctxUser.username,
+        timezone: ctxUser.preferences?.timezone || 'UTC',
+        subscription: ctxUser.subscription?.plan || 'free',
+        notificationPlatform: ctxUser.notificationPlatform || 'email'
+      };
+      const { schedule } = await generateScheduleWithFallback(task.title, task.requirements, task.startDate, task.endDate, userContext);
+      task.generatedSchedule = schedule;
       task.currentDay = 1;
-      
       // Send new first day notification
       await sendDailyTaskNotification(req.user._id, task, 1);
     }
@@ -318,22 +373,30 @@ router.get('/weekly-summary', authenticateUser, requirePremium, async (req, res)
   }
 });
 
-// Regenerate schedule with DeepSeek
+// Regenerate schedule
 router.post('/:id/regenerate', authenticateUser, requirePremium, async (req, res) => {
   try {
     const { id } = req.params;
     const task = await PremiumTask.findOne({ _id: id, user: req.user._id });
-    
     if (!task) {
       return res.status(404).json({ message: 'Task not found.' });
     }
 
-    // Regenerate schedule using DeepSeek
-    const newSchedule = await generateScheduleWithOpenRouter(task.title, task.requirements, task.startDate, task.endDate);
+    const ctxUser = await User.findById(req.user._id).lean();
+    const userContext = {
+      userId: String(ctxUser._id),
+      username: ctxUser.username,
+      timezone: ctxUser.preferences?.timezone || 'UTC',
+      subscription: ctxUser.subscription?.plan || 'free',
+      notificationPlatform: ctxUser.notificationPlatform || 'email'
+    };
+
+    const { schedule, source } = await generateScheduleWithFallback(task.title, task.requirements, task.startDate, task.endDate, userContext);
 
     // Update task with new schedule
-    task.generatedSchedule = newSchedule;
+    task.generatedSchedule = schedule;
     task.currentDay = 1;
+    task.scheduleSource = source;
     task.updatedAt = new Date();
     await task.save();
 
@@ -341,7 +404,7 @@ router.post('/:id/regenerate', authenticateUser, requirePremium, async (req, res
     await sendDailyTaskNotification(req.user._id, task, 1);
 
     res.json({ 
-      message: 'Schedule regenerated with DeepSeek!', 
+      message: `Schedule regenerated with ${source}!`, 
       task,
       nextDay: 2
     });
@@ -383,7 +446,7 @@ router.post('/test-notification', authenticateUser, requirePremium, async (req, 
       },
       token: user.fcmToken
     };
-    // await admin.messaging().send(message); // This line was removed as per the edit hint
+    // await admin.messaging().send(message); // intentionally disabled
     res.json({ message: 'Test notification sent!' });
   } catch (err) {
     console.error('Error sending test FCM notification:', err);
@@ -430,5 +493,5 @@ router.get('/calendar-status', authenticateUser, requirePremium, async (req, res
 module.exports = router;
 
 // Export for testing
-// module.exports.generateMockSchedule = generateEnhancedMockSchedule; // This line was removed as per the edit hint
-// module.exports.generateEnhancedMockSchedule = generateEnhancedMockSchedule; // This line was removed as per the edit hint 
+// module.exports.generateMockSchedule = generateEnhancedMockSchedule;
+// module.exports.generateEnhancedMockSchedule = generateEnhancedMockSchedule; 
