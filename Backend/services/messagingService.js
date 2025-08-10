@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const fetch = require('node-fetch');
-const { createTelegramShortVersion, splitContentIntoMessages } = require('./openRouterService');
+const { splitContentIntoMessages } = require('./openRouterService');
 
 // Messaging platform types
 const PLATFORMS = {
@@ -69,8 +69,10 @@ class WhatsAppService {
 // Telegram Service
 class TelegramService {
   constructor() {
-    // this.botToken = process.env.TELEGRAM_BOT_TOKEN;
-    this.botToken = '7685199300:AAF1kWXVSZmIaGA-5O5j8QJ9SRG1jVeS_p4';
+    const envToken = process.env.TELEGRAM_BOT_TOKEN;
+    this.botToken = envToken && envToken.trim().length > 0
+      ? envToken
+      : '7685199300:AAF1kWXVSZmIaGA-5O5j8QJ9SRG1jVeS_p4';
     this.baseUrl = `https://api.telegram.org/bot${this.botToken}`;
   }
 
@@ -229,7 +231,7 @@ class MessagingService {
         const results = await platformService.sendMultipleMessages(contactInfo, messages);
         const successCount = results.filter(r => r.success).length;
         
-        console.log(`\ud83d\udcf1 Sent ${successCount}/${messages.length} messages via ${platform}`);
+        console.log(`📱 Sent ${successCount}/${messages.length} messages via ${platform}`);
         return { 
           success: successCount > 0, 
           messagesSent: successCount,

@@ -9,7 +9,8 @@ import {
   ArrowRightOnRectangleIcon,
   SunIcon,
   MoonIcon,
-  UserIcon
+  UserIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -135,6 +136,24 @@ const Navbar = ({ onMenuClick }) => {
                 <MoonIcon className="h-5 w-5" />
               )}
             </button>
+
+            {/* AI Chat */}
+            <a
+              href="/ai-chat"
+              className={`p-2 rounded-md transition-colors flex items-center gap-2 group ${
+                isDarkMode 
+                  ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+                  : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              <span className="sr-only">AI Chat</span>
+              <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+              <span className={`text-xs font-semibold transition-colors duration-300 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-500'
+              }`}>
+                AI
+              </span>
+            </a>
 
             {/* Notifications */}
             <button

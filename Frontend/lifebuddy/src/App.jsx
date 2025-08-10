@@ -21,6 +21,7 @@ import PublicProfile from './pages/PublicProfile';
 import Productivity from './pages/Productivity';
 import PremiumCalendar from './pages/PremiumCalendar';
 import MySchedule from './pages/MySchedule';
+import AIChat from './components/AIChat';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
                 {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
                   <Route path="/productivity" element={<Productivity />} />
+                  <Route path="/ai-chat" element={<AIChat />} />
                   <Route path="/store" element={<Store />} />
                   <Route path="/my-schedule" element={<MySchedule />} />
                   <Route path="/dashboard" element={<Dashboard />} />

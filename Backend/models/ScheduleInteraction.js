@@ -23,3 +23,4 @@ const scheduleInteractionSchema = new mongoose.Schema({
 module.exports = mongoose.model('ScheduleInteraction', scheduleInteractionSchema);
 
 
+
