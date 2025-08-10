@@ -24,6 +24,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const premiumTaskRoutes = require('./routes/premiumTaskRoutes');
+const aiChatRoutes = require('./routes/aiChatRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -44,6 +45,7 @@ app.use(cors({
       'http://localhost:5174',
       'http://localhost:3000',
       'http://localhost:5000',
+      
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -87,6 +89,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/store', storeRoutes);
 app.use('/api/premium-tasks', premiumTaskRoutes);
+app.use('/api/ai-chat', aiChatRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -108,9 +111,24 @@ app.use('*', (req, res) => {
 });
 
 // Database connection
+async function ensureUserIndexes() {
+  try {
+    const col = mongoose.connection.db.collection('users');
+    const indexes = await col.indexes();
+    const bad = indexes.find((i) => i.key && i.key.firebaseUid === 1 && i.unique);
+    if (bad) {
+      await col.dropIndex(bad.name);
+      console.log('Dropped unique index on users.firebaseUid:', bad.name);
+    }
+  } catch (err) {
+    console.log('Index check/skipping:', err.message);
+  }
+}
+
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy')
-  .then(() => {
+  .then(async () => {
     console.log('Connected to MongoDB');
+    await ensureUserIndexes();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

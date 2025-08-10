@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -19,8 +19,50 @@ const Signup = () => {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const { register, loginWithGoogle, registerTraditional, user, loading: authLoading } = useAuth();
+  const { register, finalizeEmailRegistration, resendVerificationEmail, verifyOTP, token, user, loading: authLoading, awaitingEmailVerification } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
+  // Enhanced avatar selection with cool default avatars
+  const [selectedAvatar, setSelectedAvatar] = useState('');
+  const [uploadedAvatar, setUploadedAvatar] = useState(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  
+  const presetAvatars = [
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy1&backgroundColor=b6e3f4,c0aede,d1d4f9',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy2&backgroundColor=ffdfbf,ffd5dc,b6e3f4',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy3&backgroundColor=c0aede,d1d4f9,ffdfbf',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy4&backgroundColor=ffd5dc,b6e3f4,c0aede',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy5&backgroundColor=d1d4f9,ffdfbf,ffd5dc',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=LifeBuddy6&backgroundColor=b6e3f4,ffd5dc,c0aede'
+  ];
+
+  const handleAvatarUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setErrors({ avatar: 'File size must be less than 5MB' });
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadedAvatar(e.target.result);
+        setSelectedAvatar(e.target.result);
+        setErrors({ ...errors, avatar: '' });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeUploadedAvatar = () => {
+    setUploadedAvatar(null);
+    setSelectedAvatar('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -132,8 +174,11 @@ const Signup = () => {
     setLoading(true);
     
     try {
-      await registerTraditional(formData.email, formData.password, formData.displayName, '', '', cleanUsername(username));
-      navigate('/dashboard');
+      // New flow: Firebase email signup + OTP verification
+      const result = await register(formData.email, formData.password, formData.displayName);
+      if (result?.verificationSent) {
+        setShowOtpInput(true);
+      }
     } catch (error) {
       console.error('Registration error:', error);
       if (error.message.includes('email')) {
@@ -141,6 +186,59 @@ const Signup = () => {
       } else {
         setErrors({ general: error.message });
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpVerification = async () => {
+    if (!otpCode.trim()) {
+      setErrors({ otp: 'Please enter the OTP code' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await verifyOTP(otpCode);
+      setShowOtpInput(false);
+    } catch (error) {
+      setErrors({ otp: error.message || 'Invalid OTP code' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (!selectedAvatar) {
+      setErrors({ avatar: 'Please select or upload an avatar' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Complete backend registration after email verified, set avatar
+      const data = await finalizeEmailRegistration(formData.displayName, selectedAvatar);
+      // If user entered a desired username, set it now
+      const desired = cleanUsername(username);
+      if (desired && token) {
+        try {
+          const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/set-username`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ username: desired })
+          });
+          const body = await res.json();
+          if (!res.ok) {
+            setUsernameError(body.message || 'Could not set username');
+          }
+        } catch (_) {}
+      }
+      navigate('/dashboard');
+    } catch (err) {
+      setErrors({ general: err.message });
     } finally {
       setLoading(false);
     }
@@ -167,8 +265,141 @@ const Signup = () => {
     }
   }, [user, authLoading, navigate]);
 
+  // If awaiting verification, show OTP input first, then avatar selection
+  if (awaitingEmailVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-pink-50 to-blue-50 py-12 px-4">
+        <div className="w-full max-w-lg bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8">
+          {showOtpInput ? (
+            // OTP Verification Screen
+            <div className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white text-2xl">🔐</div>
+              <h2 className="text-2xl font-bold text-slate-800">Verify your email</h2>
+              <p className="text-gray-600 mt-2">We sent a 6-digit code to <span className="font-medium">{formData.email}</span></p>
+              
+              <div className="mt-6">
+                <input
+                  type="text"
+                  maxLength="6"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 6-digit code"
+                  className="input text-center text-2xl tracking-widest font-mono w-full max-w-xs mx-auto"
+                />
+                {errors.otp && <p className="text-danger-600 mt-2">{errors.otp}</p>}
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button 
+                  onClick={async() => {
+                    try {
+                      await resendVerificationEmail();
+                      setErrors({});
+                    } catch (err) {
+                      setErrors({ otp: err.message });
+                    }
+                  }} 
+                  className="btn-secondary py-3"
+                >
+                  Resend Code
+                </button>
+                <button 
+                  onClick={handleOtpVerification} 
+                  disabled={loading || !otpCode.trim()} 
+                  className="btn-primary py-3"
+                >
+                  {loading ? 'Verifying...' : 'Verify Code'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Avatar Selection Screen
+            <div className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-gradient-to-r from-green-500 to-blue-500 flex items-center justify-center text-white text-2xl">🎨</div>
+              <h2 className="text-2xl font-bold text-slate-800">Choose your avatar</h2>
+              <p className="text-gray-600 mt-2">Pick a cool avatar or upload your own photo</p>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 text-left">Default Avatars</h3>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {presetAvatars.map((url) => (
+                    <button 
+                      key={url} 
+                      type="button" 
+                      onClick={() => {
+                        setSelectedAvatar(url);
+                        setUploadedAvatar(null);
+                        setErrors({ ...errors, avatar: '' });
+                      }} 
+                      className={`rounded-full p-1 border-2 transition-all ${
+                        selectedAvatar === url && !uploadedAvatar 
+                          ? 'border-purple-500 scale-110' 
+                          : 'border-gray-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <img src={url} alt="avatar" className="w-12 h-12 rounded-full" />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 text-left">Upload Your Photo</h3>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-400 transition-colors"
+                    >
+                      <CameraIcon className="w-5 h-5" />
+                      Choose File
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                    {uploadedAvatar && (
+                      <button
+                        type="button"
+                        onClick={removeUploadedAvatar}
+                        className="p-1 text-red-500 hover:text-red-700"
+                      >
+                        <XMarkIcon className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                  {uploadedAvatar && (
+                    <div className="mt-3 flex items-center gap-3">
+                      <img src={uploadedAvatar} alt="uploaded" className="w-12 h-12 rounded-full border-2 border-purple-500" />
+                      <span className="text-sm text-green-600">✓ Photo uploaded</span>
+                    </div>
+                  )}
+                  {errors.avatar && <p className="text-danger-600 mt-2 text-left">{errors.avatar}</p>}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button 
+                  onClick={handleFinalize} 
+                  disabled={loading || !selectedAvatar} 
+                  className="btn-primary w-full py-3"
+                >
+                  {loading ? 'Creating Account...' : 'Complete Setup'}
+                </button>
+              </div>
+
+              {errors.general && <p className="text-danger-600 mt-4 text-center">{errors.general}</p>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-2">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-2">
       <div className="max-w-md w-full space-y-8">
         <div>
           <Link to="/" className="flex justify-center">
