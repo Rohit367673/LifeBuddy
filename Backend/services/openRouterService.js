@@ -4,11 +4,22 @@ const fetch = require('node-fetch');
 // Read API key from environment, never hardcode
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Prefer config file, fallback to env, fallback to sensible default
-let MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b';
+// Prefer config file with a prioritized list of free models; fallback to env or sensible defaults
+let PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
+let CANDIDATE_MODELS = [
+  'deepseek/deepseek-r1:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
+  'microsoft/phi-3.5-mini-instruct:free',
+  'nousresearch/hermes-3-llama-3.1-8b:free',
+  'gryphe/mythomax-l2-13b:free',
+  'openai/gpt-oss-20b:free'
+];
 try {
   const cfg = require('../config/aiConfig.json');
-  if (cfg?.model) MODEL = cfg.model;
+  if (cfg?.model) PRIMARY_MODEL = cfg.model;
+  if (Array.isArray(cfg?.models) && cfg.models.length > 0) {
+    CANDIDATE_MODELS = cfg.models;
+  }
 } catch (_) {}
 
 // Debug logging
@@ -16,43 +27,66 @@ console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
 console.log('OpenRouter API Key (first 8 chars):', OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 8) + '...' : 'NOT SET');
 
 
-async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperature = 0.7) {
+async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperature = 0.7, options = {}) {
   if (!OPENROUTER_API_KEY) {
     console.error('OPENROUTER_API_KEY not set in .env');
     throw new Error('OpenRouter API key missing.');
   }
-  try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        // Recommended by OpenRouter to help attribution and avoid some 401s in certain setups
-        'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space',
-        'X-Title': process.env.OPENROUTER_TITLE || 'LifeBuddy'
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: maxTokens,
-        temperature: temperature
-      })
-    });
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenRouter API error:', response.status, errorData);
-      throw new Error('OpenRouter API error: ' + errorData);
-    }
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error('OpenRouter API returned no content.');
-    return content;
-  } catch (error) {
-    console.error('OpenRouter API call failed:', error);
-    throw new Error('OpenRouter API call failed: ' + error.message);
+  // Build the ordered list of models to try
+  const preferred = [];
+  const overrideModel = options?.model;
+  if (overrideModel) preferred.push(overrideModel);
+  preferred.push(PRIMARY_MODEL);
+  for (const m of CANDIDATE_MODELS) {
+    if (!preferred.includes(m)) preferred.push(m);
   }
+
+  const firstErrors = [];
+  for (const model of preferred) {
+    try {
+      console.log('[OpenRouter] Trying model:', model);
+      const response = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space',
+          'X-Title': process.env.OPENROUTER_TITLE || 'LifeBuddy'
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: maxTokens,
+          temperature: temperature
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.warn(`[OpenRouter] Model ${model} failed:`, response.status, errorData);
+        firstErrors.push({ model, status: response.status, error: errorData });
+        // Try next model
+        continue;
+      }
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        console.warn(`[OpenRouter] Model ${model} returned no content`);
+        firstErrors.push({ model, status: 'no_content', error: 'Empty content' });
+        continue;
+      }
+      console.log('[OpenRouter] Using model:', model);
+      return content;
+    } catch (err) {
+      console.warn(`[OpenRouter] Model ${model} threw error:`, err?.message || err);
+      firstErrors.push({ model, status: 'exception', error: err?.message || String(err) });
+      continue;
+    }
+  }
+  const msg = 'OpenRouter API call failed across models: ' + JSON.stringify(firstErrors.slice(0, 3));
+  console.error(msg);
+  throw new Error(msg);
 }
 
 async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext = {}) {
