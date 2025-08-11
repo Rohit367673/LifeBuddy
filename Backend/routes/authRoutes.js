@@ -507,7 +507,7 @@ const generateOTP = () => {
 const sendOTPEmail = async (email, otp) => {
   try {
     // Create transporter with more secure settings
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
