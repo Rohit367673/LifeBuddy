@@ -5,6 +5,11 @@ import { useAuth } from '../context/AuthContext';
 
 export default function VoiceChat() {
   const { token } = useAuth();
+  const isMobileDevice = useMemo(() => {
+    try {
+      return /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+    } catch (_) { return false; }
+  }, []);
   const [isTalking, setIsTalking] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -49,7 +54,7 @@ export default function VoiceChat() {
         return;
       }
       const rec = new SpeechRecognition();
-      rec.continuous = false;
+      rec.continuous = isMobileDevice; // smoother UX on mobile
       rec.interimResults = false;
       rec.lang = 'en-US';
       rec.onstart = () => { recognitionActiveRef.current = true; };
@@ -71,7 +76,7 @@ export default function VoiceChat() {
       console.error('Speech init error', err);
       setErrorMessage('Failed to initialize voice.');
     }
-  }, [token]);
+  }, [token, isMobileDevice]);
 
   // Lightweight 2D avatar canvas
   useEffect(() => {
@@ -417,6 +422,15 @@ export default function VoiceChat() {
     }
   };
 
+  // Mobile-friendly toggle: tap to start, tap again to stop
+  const togglePTT = async (ev) => {
+    if (isTalking) {
+      await stopPTT(ev);
+    } else {
+      await startPTT(ev);
+    }
+  };
+
   // Core handler for voice queries (single ask endpoint)
   const handleVoiceQuery = async (text) => {
     setTranscript(text);
@@ -628,17 +642,28 @@ export default function VoiceChat() {
 
       {/* Push-to-talk button */}
       <div className="fixed right-4 bottom-6" style={{ zIndex: 2000 }}>
-            <button
-              onMouseDown={startPTT}
-              onMouseUp={stopPTT}
-              onTouchStart={startPTT}
-              onTouchEnd={stopPTT}
-          className={`px-5 py-3 rounded-full text-white shadow-xl transition-colors flex items-center gap-2 ${isTalking ? 'bg-red-500' : 'bg-blue-600'}`}
-          aria-label="Push to talk"
-            >
-              {isTalking ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
-              {isTalking ? 'Release to stop' : 'Hold to talk'}
-            </button>
+        {isMobileDevice ? (
+          <button
+            onClick={togglePTT}
+            className={`px-6 py-4 rounded-full text-white shadow-xl transition-colors flex items-center gap-2 ${isTalking ? 'bg-red-500' : 'bg-blue-600'}`}
+            aria-label="Tap to talk"
+          >
+            {isTalking ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
+            {isTalking ? 'Tap to stop' : 'Tap to talk'}
+          </button>
+        ) : (
+          <button
+            onMouseDown={startPTT}
+            onMouseUp={stopPTT}
+            onTouchStart={startPTT}
+            onTouchEnd={stopPTT}
+            className={`px-5 py-3 rounded-full text-white shadow-xl transition-colors flex items-center gap-2 ${isTalking ? 'bg-red-500' : 'bg-blue-600'}`}
+            aria-label="Push to talk"
+          >
+            {isTalking ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
+            {isTalking ? 'Release to stop' : 'Hold to talk'}
+          </button>
+        )}
       </div>
     </div>
   );
