@@ -373,6 +373,16 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      // Fast fail if Firebase isn't initialized (common cause of Google login issues)
+      if (!auth) {
+        const hint =
+          'Google login not configured. Please set VITE_FIREBASE_* values in Frontend/lifebuddy/.env (or .env.local), enable Google provider in Firebase Auth, and restart the dev server.';
+        console.error('Google login blocked: Firebase auth is null. ' + hint);
+        toast.error('Google login is not configured. Please update your Firebase .env settings.');
+        setLoading(false);
+        return;
+      }
+
       // Log configuration for debugging
       logConfig();
       
