@@ -301,6 +301,7 @@ if (require.main === module) {
 }
 
 module.exports = { 
+  generateMessageWithOpenRouter,
   generateScheduleWithOpenRouter,
   splitContentIntoMessages,
-}; 
+};
