@@ -22,6 +22,7 @@ import Productivity from './pages/Productivity';
 import PremiumCalendar from './pages/PremiumCalendar';
 import MySchedule from './pages/MySchedule';
 import AIChat from './components/AIChat';
+import VoiceChat from './pages/VoiceChat';
 
 function App() {
   return (
@@ -38,11 +39,14 @@ function App() {
                 <Route path="/premium" element={<Premium />} />
                 <Route path="/subscribe-success" element={<SubscribeSuccess />} />
                 <Route path="/profile/:identifier" element={<PublicProfile />} />
+                {/* Direct voice route (also added inside MainLayout below) */}
+                <Route path="/ai-voice" element={<VoiceChat />} />
 
                 {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
                   <Route path="/productivity" element={<Productivity />} />
                   <Route path="/ai-chat" element={<AIChat />} />
+                  <Route path="/ai-voice" element={<VoiceChat />} />
                   <Route path="/store" element={<Store />} />
                   <Route path="/my-schedule" element={<MySchedule />} />
                   <Route path="/dashboard" element={<Dashboard />} />
@@ -55,6 +59,8 @@ function App() {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/profile" element={<Profile />} />
                 </Route>
+                {/* Fallback */}
+                <Route path="*" element={<div style={{ padding: 16 }}>Page not found</div>} />
               </Routes>
             </div>
           </PremiumProvider>

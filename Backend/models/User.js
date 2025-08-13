@@ -351,6 +351,24 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Custom AI assistant display name
+  aiAssistantName: {
+    type: String,
+    trim: true,
+    maxlength: 40,
+    default: 'LifeBuddy AI'
+  },
+  // Custom AI theme preferences
+  aiThemeColor: {
+    type: String,
+    trim: true,
+    default: '#7c3aed' // purple
+  },
+  aiBackgroundStyle: {
+    type: String,
+    enum: ['glass', 'gradient', 'particles'],
+    default: 'glass'
+  },
   // AI Personalization fields
   aiProfile: {
     learningStyle: {

@@ -7,6 +7,7 @@ export default function VoiceChat() {
   const { token } = useAuth();
   const [isTalking, setIsTalking] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const recognitionRef = useRef(null);
   const recognitionActiveRef = useRef(false);
   const mediaStreamRef = useRef(null);
@@ -41,21 +42,34 @@ export default function VoiceChat() {
   }, []);
 
   useEffect(() => {
-    // Setup speech recognition (Web Speech API - Chrome)
-    if ('webkitSpeechRecognition' in window) {
-      const Rec = window.webkitSpeechRecognition;
-      const rec = new Rec();
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setErrorMessage('Voice not supported on this browser. Try Chrome desktop or Android Chrome.');
+        return;
+      }
+      const rec = new SpeechRecognition();
       rec.continuous = false;
       rec.interimResults = false;
       rec.lang = 'en-US';
       rec.onstart = () => { recognitionActiveRef.current = true; };
       rec.onend = () => { recognitionActiveRef.current = false; };
       rec.onresult = async (e) => {
-        const text = (e.results?.[0]?.[0]?.transcript || '').trim();
-        if (text.length > 0) hadSpeechRef.current = true;
-        await handleVoiceQuery(text);
+        try {
+          const text = (e.results?.[0]?.[0]?.transcript || '').trim();
+          if (text.length > 0) hadSpeechRef.current = true;
+          await handleVoiceQuery(text);
+        } catch (err) {
+          console.error('Voice handler error', err);
+        }
+      };
+      rec.onerror = (e) => {
+        console.error('Speech error', e);
       };
       recognitionRef.current = rec;
+    } catch (err) {
+      console.error('Speech init error', err);
+      setErrorMessage('Failed to initialize voice.');
     }
   }, [token]);
 
@@ -586,6 +600,11 @@ export default function VoiceChat() {
           <div className="hidden sm:block text-xs text-white/80 max-w-lg truncate">
             {transcript || 'Hold the mic to speak'}
           </div>
+          {errorMessage && (
+            <div className="text-xs px-2 py-1 rounded bg-red-500/20 border border-red-400/40 text-red-100">
+              {errorMessage}
+            </div>
+          )}
           {/* Voice preference */}
           <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1">
             <button
