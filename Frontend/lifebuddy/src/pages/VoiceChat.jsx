@@ -23,6 +23,7 @@ export default function VoiceChat() {
   const avatarCanvasRef = useRef(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const hadSpeechRef = useRef(false);
+  const heardSpeechRef = useRef(false);
   const voicesRef = useRef([]);
   const preferredVoiceRef = useRef(null);
   const [voicePref, setVoicePref] = useState(() => {
@@ -55,10 +56,12 @@ export default function VoiceChat() {
       }
       const rec = new SpeechRecognition();
       rec.continuous = isMobileDevice; // smoother UX on mobile
-      rec.interimResults = false;
+      rec.interimResults = isMobileDevice; // get faster partials on mobile
       rec.lang = 'en-US';
       rec.onstart = () => { recognitionActiveRef.current = true; };
       rec.onend = () => { recognitionActiveRef.current = false; };
+      rec.onaudiostart = () => { heardSpeechRef.current = true; };
+      rec.onspeechstart = () => { heardSpeechRef.current = true; };
       rec.onresult = async (e) => {
         try {
           const text = (e.results?.[0]?.[0]?.transcript || '').trim();
@@ -378,6 +381,7 @@ export default function VoiceChat() {
     if (ev?.preventDefault) ev.preventDefault();
       setIsTalking(true);
     hadSpeechRef.current = false;
+    heardSpeechRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
@@ -414,11 +418,9 @@ export default function VoiceChat() {
     }
     analyserRef.current = null;
 
-    // If user released without speech, play a friendly prompt
-    if (!hadSpeechRef.current) {
-      const prompt = 'Listening…';
-      setAiReply(prompt);
-      // no TTS to avoid interruption
+    // If user released without any detected audio/speech, do not show noisy prompts
+    if (!hadSpeechRef.current && !heardSpeechRef.current) {
+      setAiReply('');
     }
   };
 
