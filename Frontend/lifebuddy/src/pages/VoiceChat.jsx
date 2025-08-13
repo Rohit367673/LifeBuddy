@@ -411,9 +411,9 @@ export default function VoiceChat() {
 
     // If user released without speech, play a friendly prompt
     if (!hadSpeechRef.current) {
-      const prompt = 'Hey there! How can I help you today?';
+      const prompt = 'Listening…';
       setAiReply(prompt);
-      try { await speakWithBrowserTTS(prompt); } catch (_) {}
+      // no TTS to avoid interruption
     }
   };
 
@@ -424,20 +424,12 @@ export default function VoiceChat() {
     try {
       if (!text || text.trim().length === 0) return; // Empty handled on release
       const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
-      if (!authToken) {
-        setAiReply('Please log in to use voice chat.');
-        return;
-      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
       const resp = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        headers: authToken ? { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
-        signal: controller.signal
       });
-      clearTimeout(timeoutId);
 
       let finalText = '';
       if (resp.ok) {
@@ -595,7 +587,7 @@ export default function VoiceChat() {
       <canvas ref={avatarCanvasRef} className="fixed" style={{ zIndex: 1200, pointerEvents: 'none' }} />
 
       {/* Top bar */}
-      <div className="fixed left-0 right-0 p-4 flex items-center justify-between" style={{ zIndex: 2000, top: 64 }}>
+      <div className="fixed left-0 right-0 p-4 flex items-center justify-between" style={{ zIndex: 2000, top: 56 }}>
         <h1 className="text-white/90 text-xl font-semibold">Voice Chat</h1>
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-xs text-white/80 max-w-lg truncate">

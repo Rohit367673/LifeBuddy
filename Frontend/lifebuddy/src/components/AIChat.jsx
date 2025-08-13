@@ -91,9 +91,15 @@ export default function AIChat() {
   };
 
   return (
-    <div className="min-h-screen pt-16 bg-[radial-gradient(800px_circle_at_10%_10%,rgba(59,130,246,.08),transparent_40%),radial-gradient(700px_circle_at_90%_30%,rgba(16,185,129,.08),transparent_40%)]">
+    <div className="min-h-screen pt-14 bg-[radial-gradient(800px_circle_at_10%_10%,rgba(59,130,246,.08),transparent_40%),radial-gradient(700px_circle_at_90%_30%,rgba(16,185,129,.08),transparent_40%)]">
+      <style>{`
+        @keyframes dotBlink { 0%,100%{opacity:.2} 50%{opacity:1} }
+        .typing-dots span { display:inline-block; width:6px; height:6px; margin-left:4px; background:#64748b; border-radius:50%; opacity:.2; animation: dotBlink 1s infinite; }
+        .typing-dots span:nth-child(2){ animation-delay:.2s }
+        .typing-dots span:nth-child(3){ animation-delay:.4s }
+      `}</style>
       {/* Header */}
-      <div className="sticky top-16 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 bg-white/80 border-b border-white/50">
+      <div className="sticky top-14 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 bg-white/80 border-b border-white/50">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500" />
@@ -101,8 +107,8 @@ export default function AIChat() {
             <span className="ml-1 inline-block w-2 h-2 rounded-full bg-emerald-500" />
           </div>
           <a href="/ai-voice" className="text-xs px-3 py-1 rounded-lg text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-1"><MicrophoneIcon className="w-4 h-4"/>Voice</a>
+          </div>
         </div>
-      </div>
 
       {/* Chat */}
       <div className="max-w-4xl mx-auto px-4">
@@ -111,8 +117,8 @@ export default function AIChat() {
             <div className="text-center text-slate-500 py-12">
               <div className="text-lg font-medium mb-2">Start a conversation</div>
               <div className="text-sm">Ask for plans, steps, summaries, or help with your schedule.</div>
-            </div>
-          )}
+                  </div>
+                )}
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${m.role==='user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
@@ -124,11 +130,19 @@ export default function AIChat() {
                   </button>
                 )}
               </div>
-            </div>
+                </div>
           ))}
+          {sending ? (
+            <div className="flex justify-start">
+              <div className="max-w-[78%] rounded-2xl px-4 py-3 shadow-sm bg-white border border-slate-100 text-slate-700 flex items-center">
+                <span>Generating</span>
+                <span className="typing-dots ml-2"><span></span><span></span><span></span></span>
+              </div>
+            </div>
+          ) : null}
           <div ref={endRef} />
         </div>
-      </div>
+        </div>
 
       {/* Input bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white/80 to-white/30 backdrop-blur border-t border-white/50">
@@ -144,10 +158,10 @@ export default function AIChat() {
           />
           <button type="submit" disabled={!input.trim() || sending} className="rounded-xl px-4 py-3 bg-blue-600 text-white shadow disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2">
             <PaperAirplaneIcon className="w-4 h-4"/>
-            Send
-          </button>
-        </form>
-      </div>
+              Send
+            </button>
+          </form>
+        </div>
     </div>
   );
 }
