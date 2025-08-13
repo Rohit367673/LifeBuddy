@@ -91,9 +91,9 @@ export default function AIChat() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(800px_circle_at_10%_10%,rgba(59,130,246,.08),transparent_40%),radial-gradient(700px_circle_at_90%_30%,rgba(16,185,129,.08),transparent_40%)]">
+    <div className="min-h-screen pt-16 bg-[radial-gradient(800px_circle_at_10%_10%,rgba(59,130,246,.08),transparent_40%),radial-gradient(700px_circle_at_90%_30%,rgba(16,185,129,.08),transparent_40%)]">
       {/* Header */}
-      <div className="sticky top-0 z-20 mt-8 backdrop-blur supports-[backdrop-filter]:bg-white/40 bg-white/80 border-b border-white/50">
+      <div className="sticky top-16 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 bg-white/80 border-b border-white/50">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500" />
@@ -106,7 +106,7 @@ export default function AIChat() {
 
       {/* Chat */}
       <div className="max-w-4xl mx-auto px-4">
-        <div className="mt-6 mb-24 space-y-4">
+        <div className="mt-14 mb-24 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-slate-500 py-12">
               <div className="text-lg font-medium mb-2">Start a conversation</div>

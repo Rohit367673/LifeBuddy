@@ -18,7 +18,7 @@ function requirePremium(req, res, next) {
  * POST /api/ai-chat/general
  * General AI chat with personalization
  */
-router.post('/general', auth, requirePremium, async (req, res) => {
+router.post('/general', auth, async (req, res) => {
   try {
     const { message, topic = 'general' } = req.body;
     const userId = req.user.id;
@@ -74,7 +74,7 @@ router.post('/general', auth, requirePremium, async (req, res) => {
  * GET /api/ai-chat/schedule
  * Fetch current premium schedule for the user (for AI context)
  */
-router.get('/schedule', auth, requirePremium, async (req, res) => {
+router.get('/schedule', auth, async (req, res) => {
   try {
     const task = await PremiumTask.findOne({ user: req.user.id }).sort({ createdAt: -1 });
     if (!task) return res.status(404).json({ success: false, message: 'No schedule found' });
@@ -88,7 +88,7 @@ router.get('/schedule', auth, requirePremium, async (req, res) => {
  * POST /api/ai-chat/ask
  * Ask AI about schedule or personal queries; uses user_id personalization
  */
-router.post('/ask', auth, requirePremium, async (req, res) => {
+router.post('/ask', auth, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'message is required' });

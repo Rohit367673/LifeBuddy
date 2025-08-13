@@ -417,72 +417,44 @@ export default function VoiceChat() {
     }
   };
 
-  // Core handler for voice queries (stream → fallback → TTS)
+  // Core handler for voice queries (single ask endpoint)
   const handleVoiceQuery = async (text) => {
     setTranscript(text);
     setAiReply('');
     try {
       if (!text || text.trim().length === 0) return; // Empty handled on release
+      const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+      if (!authToken) {
+        setAiReply('Please log in to use voice chat.');
+        return;
+      }
 
-      // Try streaming with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const resp = await fetch(`${getApiUrl()}/api/ai-chat/stream`, {
+      const resp = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+
       let finalText = '';
-
-      if (resp.ok && resp.body) {
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let done = false;
-        while (!done) {
-          const { value, done: d } = await reader.read();
-          if (d) { done = true; break; }
-          const chunk = decoder.decode(value, { stream: true });
-          finalText += chunk;
-          setAiReply(prev => prev + chunk);
-        }
+      if (resp.ok) {
+        const data = await resp.json();
+        finalText = (data && data.response) || '';
+      } else if (resp.status === 401 || resp.status === 403) {
+        let msg = '';
+        try { const j = await resp.json(); msg = j.message || ''; } catch (_) { try { msg = await resp.text(); } catch (_) {} }
+        finalText = msg || 'Session invalid. Please log in again.';
       } else {
-        // Try to parse error
-        let errMsg = '';
-        try { const j = await resp.json(); errMsg = j.message || ''; } catch (_) { try { errMsg = await resp.text(); } catch (_) {} }
-        if (resp.status === 401 || resp.status === 402 || resp.status === 403) {
-          finalText = errMsg || 'This feature requires a premium subscription or your session is not authorized.';
-        }
-
-        // Fallback to non-streaming endpoint if not an auth error
-        if (!finalText) {
-          const controller2 = new AbortController();
-          const t2 = setTimeout(() => controller2.abort(), 12000);
-          const alt = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text }),
-            signal: controller2.signal
-          });
-          clearTimeout(t2);
-          if (alt.ok) {
-            const data = await alt.json();
-            finalText = data.response || '';
-            setAiReply(finalText);
-          } else {
-            let err2 = '';
-            try { const j2 = await alt.json(); err2 = j2.message || ''; } catch (_) { try { err2 = await alt.text(); } catch (_) {} }
-            finalText = err2 || 'Sorry, I could not get a response from the AI service.';
-          }
-        }
+        try { const j = await resp.json(); finalText = j.message || ''; } catch (_) { try { finalText = await resp.text(); } catch (_) {} }
+        if (!finalText) finalText = 'Sorry, I could not get a response from the AI service.';
       }
 
-      if (!finalText || finalText.trim().length === 0) {
-        finalText = "Sorry, I'm having trouble responding right now.";
-      }
+      if (!finalText || finalText.trim().length === 0) finalText = "Sorry, I'm having trouble responding right now.";
       setAiReply(finalText);
-      await speakWithBrowserTTS(finalText);
+      try { await speakWithBrowserTTS(finalText); } catch (_) {}
     } catch (err) {
       console.error('Voice stream error', err);
       const finalText = "Sorry, I'm having trouble connecting to the AI right now.";
@@ -520,11 +492,40 @@ export default function VoiceChat() {
     return filtered.length ? filtered[0] : voices[0];
   };
 
+  // Ensure voices are available (Chrome sometimes delays)
+  const waitForVoices = async (timeoutMs = 2000) => {
+    if (!window.speechSynthesis) return [];
+    let voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length) return voices;
+    await new Promise((resolve) => {
+      const start = Date.now();
+      const iv = setInterval(() => {
+        voices = window.speechSynthesis.getVoices();
+        if (voices.length || Date.now() - start > timeoutMs) {
+          clearInterval(iv);
+          resolve();
+        }
+      }, 120);
+    });
+    return window.speechSynthesis.getVoices() || [];
+  };
+
   const speakWithBrowserTTS = async (text) => {
     if (!window.speechSynthesis) return;
     
     // Stop any current speech
     window.speechSynthesis.cancel();
+
+    // Workaround: Chrome sometimes starts paused; keep resuming briefly
+    try {
+      const resumeIv = setInterval(() => window.speechSynthesis.resume(), 200);
+      setTimeout(() => clearInterval(resumeIv), 2000);
+    } catch (_) {}
+
+    // Ensure voices are loaded and select preferred
+    const voices = await waitForVoices();
+    if (!voicesRef.current || !voicesRef.current.length) voicesRef.current = voices;
+    if (!preferredVoiceRef.current) preferredVoiceRef.current = pickPreferredVoice(voicePref);
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = preferredVoiceRef.current;
@@ -585,7 +586,7 @@ export default function VoiceChat() {
   `, []);
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden pt-16">
       <style>{animatedBgCss}</style>
       <div className="ai-voice-bg" style={{ zIndex: 0, position: 'fixed' }} />
       <canvas ref={bgCanvasRef} className="fixed inset-0" style={{ zIndex: 200, pointerEvents: 'none' }} />
@@ -594,7 +595,7 @@ export default function VoiceChat() {
       <canvas ref={avatarCanvasRef} className="fixed" style={{ zIndex: 1200, pointerEvents: 'none' }} />
 
       {/* Top bar */}
-      <div className="fixed top-0 left-0 right-0 p-4 flex items-center justify-between" style={{ zIndex: 2000 }}>
+      <div className="fixed left-0 right-0 p-4 flex items-center justify-between" style={{ zIndex: 2000, top: 64 }}>
         <h1 className="text-white/90 text-xl font-semibold">Voice Chat</h1>
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-xs text-white/80 max-w-lg truncate">
