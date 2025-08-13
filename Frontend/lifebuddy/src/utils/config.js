@@ -30,6 +30,17 @@ export const getApiUrl = () => {
   return config.apiUrl;
 };
 
+// Helper function to get fallback API URLs
+export const getFallbackApiUrls = () => {
+  const primary = getApiUrl();
+  const fallbacks = [
+    'https://lifebuddy.onrender.com',
+    'http://localhost:5001'
+  ].filter(url => url !== primary);
+  
+  return [primary, ...fallbacks];
+};
+
 // Helper function to log configuration for debugging
 export const logConfig = () => {
   console.log('=== Environment Configuration ===');

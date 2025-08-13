@@ -137,7 +137,7 @@ const Navbar = ({ onMenuClick }) => {
               )}
             </button>
 
-            {/* AI Chat */}
+            {/* AI Assistant */}
             <a
               href="/ai-chat"
               className={`p-2 rounded-md transition-colors flex items-center gap-2 group ${
@@ -146,7 +146,7 @@ const Navbar = ({ onMenuClick }) => {
                   : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
               }`}
             >
-              <span className="sr-only">AI Chat</span>
+              <span className="sr-only">AI Assistant</span>
               <SparklesIcon className="h-5 w-5" aria-hidden="true" />
               <span className={`text-xs font-semibold transition-colors duration-300 ${
                 isDarkMode ? 'text-gray-300' : 'text-gray-500'
