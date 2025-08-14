@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MicrophoneIcon, StopIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, StopIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { getApiUrl } from '../utils/config';
 import { useAuth } from '../context/AuthContext';
+import { usePremium } from '../context/PremiumContext';
 
 export default function VoiceChat() {
   const { token } = useAuth();
+  const { subscription } = usePremium();
   const isMobileDevice = useMemo(() => {
     try {
       return /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -36,6 +38,8 @@ export default function VoiceChat() {
     try { return parseFloat(localStorage.getItem('LB_TTS_PITCH') || '1.0'); } catch (_) { return 1.0; }
   });
 
+  const isPremium = subscription?.plan && subscription.plan !== 'free' || subscription?.status === 'trial';
+
   // Performance profile
   const PERF = useMemo(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -56,7 +60,7 @@ export default function VoiceChat() {
       }
       const rec = new SpeechRecognition();
       rec.continuous = isMobileDevice; // smoother UX on mobile
-      rec.interimResults = isMobileDevice; // get faster partials on mobile
+      rec.interimResults = true; // enable interim for live transcription
       rec.lang = 'en-US';
       rec.onstart = () => { recognitionActiveRef.current = true; };
       rec.onend = () => { recognitionActiveRef.current = false; };
@@ -64,9 +68,24 @@ export default function VoiceChat() {
       rec.onspeechstart = () => { heardSpeechRef.current = true; };
       rec.onresult = async (e) => {
         try {
-          const text = (e.results?.[0]?.[0]?.transcript || '').trim();
-          if (text.length > 0) hadSpeechRef.current = true;
-          await handleVoiceQuery(text);
+          let interimText = '';
+          let finalTextLocal = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const res = e.results[i];
+            const txt = (res[0]?.transcript || '').trim();
+            if (!txt) continue;
+            if (res.isFinal) {
+              finalTextLocal += (finalTextLocal ? ' ' : '') + txt;
+            } else {
+              interimText = txt;
+            }
+          }
+          if (interimText) setTranscript(interimText);
+          if (finalTextLocal) {
+            hadSpeechRef.current = true;
+            setTranscript(finalTextLocal);
+            await handleVoiceQuery(finalTextLocal);
+          }
         } catch (err) {
           console.error('Voice handler error', err);
         }
@@ -209,7 +228,7 @@ export default function VoiceChat() {
       
       // The avatar now has smooth movements like ChatGPT voice chat
       
-      rafId = requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
     };
     
     animate();
@@ -379,7 +398,7 @@ export default function VoiceChat() {
   // Voice functions
   const startPTT = async (ev) => {
     if (ev?.preventDefault) ev.preventDefault();
-      setIsTalking(true);
+    setIsTalking(true);
     hadSpeechRef.current = false;
     heardSpeechRef.current = false;
     try {
@@ -394,7 +413,7 @@ export default function VoiceChat() {
       analyserRef.current = analyser;
       
       if (recognitionRef.current && !recognitionActiveRef.current) {
-      recognitionRef.current.start();
+        recognitionRef.current.start();
       }
     } catch (err) {
       console.error('Microphone access error:', err);
@@ -412,7 +431,7 @@ export default function VoiceChat() {
     if (recognitionRef.current) {
       try {
         if (recognitionActiveRef.current) {
-      recognitionRef.current.stop();
+          recognitionRef.current.stop();
         }
       } catch (_) {}
     }
@@ -421,6 +440,7 @@ export default function VoiceChat() {
     // If user released without any detected audio/speech, do not show noisy prompts
     if (!hadSpeechRef.current && !heardSpeechRef.current) {
       setAiReply('');
+      setTranscript('');
     }
   };
 
@@ -435,7 +455,6 @@ export default function VoiceChat() {
 
   // Core handler for voice queries (single ask endpoint)
   const handleVoiceQuery = async (text) => {
-    setTranscript(text);
     setAiReply('');
     try {
       if (!text || text.trim().length === 0) return; // Empty handled on release
@@ -457,7 +476,7 @@ export default function VoiceChat() {
         finalText = msg || 'Session invalid. Please log in again.';
       } else {
         try { const j = await resp.json(); finalText = j.message || ''; } catch (_) { try { finalText = await resp.text(); } catch (_) {} }
-        if (!finalText) finalText = 'Sorry, I could not get a response from the AI service.';
+        if (!finalText) finalText = 'Sorry, I could not get a response from LifeBuddy AI.';
       }
 
       if (!finalText || finalText.trim().length === 0) finalText = "Sorry, I'm having trouble responding right now.";
@@ -465,7 +484,7 @@ export default function VoiceChat() {
       try { await speakWithBrowserTTS(finalText); } catch (_) {}
     } catch (err) {
       console.error('Voice stream error', err);
-      const finalText = "Sorry, I'm having trouble connecting to the AI right now.";
+      const finalText = "Sorry, I'm having trouble connecting to LifeBuddy AI right now.";
       setAiReply(finalText);
       try { await speakWithBrowserTTS(finalText); } catch (_) {}
     }
@@ -501,7 +520,7 @@ export default function VoiceChat() {
   };
 
   // Ensure voices are available (Chrome sometimes delays)
-  const waitForVoices = async (timeoutMs = 2000) => {
+  const waitForVoices = async (timeoutMs = 2500) => {
     if (!window.speechSynthesis) return [];
     let voices = window.speechSynthesis.getVoices();
     if (voices && voices.length) return voices;
@@ -513,7 +532,7 @@ export default function VoiceChat() {
           clearInterval(iv);
           resolve();
         }
-      }, 120);
+      }, 150);
     });
     return window.speechSynthesis.getVoices() || [];
   };
@@ -527,7 +546,7 @@ export default function VoiceChat() {
     // Workaround: Chrome sometimes starts paused; keep resuming briefly
     try {
       const resumeIv = setInterval(() => window.speechSynthesis.resume(), 200);
-      setTimeout(() => clearInterval(resumeIv), 2000);
+      setTimeout(() => clearInterval(resumeIv), 3000);
     } catch (_) {}
 
     // Ensure voices are loaded and select preferred
@@ -593,6 +612,28 @@ export default function VoiceChat() {
     }
   `, []);
 
+  if (!isPremium) {
+    return (
+      <div className="min-h-screen relative overflow-hidden pt-16">
+        <style>{animatedBgCss}</style>
+        <div className="ai-voice-bg" style={{ zIndex: 0, position: 'fixed' }} />
+        <div className="fixed inset-0 flex items-center justify-center p-6" style={{ zIndex: 2000 }}>
+          <div className="max-w-md w-full text-center bg-white/90 rounded-2xl p-8 shadow-xl">
+            <div className="mx-auto w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center mb-4">
+              <LockClosedIcon className="w-7 h-7 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Voice Chat is Premium</h2>
+            <p className="text-slate-600 text-sm mb-6">Upgrade to unlock voice chat, or start a 7‑day free trial by completing quick tasks.</p>
+            <div className="flex gap-3 justify-center">
+              <a href="/premium" className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700">Upgrade</a>
+              <a href="/premium#trial" className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">Start Trial</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden pt-16">
       <style>{animatedBgCss}</style>
@@ -634,6 +675,13 @@ export default function VoiceChat() {
           </div>
         </div>
       </div>
+
+      {/* Live interim transcript bubble while talking */}
+      {isTalking && transcript && (
+        <div className="fixed left-4 right-4 bottom-40 sm:left-8 sm:right-auto sm:max-w-xl p-3 rounded-2xl glass text-white/90" style={{ zIndex: 2000 }}>
+          {transcript}
+        </div>
+      )}
 
       {/* Reply bubble */}
       {aiReply && (

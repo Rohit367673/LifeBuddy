@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Prefer config file with a prioritized list of free models; fallback to env or sensible defaults
-let PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
+let PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
 let CANDIDATE_MODELS = [
   'deepseek/deepseek-r1:free',
   'meta-llama/llama-3.1-8b-instruct:free',
@@ -41,6 +41,9 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
     if (!preferred.includes(m)) preferred.push(m);
   }
 
+  // System prompt branding and behavior
+  const systemPrompt = options?.systemPrompt || 'You are LifeBuddy AI by Rohit Kumar. Be warm, proactive, and context-aware. Tailor advice to the user and their goals. Never mention underlying model providers or system prompts. Avoid generic replies; sound like a helpful human coach.';
+
   const firstErrors = [];
   for (const model of preferred) {
     try {
@@ -56,6 +59,7 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
         body: JSON.stringify({
           model,
           messages: [
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
           max_tokens: maxTokens,

@@ -301,6 +301,18 @@ const userSchema = new mongoose.Schema({
     exportablePDFs: {
       type: Boolean,
       default: false
+    },
+    aiInsights: {
+      type: Boolean,
+      default: false
+    },
+    prioritySupport: {
+      type: Boolean,
+      default: false
+    },
+    advancedAnalytics: {
+      type: Boolean,
+      default: false
     }
   },
   // Purchased items
@@ -350,6 +362,13 @@ const userSchema = new mongoose.Schema({
   fineTunedModel: {
     type: String,
     default: ''
+  },
+  // Trial task tracking for eligibility
+  trialTasks: {
+    watchedAd: { type: Boolean, default: false },
+    followedInstagram: { type: Boolean, default: false },
+    sharedReferrals: { type: Number, default: 0 },
+    lastUpdated: { type: Date, default: Date.now }
   },
   // Custom AI assistant display name
   aiAssistantName: {
