@@ -86,6 +86,9 @@ export const PremiumProvider = ({ children }) => {
           status: 'completed'
         }
       };
+      if (paymentData?.couponCode) {
+        requestBody.couponCode = paymentData.couponCode;
+      }
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/subscribe`, {
         method: 'POST',

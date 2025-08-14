@@ -2,6 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 const { checkTrialStatus } = require('../middlewares/premiumMiddleware');
+const Coupon = require('../models/Coupon');
 
 const router = express.Router();
 
@@ -35,7 +36,17 @@ router.post('/trial', authenticateUser, async (req, res) => {
         message: 'Trial is only available for free users.'
       });
     }
-    
+
+    // Optional: enforce trial tasks requirements
+    const { requireTasks = false } = req.query;
+    if (String(requireTasks) === 'true') {
+      const t = user.trialTasks || {};
+      const ok = !!t.watchedAd && !!t.followedInstagram && (t.sharedReferrals || 0) >= 10;
+      if (!ok) {
+        return res.status(403).json({ message: 'Complete the trial tasks to unlock 7-day premium: watch an ad, follow on Instagram (@Rohitkumar324), and share with 10 friends.' });
+      }
+    }
+
     // Set trial for 7 days
     const trialEndDate = new Date();
     trialEndDate.setDate(trialEndDate.getDate() + 7);
@@ -53,7 +64,10 @@ router.post('/trial', authenticateUser, async (req, res) => {
       profileInsights: true,
       fullCalendarSync: true,
       adFree: true,
-      exportablePDFs: true
+      exportablePDFs: true,
+      aiInsights: true,
+      prioritySupport: true,
+      advancedAnalytics: true
     };
     
     await user.save();
@@ -72,7 +86,7 @@ router.post('/trial', authenticateUser, async (req, res) => {
 // Subscribe to premium plan
 router.post('/subscribe', authenticateUser, async (req, res) => {
   try {
-    const { plan, paymentData } = req.body;
+    const { plan, paymentData, couponCode } = req.body;
     
     if (!['monthly', 'yearly'].includes(plan)) {
       return res.status(400).json({
@@ -90,15 +104,30 @@ router.post('/subscribe', authenticateUser, async (req, res) => {
       endDate.setFullYear(endDate.getFullYear() + 1);
     }
     
+    // Coupon handling
+    let discount = 0;
+    let couponUsed = null;
+    const baseAmount = paymentData?.amount || (plan === 'monthly' ? 9.99 : 99.99);
+    if (couponCode) {
+      const normalized = String(couponCode).trim().toUpperCase();
+      const coupon = await Coupon.findOne({ code: normalized, isActive: true });
+      if (coupon) {
+        discount = Math.min(baseAmount, Number(coupon.discountAmount) || 0);
+        couponUsed = coupon;
+      }
+    }
+
     // Store payment information
     const paymentInfo = {
       method: paymentData?.method || 'mock',
       transactionId: paymentData?.transactionId || `MOCK_${Date.now()}`,
-      amount: paymentData?.amount || (plan === 'monthly' ? 9.99 : 99.99),
+      amount: Math.max(0, baseAmount - discount),
       currency: paymentData?.currency || 'USD',
       status: paymentData?.status || 'completed',
       cardLast4: paymentData?.cardLast4,
-      timestamp: new Date()
+      timestamp: new Date(),
+      couponCode: couponUsed ? couponUsed.code : undefined,
+      discountApplied: discount
     };
     
     user.subscription = {
@@ -127,6 +156,18 @@ router.post('/subscribe', authenticateUser, async (req, res) => {
       advancedAnalytics: true
     };
     
+    // Record coupon usage
+    if (couponUsed) {
+      couponUsed.uses.push({
+        user: user._id,
+        plan,
+        amountBefore: baseAmount,
+        discountApplied: discount,
+        transactionId: paymentInfo.transactionId
+      });
+      await couponUsed.save();
+    }
+
     await user.save();
     
     res.json({
@@ -164,6 +205,36 @@ router.post('/cancel', authenticateUser, async (req, res) => {
     console.error('Error cancelling subscription:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+// Trial task completion endpoints
+router.post('/trial-tasks/watch-ad', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.trialTasks = { ...(user.trialTasks || {}), watchedAd: true, lastUpdated: new Date() };
+    await user.save();
+    res.json({ success: true, trialTasks: user.trialTasks });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+router.post('/trial-tasks/follow-instagram', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.trialTasks = { ...(user.trialTasks || {}), followedInstagram: true, lastUpdated: new Date() };
+    await user.save();
+    res.json({ success: true, trialTasks: user.trialTasks });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+router.post('/trial-tasks/share', authenticateUser, async (req, res) => {
+  try {
+    const { count = 1 } = req.body;
+    const user = await User.findById(req.user._id);
+    const current = user.trialTasks?.sharedReferrals || 0;
+    user.trialTasks = { ...(user.trialTasks || {}), sharedReferrals: current + Number(count), lastUpdated: new Date() };
+    await user.save();
+    res.json({ success: true, trialTasks: user.trialTasks });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 // Get billing history

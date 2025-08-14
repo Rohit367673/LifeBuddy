@@ -198,7 +198,7 @@ export default function MySchedule() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Your AI Roadmap
               </h1>
-              <p className="text-sm text-slate-600 mt-1">Powered by DeepSeek Intelligence</p>
+              <p className="text-sm text-slate-600 mt-1">Powered by LifeBuddy AI</p>
             </div>
             <motion.div
               className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg"

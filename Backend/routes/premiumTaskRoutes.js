@@ -441,8 +441,8 @@ router.post('/test-notification', authenticateUser, requirePremium, async (req, 
     }
     const message = {
       notification: {
-        title: 'DeepSeek Test Notification',
-        body: 'This is a test push notification for your DeepSeek schedule.'
+        title: 'LifeBuddy AI Test Notification',
+                  body: 'This is a test push notification for your LifeBuddy schedule.'
       },
       token: user.fcmToken
     };

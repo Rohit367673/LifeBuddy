@@ -697,23 +697,17 @@ export const AuthProvider = ({ children }) => {
           try {
             console.log('Checking for redirect result...');
             const result = await getRedirectResult(auth);
-            if (result) {
+            if (result && result.user) {
               console.log('Redirect result received:', result.user.email);
               await handleSuccessfulGoogleLogin(result.user);
               userSet = true;
+              setTimeout(() => navigate('/dashboard'), 100);
             } else {
               console.log('No redirect result found');
             }
           } catch (error) {
             console.error('Error handling redirect result:', error);
-            // Don't let redirect errors break the auth flow
             setUser(null);
-            // Clear any stale redirect state
-            try {
-              await getRedirectResult(auth);
-            } catch (clearError) {
-              console.log('Clearing redirect result:', clearError);
-            }
           }
         };
 
@@ -737,6 +731,20 @@ export const AuthProvider = ({ children }) => {
 
     return unsubscribe;
   }, []);
+
+  // Fallback: if we have a Firebase user (e.g., after Google redirect) but no backend token yet,
+  // finalize login with backend to avoid redirect loops back to /login
+  useEffect(() => {
+    (async () => {
+      if (firebaseUser && !token) {
+        try {
+          await handleSuccessfulGoogleLogin(firebaseUser);
+        } catch (_) {
+          // ignore; UI will continue to show login
+        }
+      }
+    })();
+  }, [firebaseUser, token]);
 
   // Store token in localStorage when it changes
   useEffect(() => {

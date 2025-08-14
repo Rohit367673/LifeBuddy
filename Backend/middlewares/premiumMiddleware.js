@@ -119,9 +119,25 @@ const checkTrialStatus = async (req, res, next) => {
   }
 };
 
+// Require premium plan or active trial
+const requirePremium = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const plan = user?.subscription?.plan;
+    const status = user?.subscription?.status;
+    const isPremium = plan && plan !== 'free';
+    const isTrialActive = status === 'trial' && user.subscription.trialEndDate && new Date() <= new Date(user.subscription.trialEndDate);
+    if (isPremium || isTrialActive) return next();
+    return res.status(403).json({ success: false, message: 'Premium required' });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+};
+
 module.exports = {
   checkPremiumFeature,
   checkUsageLimit,
   updateUsage,
-  checkTrialStatus
+  checkTrialStatus,
+  requirePremium
 }; 

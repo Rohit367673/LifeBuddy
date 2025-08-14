@@ -1,14 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser: auth } = require('../middlewares/authMiddleware');
+const { requirePremium } = require('../middlewares/premiumMiddleware');
 const MistralService = require('../services/mistralService');
 const { generateMessageWithOpenRouter } = require('../services/openRouterService');
 const User = require('../models/User');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
 const PremiumTask = require('../models/PremiumTask');
+const ChatMessage = require('../models/ChatMessage');
 
-// Helper: ensure premium user
-function requirePremium(req, res, next) {
+// Query filter to block irrelevant/abusive inputs
+function isIrrelevantQuery(text = '') {
+  if (!text || typeof text !== 'string') return true;
+  const msg = text.toLowerCase().trim();
+  if (msg.length < 2) return true;
+  const banned = [
+    'kill', 'suicide', 'self harm', 'hate speech', 'racist', 'nsfw', 'sex', 'porn',
+    'credit card', 'password', 'ssn', 'social security', 'bank account'
+  ];
+  if (banned.some(k => msg.includes(k))) return true;
+  const lowValue = [
+    'tell me a joke', 'sing a song', 'what\'s your name', 'are you chatgpt',
+    'who made you', 'what model are you', 'say deepseek', 'are you deepseek'
+  ];
+  if (lowValue.some(k => msg.includes(k))) return true;
+  return false;
+}
+
+// Helper kept for backward compatibility (not used)
+function requirePremiumLegacy(req, res, next) {
   const plan = req.user?.subscription?.plan;
   if (plan && plan !== 'free') return next();
   return res.status(403).json({ success: false, message: 'Premium required' });
@@ -88,10 +108,15 @@ router.get('/schedule', auth, async (req, res) => {
  * POST /api/ai-chat/ask
  * Ask AI about schedule or personal queries; uses user_id personalization
  */
-router.post('/ask', auth, async (req, res) => {
+router.post('/ask', auth, requirePremium, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'message is required' });
+
+    // Filter irrelevant/blocked queries
+    if (isIrrelevantQuery(message)) {
+      return res.json({ success: true, response: 'I can’t help with that request. Try asking about plans, schedules, productivity, fitness, coding help, or learning topics.' });
+    }
 
     const user = await User.findById(req.user.id).select('displayName aiAssistantName aiThemeColor aiBackgroundStyle aiProfile subscription');
     const scheduleTask = await PremiumTask.findOne({ user: req.user.id }).sort({ createdAt: -1 });
@@ -102,13 +127,14 @@ router.post('/ask', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt');
 
-    // Prefer OpenRouter DeepSeek R1 free model. If it fails, fall back to Mistral service if configured.
+    // Save user message to chat history (TTL 24h)
+    await ChatMessage.create({ user: req.user.id, role: 'user', content: message, topic: 'general' });
+
+    // Prefer OpenRouter models with LifeBuddy system prompt; fallback to Mistral
     let response = '';
     try {
-      const prompt = `You are LifeBuddy (concise). User: ${user?.displayName || 'friend'}.\n` +
-        `Schedule: ${currentSchedule}.\nRecent interactions: ${JSON.stringify(recentInteractions)}.\n` +
-        `Question: ${message}`;
-      response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+      const prompt = `User: ${user?.displayName || 'friend'}\nSchedule: ${currentSchedule}\nRecent: ${JSON.stringify(recentInteractions)}\nQuestion: ${message}`;
+      response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'meta-llama/llama-3.1-8b-instruct:free' });
     } catch (openRouterErr) {
       console.warn('OpenRouter failed, trying Mistral fallback:', openRouterErr?.message || openRouterErr);
       response = await MistralService.generateProductivityAdvice(
@@ -119,6 +145,9 @@ router.post('/ask', auth, async (req, res) => {
       );
     }
 
+    // Save assistant response
+    await ChatMessage.create({ user: req.user.id, role: 'assistant', content: response, topic: 'general' });
+
     res.json({ success: true, response, aiName: user.aiAssistantName || 'LifeBuddy AI', themeColor: user.aiThemeColor, backgroundStyle: user.aiBackgroundStyle });
   } catch (e) {
     console.error('AI ask error:', e);
@@ -126,7 +155,7 @@ router.post('/ask', auth, async (req, res) => {
   }
 });
 
-// Text streaming endpoint using OpenRouter DeepSeek R1 with chunking
+// Text streaming endpoint using OpenRouter with chunking
 router.post('/stream', auth, requirePremium, async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -134,16 +163,26 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
       return res.status(400).json({ success: false, message: 'message is required' });
     }
 
+    // Filter irrelevant/blocked queries early
+    if (isIrrelevantQuery(message)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      const msg = 'I can’t help with that request. Try asking for plans, steps, summaries, or help with your schedule.';
+      res.write(msg);
+      return res.end();
+    }
+
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
     if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
     const user = await User.findById(req.user.id).select('displayName');
-    const prompt = `You are LifeBuddy (concise). User: ${user?.displayName || 'friend'}. Question: ${message}`;
+    const prompt = `User: ${user?.displayName || 'friend'}\nQuestion: ${message}`;
 
     let fullText = '';
     try {
-      fullText = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+      fullText = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'meta-llama/llama-3.1-8b-instruct:free' });
     } catch (err) {
       // If OpenRouter fails, send a friendly message instead of 404/500 to keep UX smooth
       fullText = 'Sorry, my AI brain is busy right now. Please try again in a moment.';
@@ -151,6 +190,10 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
     if (!fullText || typeof fullText !== 'string') {
       fullText = 'Sorry, I could not generate a response right now.';
     }
+
+    // Save both sides of the conversation
+    await ChatMessage.create({ user: req.user.id, role: 'user', content: message, topic: 'general' });
+    await ChatMessage.create({ user: req.user.id, role: 'assistant', content: fullText, topic: 'general' });
 
     const chunkSize = 96;
     let index = 0;
@@ -199,6 +242,10 @@ router.post('/ai-name', auth, requirePremium, async (req, res) => {
 router.post('/coding', auth, async (req, res) => {
   try {
     const { question, codeContext = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    if (isIrrelevantQuery(question)) {
+      return res.json({ success: true, response: 'I can help with coding questions, best practices, and debugging. Try asking about your code, errors, or a specific concept.' });
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -251,6 +298,10 @@ router.post('/coding', auth, async (req, res) => {
 router.post('/fitness', auth, async (req, res) => {
   try {
     const { question, fitnessGoals = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    if (isIrrelevantQuery(question)) {
+      return res.json({ success: true, response: 'I can help with safe and effective fitness plans, routines, and nutrition. Ask about your goal and constraints.' });
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -303,6 +354,10 @@ router.post('/fitness', auth, async (req, res) => {
 router.post('/education', auth, async (req, res) => {
   try {
     const { topic, difficulty = 'beginner' } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'topic is required' });
+    if (isIrrelevantQuery(topic)) {
+      return res.json({ success: true, response: 'I can break down complex topics into digestible parts. Ask for a roadmap or explanation on a subject.' });
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -357,6 +412,10 @@ router.post('/education', auth, async (req, res) => {
 router.post('/productivity', auth, async (req, res) => {
   try {
     const { question, currentSchedule = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    if (isIrrelevantQuery(question)) {
+      return res.json({ success: true, response: 'I can help with time management, habits, and scheduling. Ask me to plan your day or optimize your routine.' });
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');

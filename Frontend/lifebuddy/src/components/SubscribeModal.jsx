@@ -4,9 +4,11 @@ import {
   CreditCardIcon,
   LockClosedIcon,
   CheckIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  TicketIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../utils/config';
 
 const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const [paymentMethod, setPaymentMethod] = useState('card');
@@ -19,6 +21,9 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   });
   const [errors, setErrors] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [coupon, setCoupon] = useState('');
+  const [couponInfo, setCouponInfo] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   const planDetails = {
     monthly: { name: 'Monthly Plan', price: 9.99, period: 'month' },
@@ -38,6 +43,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
       });
       setErrors({});
       setIsProcessing(false);
+      setCoupon('');
+      setCouponInfo(null);
     }
   }, [isOpen]);
 
@@ -119,6 +126,28 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
     }
   };
 
+  const validateCoupon = async () => {
+    const code = coupon.trim();
+    if (!code) return;
+    setValidatingCoupon(true);
+    try {
+      const resp = await fetch(`${getApiUrl()}/api/coupons/validate?code=${encodeURIComponent(code)}`);
+      const data = await resp.json();
+      if (resp.ok && data.valid) {
+        setCouponInfo(data);
+        toast.success(`Coupon applied: -$${data.discountAmount}`);
+      } else {
+        setCouponInfo(null);
+        toast.error(data.message || 'Invalid coupon');
+      }
+    } catch (e) {
+      setCouponInfo(null);
+      toast.error('Failed to validate coupon');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
   const handlePayPalPayment = async () => {
     setIsProcessing(true);
     
@@ -130,9 +159,11 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
       const paymentData = {
         method: 'paypal',
         transactionId: 'PAYPAL_' + Date.now(),
-        amount: currentPlan.price,
+        amount: Math.max(0, currentPlan.price - (couponInfo?.discountAmount || 0)),
         currency: 'USD',
-        status: 'completed'
+        status: 'completed',
+        couponCode: couponInfo?.code,
+        discountApplied: couponInfo?.discountAmount || 0
       };
       
       onSuccess(paymentData);
@@ -159,10 +190,12 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
       const paymentData = {
         method: 'card',
         transactionId: 'CARD_' + Date.now(),
-        amount: currentPlan.price,
+        amount: Math.max(0, currentPlan.price - (couponInfo?.discountAmount || 0)),
         currency: 'USD',
         status: 'completed',
-        cardLast4: formData.cardNumber.slice(-4)
+        cardLast4: formData.cardNumber.slice(-4),
+        couponCode: couponInfo?.code,
+        discountApplied: couponInfo?.discountAmount || 0
       };
       
       onSuccess(paymentData);
@@ -184,6 +217,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   };
 
   if (!isOpen) return null;
+
+  const finalPrice = Math.max(0, currentPlan.price - (couponInfo?.discountAmount || 0));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -216,12 +251,35 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${currentPlan.price}
+                  ${finalPrice.toFixed(2)}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-300">
                   per {currentPlan.period}
                 </div>
               </div>
+            </div>
+            {couponInfo && (
+              <div className="mt-2 text-sm text-green-700 dark:text-green-300">Coupon {couponInfo.code} applied (−${couponInfo.discountAmount})</div>
+            )}
+          </div>
+
+          {/* Coupon */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Coupon Code (optional)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={coupon}
+                onChange={(e)=>setCoupon(e.target.value)}
+                placeholder="INFLUENCER10"
+                className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button onClick={validateCoupon} disabled={validatingCoupon || !coupon.trim()} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 flex items-center gap-1">
+                <TicketIcon className="w-4 h-4"/>
+                Apply
+              </button>
             </div>
           </div>
 
@@ -387,7 +445,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
                 Processing...
               </div>
             ) : (
-              `Pay $${currentPlan.price}`
+              `Pay $${finalPrice.toFixed(2)}`
             )}
           </button>
           

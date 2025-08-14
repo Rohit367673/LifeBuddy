@@ -34,9 +34,44 @@ router.get('/', authenticateUser, async (req, res) => {
   }
 });
 
+// Provide progress at /progress to avoid collision with '/:id'
+router.get('/progress', authenticateUser, async (req, res) => {
+  try {
+    const userAchievements = await Achievement.find({ user: req.user._id });
+    const availableAchievements = Achievement.getAvailableAchievements();
+    const progressData = [];
+
+    for (const achievement of availableAchievements) {
+      const existing = userAchievements.find(a => a.type === achievement.type);
+      if (existing) {
+        progressData.push({
+          ...achievement,
+          progress: existing.progress,
+          isEarned: existing.isEarned,
+          earnedAt: existing.earnedAt
+        });
+      } else {
+        progressData.push({
+          ...achievement,
+          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
+          isEarned: false
+        });
+      }
+    }
+
+    res.json(progressData);
+  } catch (error) {
+    console.error('Error fetching achievement progress:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Get achievement by ID
 router.get('/:id', authenticateUser, async (req, res) => {
   try {
+    if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid achievement id' });
+    }
     const achievement = await Achievement.findOne({
       _id: req.params.id,
       user: req.user._id

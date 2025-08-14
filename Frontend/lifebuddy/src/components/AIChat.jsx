@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/config';
-import { PaperAirplaneIcon, MicrophoneIcon, ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, MicrophoneIcon, ClipboardDocumentIcon, CheckIcon, LockClosedIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { usePremium } from '../context/PremiumContext';
 
 export default function AIChat() {
   const { token, user } = useAuth();
+  const { subscription } = usePremium();
   const [messages, setMessages] = useState(() => {
     try { return JSON.parse(localStorage.getItem('LB_CHAT_HISTORY') || '[]'); } catch (_) { return []; }
   });
@@ -15,7 +17,8 @@ export default function AIChat() {
   const abortRef = useRef(null);
   const textareaRef = useRef(null);
 
-  const aiName = user?.aiAssistantName || 'LifeBuddy';
+  const aiName = user?.aiAssistantName || 'LifeBuddy AI';
+  const isPremium = subscription?.plan && subscription.plan !== 'free' || subscription?.status === 'trial';
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, sending]);
   useEffect(() => { try { localStorage.setItem('LB_CHAT_HISTORY', JSON.stringify(messages)); } catch (_) {} }, [messages]);
@@ -64,7 +67,7 @@ export default function AIChat() {
         const out = alt.ok ? (data.response || 'Okay.') : (data.message || 'Sorry, I could not respond.');
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: out } : m));
       } catch (_) {
-        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: 'Sorry, I could not connect to the AI.' } : m));
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: 'Sorry, I could not connect to LifeBuddy AI.' } : m));
       }
     } finally {
       setSending(false);
@@ -90,6 +93,24 @@ export default function AIChat() {
     try { await navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 1200); } catch (_) {}
   };
 
+  if (!isPremium) {
+    return (
+      <div className="min-h-screen pt-16 flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="max-w-md w-full text-center bg-white shadow-xl rounded-2xl p-8 border border-slate-100">
+          <div className="mx-auto w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center mb-4">
+            <LockClosedIcon className="w-7 h-7 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">LifeBuddy AI is a Premium feature</h2>
+          <p className="text-slate-600 text-sm mb-6">Upgrade to unlock the full conversational assistant, or start a 7‑day free trial by completing quick tasks.</p>
+          <div className="flex gap-3 justify-center">
+            <a href="/premium" className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700">Upgrade</a>
+            <a href="/premium#trial" className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">Start Trial</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-14 bg-[radial-gradient(800px_circle_at_10%_10%,rgba(59,130,246,.08),transparent_40%),radial-gradient(700px_circle_at_90%_30%,rgba(16,185,129,.08),transparent_40%)]">
       <style>{`
@@ -102,7 +123,9 @@ export default function AIChat() {
       <div className="sticky top-14 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 bg-white/80 border-b border-white/50">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center">
+              <SparklesIcon className="w-4 h-4 text-white" />
+            </div>
             <div className="text-slate-700 font-semibold">{aiName}</div>
             <span className="ml-1 inline-block w-2 h-2 rounded-full bg-emerald-500" />
           </div>
@@ -121,8 +144,8 @@ export default function AIChat() {
                 )}
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${m.role==='user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
-                <div className="whitespace-pre-wrap text-sm leading-6">{m.content}</div>
+              <div className={`relative max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${m.role==='user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
+                <div className="whitespace-pre-wrap text-[15px] leading-7">{m.content}</div>
                 <div className="mt-2 text-[10px] opacity-60">{new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 {m.role==='assistant' && m.content && (
                   <button onClick={()=>copyText(m.id, m.content)} className="absolute -right-2 -top-2 bg-white border border-slate-200 rounded-full p-1 shadow hover:shadow-md">
