@@ -69,6 +69,9 @@ router.get('/progress', authenticateUser, async (req, res) => {
 // Get achievement by ID
 router.get('/:id', authenticateUser, async (req, res) => {
   try {
+    if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid achievement id' });
+    }
     const achievement = await Achievement.findOne({
       _id: req.params.id,
       user: req.user._id
