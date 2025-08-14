@@ -7,7 +7,6 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Prefer config file with a prioritized list of free models; fallback to env or sensible defaults
 let PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
 let CANDIDATE_MODELS = [
-  'deepseek/deepseek-r1:free',
   'meta-llama/llama-3.1-8b-instruct:free',
   'microsoft/phi-3.5-mini-instruct:free',
   'nousresearch/hermes-3-llama-3.1-8b:free',
