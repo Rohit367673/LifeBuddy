@@ -46,6 +46,20 @@ export const AuthProvider = ({ children }) => {
     return token;
   };
 
+  // Utility: probe the Firebase handler init endpoint to know if redirect can work
+  const canUseRedirectHandler = async () => {
+    try {
+      const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`;
+      if (!authDomain) return false;
+      const url = `https://${authDomain}/__/firebase/init.json`;
+      const res = await fetch(url, { method: 'GET', mode: 'no-cors' }).catch(() => null);
+      // With no-cors we cannot read status; consider reachable only if no network error
+      return !!res;
+    } catch (_) {
+      return false;
+    }
+  };
+
   // Traditional registration (without Firebase)
   const registerTraditional = async (email, password, displayName, firstName = '', lastName = '', username = '') => {
     try {
@@ -399,47 +413,45 @@ export const AuthProvider = ({ children }) => {
       console.log('Current auth state:', auth.currentUser);
       console.log('API URL:', getApiUrl());
       
-      // Check if we're in a mobile browser (Instagram, Facebook, etc.)
+      // Try popup first, fallback to redirect only if handler looks reachable or on mobile
       const isMobileBrowser = /Instagram|FBAN|FBAV|Facebook|Line|Twitter|LinkedInApp|WhatsApp|TelegramWebApp/i.test(navigator.userAgent);
-      
-      if (isMobileBrowser) {
-        console.log('Detected mobile browser, using redirect method');
-        // Clear any existing redirect result first
-        try {
-          await getRedirectResult(auth);
-        } catch (error) {
-          console.log('Clearing existing redirect result:', error);
-        }
-        
-        await signInWithRedirect(auth, provider);
-        // The redirect will happen here, and the result will be handled in useEffect
-        return;
-      }
-      
-      // Try popup first, fallback to redirect for desktop
+
+      // Attempt popup flow
       try {
         console.log('Attempting popup login...');
         const result = await signInWithPopup(auth, provider);
         console.log('Popup login successful:', result.user.email);
-        
-        // Handle successful popup login
         const firebaseUser = result.user;
         await handleSuccessfulGoogleLogin(firebaseUser);
         setLoading(false);
-        
+        return;
       } catch (popupError) {
-        console.log('Popup failed, trying redirect:', popupError);
-        
-        // Clear any existing redirect result first
-        try {
-          await getRedirectResult(auth);
-        } catch (error) {
-          console.log('Clearing existing redirect result:', error);
+        const code = popupError?.code || 'unknown';
+        const msg = popupError?.message || String(popupError);
+        console.log('Popup failed:', code, msg);
+        if (code === 'auth/unauthorized-domain') {
+          toast.error('Unauthorized domain in Firebase Auth. Add your app domain (and localhost) to Authentication > Settings > Authorized domains.');
+        } else if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+          toast('Popup was blocked/closed. Trying redirect...', { icon: '⚠️' });
         }
-        
-        await signInWithRedirect(auth, provider);
-        // The redirect will happen here, and the result will be handled in useEffect
       }
+
+      // If popup failed, use redirect only on mobile browsers
+      if (isMobileBrowser) {
+        console.log('Falling back to redirect method (mobile)');
+        try {
+          await getRedirectResult(auth).catch(() => {});
+        } catch (_) {}
+        try {
+          sessionStorage.setItem('fb_redirect', '1');
+        } catch (_) {}
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      // Desktop: do not use redirect to avoid broken handler on misconfigured domains
+      toast.error('Google sign-in popup failed. Please enable popups for this site and try again.');
+      setLoading(false);
     } catch (error) {
       console.error('Google login error:', error);
       toast.error(error.message || 'Failed to login with Google');
