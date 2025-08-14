@@ -426,30 +426,31 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
         return;
       } catch (popupError) {
-        console.log('Popup failed:', popupError?.message || popupError);
-      }
-
-      // If popup failed, decide whether redirect is viable
-      let allowRedirect = isMobileBrowser;
-      if (!allowRedirect) {
-        try {
-          allowRedirect = await canUseRedirectHandler();
-        } catch (_) {
-          allowRedirect = false;
+        const code = popupError?.code || 'unknown';
+        const msg = popupError?.message || String(popupError);
+        console.log('Popup failed:', code, msg);
+        if (code === 'auth/unauthorized-domain') {
+          toast.error('Unauthorized domain in Firebase Auth. Add your app domain (and localhost) to Authentication > Settings > Authorized domains.');
+        } else if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+          toast('Popup was blocked/closed. Trying redirect...', { icon: '⚠️' });
         }
       }
 
-      if (allowRedirect) {
-        console.log('Falling back to redirect method');
+      // If popup failed, use redirect only on mobile browsers
+      if (isMobileBrowser) {
+        console.log('Falling back to redirect method (mobile)');
         try {
           await getRedirectResult(auth).catch(() => {});
+        } catch (_) {}
+        try {
+          sessionStorage.setItem('fb_redirect', '1');
         } catch (_) {}
         await signInWithRedirect(auth, provider);
         return;
       }
 
-      // If neither popup nor redirect can be used
-      toast.error('Google sign-in is temporarily unavailable. Please check Firebase auth domain configuration.');
+      // Desktop: do not use redirect to avoid broken handler on misconfigured domains
+      toast.error('Google sign-in popup failed. Please enable popups for this site and try again.');
       setLoading(false);
     } catch (error) {
       console.error('Google login error:', error);
