@@ -1,446 +1,303 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MicrophoneIcon, StopIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, StopIcon, SpeakerWaveIcon } from '@heroicons/react/24/outline';
 import { getApiUrl } from '../utils/config';
 import { useAuth } from '../context/AuthContext';
 
+/**
+ * VoiceChat.jsx
+ *
+ * A single-file React component that provides a ChatGPT-like circular voice bubble
+ * with responsive animations for these states:
+ *  - idle    : small subtle pulse
+ *  - listening: mic + ripple + animated level bars (recording or speech-recognizer active)
+ *  - thinking : three-dot loader inside circle
+ *  - speaking : waveform bars animated while TTS speaks
+ *
+ * Features:
+ *  - Works with Web Speech API (SpeechRecognition) where available (Chrome desktop/Android)
+ *  - MediaRecorder fallback for browsers without SpeechRecognition (iOS Safari) — posts audio to /api/ai-chat/ask-audio
+ *  - Robust pointer/touch handling for press-and-hold PTT and single-tap toggle
+ *  - Responsive sizes (small on mobile, larger on desktop)
+ *  - Tailwind CSS classes are used; convert to plain CSS if you don't use Tailwind
+ *
+ * Usage: drop this file into your React app and import it where needed.
+ * Ensure getApiUrl() returns backend origin and you have POST endpoints:
+ *   POST `${getApiUrl()}/api/ai-chat/ask` (JSON with { message }) => { response: '...' }
+ *   POST `${getApiUrl()}/api/ai-chat/ask-audio` (multipart form-data 'file') => { transcript: '...' } or { response: '...' }
+ */
+
 export default function VoiceChat() {
-  const { token } = useAuth();
-  const isMobileDevice = useMemo(() => {
-    try {
-      return /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-    } catch (_) { return false; }
-  }, []);
-  const [isTalking, setIsTalking] = useState(false);
+  const { token } = useAuth?.() || {};
+
+  // UI state: 'idle' | 'listening' | 'thinking' | 'speaking'
+  const [state, setState] = useState('idle');
   const [transcript, setTranscript] = useState('');
+  const [aiReply, setAiReply] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+
+  // TTS options
+  const [voicePref, setVoicePref] = useState(() => { try { return localStorage.getItem('LB_VOICE_PREF') || 'female'; } catch { return 'female'; } });
+  const [ttsRate, setTtsRate] = useState(() => { try { return parseFloat(localStorage.getItem('LB_TTS_RATE') || '0.95'); } catch { return 0.95; } });
+  const [ttsPitch, setTtsPitch] = useState(() => { try { return parseFloat(localStorage.getItem('LB_TTS_PITCH') || '1.0'); } catch { return 1.0; } });
+
+  // Refs for recognition/fallback/tts
   const recognitionRef = useRef(null);
   const recognitionActiveRef = useRef(false);
   const mediaStreamRef = useRef(null);
   const analyserRef = useRef(null);
-  const audioDataRef = useRef(new Uint8Array(64));
-  const [aiReply, setAiReply] = useState('');
-  const bgCanvasRef = useRef(null);
-  const avatarCanvasRef = useRef(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const hadSpeechRef = useRef(false);
-  const heardSpeechRef = useRef(false);
+
+  // MediaRecorder fallback
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+
+  // TTS voices
   const voicesRef = useRef([]);
   const preferredVoiceRef = useRef(null);
-  const [voicePref, setVoicePref] = useState(() => {
-    try { return localStorage.getItem('LB_VOICE_PREF') || 'female'; } catch (_) { return 'female'; }
-  });
-  const [ttsRate, setTtsRate] = useState(() => {
-    try { return parseFloat(localStorage.getItem('LB_TTS_RATE') || '0.85'); } catch (_) { return 0.85; }
-  });
-  const [ttsPitch, setTtsPitch] = useState(() => {
-    try { return parseFloat(localStorage.getItem('LB_TTS_PITCH') || '1.0'); } catch (_) { return 1.0; }
-  });
 
-  // Performance profile
-  const PERF = useMemo(() => {
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-    return {
-      dpr: Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.5),
-      fps2d: isMobile ? 24 : 30,
-      pathCount: isMobile ? 10 : 18,
-      particleCount: isMobile ? 60 : 120,
-    };
+  // internal flags
+  const hadSpeechRef = useRef(false);
+  const heardSpeechRef = useRef(false);
+
+  const isMobileDevice = useMemo(() => {
+    try { return /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768; } catch { return false; }
   }, []);
 
+  // -----------------------
+  // Initialize SpeechRecognition (if available)
+  // -----------------------
   useEffect(() => {
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        setErrorMessage('Voice not supported on this browser. Try Chrome desktop or Android Chrome.');
+        recognitionRef.current = null;
         return;
       }
+
       const rec = new SpeechRecognition();
-      rec.continuous = isMobileDevice; // smoother UX on mobile
-      rec.interimResults = isMobileDevice; // get faster partials on mobile
+      rec.continuous = false; // PTT sessions handled on press/release
+      rec.interimResults = false;
       rec.lang = 'en-US';
-      rec.onstart = () => { recognitionActiveRef.current = true; };
-      rec.onend = () => { recognitionActiveRef.current = false; };
+      rec.maxAlternatives = 1;
+
+      rec.onstart = () => {
+        recognitionActiveRef.current = true;
+        hadSpeechRef.current = false;
+        heardSpeechRef.current = false;
+      };
+      rec.onend = () => {
+        recognitionActiveRef.current = false;
+      };
       rec.onaudiostart = () => { heardSpeechRef.current = true; };
       rec.onspeechstart = () => { heardSpeechRef.current = true; };
+
       rec.onresult = async (e) => {
         try {
           const text = (e.results?.[0]?.[0]?.transcript || '').trim();
-          if (text.length > 0) hadSpeechRef.current = true;
+          if (text.length) hadSpeechRef.current = true;
+          setTranscript(text);
+          // Move into thinking and call AI
+          setState('thinking');
           await handleVoiceQuery(text);
-        } catch (err) {
-          console.error('Voice handler error', err);
-        }
+        } catch (err) { console.error('rec.onresult err', err); }
       };
+
       rec.onerror = (e) => {
-        console.error('Speech error', e);
+        console.warn('SpeechRecognition error', e);
       };
+
       recognitionRef.current = rec;
     } catch (err) {
       console.error('Speech init error', err);
-      setErrorMessage('Failed to initialize voice.');
+      recognitionRef.current = null;
     }
-  }, [token, isMobileDevice]);
+  }, []);
 
-  // Lightweight 2D avatar canvas
+  // -----------------------
+  // Load voices for TTS
+  // -----------------------
   useEffect(() => {
-    const canvas = avatarCanvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    let rafId;
-    let lastFrame = 0;
-    
-    // Avatar state
-    let blinkPhase = 0;
-    let nextBlinkAt = performance.now() + 2000 + Math.random() * 3000;
-    let mouthOpen = 0;
-    let headBob = 0;
-    
-    function resize() {
-      const isDesktop = window.innerWidth >= 1024;
-      const sidebar = isDesktop ? 256 : 0;
-      const header = 64;
-      const width = window.innerWidth - sidebar;
-      const height = window.innerHeight - header;
-      
-      canvas.width = Math.floor(width * PERF.dpr);
-      canvas.height = Math.floor(height * PERF.dpr);
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
-      canvas.style.left = sidebar + 'px';
-      canvas.style.top = header + 'px';
-      ctx.setTransform(PERF.dpr, 0, 0, PERF.dpr, 0, 0);
-    }
-    
-    resize();
-    window.addEventListener('resize', resize);
-    
-    const animate = () => {
-      const now = performance.now();
-      if (now - lastFrame < (1000 / PERF.fps2d)) {
-        rafId = requestAnimationFrame(animate);
-        return;
-      }
-      lastFrame = now;
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width / PERF.dpr, canvas.height / PERF.dpr);
-      
-      // Blink logic
-      if (now >= nextBlinkAt) {
-        blinkPhase = 1;
-        nextBlinkAt = now + 2500 + Math.random() * 3000;
-      }
-      if (blinkPhase > 0) {
-        blinkPhase = Math.max(0, blinkPhase - 0.15);
-      }
-      
-      // Mouth animation
-      if (isTalking) {
-        mouthOpen = Math.min(1, mouthOpen + 0.1);
-      } else if (isSpeaking) {
-        const t = now * 0.006;
-        mouthOpen = Math.abs(Math.sin(t) * 0.8);
-      } else {
-        mouthOpen = Math.max(0, mouthOpen - 0.05);
-      }
-      
-      // Head movement when speaking
-      if (isSpeaking) {
-        const t = now * 0.0016;
-        headBob = Math.sin(t * 1.3) * 0.02;
-      } else {
-        headBob = Math.max(0, headBob - 0.01);
-      }
-      
-      // Draw ChatGPT-style circular avatar with movements
-      const centerX = (canvas.width / PERF.dpr) / 2;
-      const centerY = (canvas.height / PERF.dpr) / 2;
-      const baseSize = Math.min(canvas.width, canvas.height) / PERF.dpr * 0.25; // Smaller size
-      
-      // Dynamic size changes based on voice activity (like ChatGPT)
-      let dynamicSize = baseSize;
-      if (isTalking) {
-        dynamicSize = baseSize * 1.1; // Grow when talking
-      } else if (isSpeaking) {
-        dynamicSize = baseSize * 1.05; // Slightly grow when AI speaks
-      } else {
-        dynamicSize = baseSize * 0.95; // Slightly shrink when idle
-      }
-      
-      // Add breathing effect
-      const breathing = Math.sin(performance.now() * 0.003) * 0.02;
-      dynamicSize *= (1 + breathing);
-      
-      // Create smooth blue gradient like ChatGPT (from center)
-      const gradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, dynamicSize
-      );
-      gradient.addColorStop(0, '#ffffff'); // Pure white center
-      gradient.addColorStop(0.2, '#e3f2fd'); // Light blue
-      gradient.addColorStop(0.5, '#bbdefb'); // Medium light blue
-      gradient.addColorStop(0.8, '#90caf9'); // Medium blue
-      gradient.addColorStop(1, '#64b5f6'); // Deeper blue at edges
-      
-      // Main circle with ChatGPT blue gradient
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY + headBob * dynamicSize, dynamicSize, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Add subtle shadow for depth
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      
-      // Inner highlight for premium look
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.beginPath();
-      ctx.arc(centerX - dynamicSize * 0.2, centerY - dynamicSize * 0.2 + headBob * dynamicSize, dynamicSize * 0.15, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Reset shadow
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      
-      // The avatar now has smooth movements like ChatGPT voice chat
-      
-      rafId = requestAnimationFrame(animate);
+    const loadVoices = () => {
+      voicesRef.current = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+      preferredVoiceRef.current = pickPreferredVoice(voicePref);
     };
-    
-    animate();
+    loadVoices();
+    if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null; };
+  }, [voicePref]);
 
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', resize);
-    };
-  }, [isTalking, isSpeaking, PERF.dpr, PERF.fps2d]);
+  const pickPreferredVoice = (pref) => {
+    if (!window.speechSynthesis) return null;
+    const vs = window.speechSynthesis.getVoices() || [];
+    if (!vs.length) return null;
+    const female = ['Samantha','Victoria','Fiona','Google UK English Female','Google US English'];
+    const male = ['Alex','Daniel','Fred','Google US English'];
+    const list = pref === 'male' ? male : female;
+    const filtered = vs.filter(v => list.some(n => v.name.toLowerCase().includes(n.toLowerCase())));
+    return filtered.length ? filtered[0] : vs[0];
+  };
 
-  // Animated cyber background (circuit lines, pulses, particles) on 2D canvas
-  useEffect(() => {
-    const canvas = bgCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let rafId;
-    let t0 = performance.now();
-    const DPR = PERF.dpr;
-    let last = 0;
-    let running = true;
+  const speakWithBrowserTTS = async (text) => {
+    if (!window.speechSynthesis || isMuted) return;
+    try { window.speechSynthesis.cancel(); } catch {}
 
-    function resize() {
-      canvas.width = Math.floor(window.innerWidth * DPR);
-      canvas.height = Math.floor(window.innerHeight * DPR);
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    }
-    resize();
-    window.addEventListener('resize', resize);
+    if (!preferredVoiceRef.current) preferredVoiceRef.current = pickPreferredVoice(voicePref);
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.voice = preferredVoiceRef.current || null;
+    utter.rate = Math.min(1.2, Math.max(0.7, ttsRate));
+    utter.pitch = Math.min(2.0, Math.max(0.5, ttsPitch));
+    utter.volume = 0.98;
+    utter.onstart = () => setState('speaking');
+    utter.onend = () => setState('idle');
+    utter.onerror = () => setState('idle');
 
-    // Generate circuit paths
-    const paths = [];
-    const nodes = [];
-    const particles = [];
-    const pathCount = PERF.pathCount;
-    const particleCount = PERF.particleCount;
-
-    // Create circuit paths
-    for (let i = 0; i < pathCount; i++) {
-      const startX = Math.random() * window.innerWidth;
-      const startY = Math.random() * window.innerHeight;
-      const endX = startX + (Math.random() - 0.5) * 200;
-      const endY = startY + (Math.random() - 0.5) * 200;
-      paths.push({
-        x1: startX, y1: startY,
-        x2: endX, y2: endY,
-        progress: Math.random(),
-        speed: 0.5 + Math.random() * 1.5,
-        alpha: 0.3 + Math.random() * 0.4
-      });
-    }
-
-    // Create nodes
-    for (let i = 0; i < pathCount / 2; i++) {
-      nodes.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        size: 2 + Math.random() * 4,
-        pulse: Math.random() * Math.PI * 2,
-        speed: 0.02 + Math.random() * 0.03
-      });
-    }
-
-    // Create particles
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        size: 1 + Math.random() * 2,
-        alpha: 0.3 + Math.random() * 0.4
-      });
-    }
-
-    function animate(t) {
-      if (!running) return;
-      
-      if (t - last < (1000 / PERF.fps2d)) {
-        rafId = requestAnimationFrame(animate);
-        return;
+    // Break into short chunks to avoid cutting off long text
+    const MAX = 220;
+    if (text.length > MAX) {
+      const chunks = text.match(new RegExp(`.{1,${MAX}}(\s|$)`, 'g')) || [text];
+      for (let i = 0; i < chunks.length; i++) {
+        const c = new SpeechSynthesisUtterance(chunks[i]);
+        c.voice = utter.voice; c.rate = utter.rate; c.pitch = utter.pitch; c.volume = utter.volume;
+        if (i === 0) c.onstart = () => setState('speaking');
+        if (i === chunks.length - 1) c.onend = () => setState('idle');
+        window.speechSynthesis.speak(c);
       }
-      last = t;
-
-      const dt = t - t0;
-      t0 = t;
-
-      // Clear with fade effect
-      ctx.fillStyle = 'rgba(11, 16, 32, 0.1)';
-      ctx.fillRect(0, 0, canvas.width / DPR, canvas.height / DPR);
-
-      // Update and draw paths
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 1;
-      paths.forEach(path => {
-        path.progress += path.speed * dt * 0.001;
-        if (path.progress > 1) path.progress = 0;
-
-        const x = path.x1 + (path.x2 - path.x1) * path.progress;
-        const y = path.y1 + (path.y2 - path.y1) * path.progress;
-
-        ctx.globalAlpha = path.alpha;
-        ctx.beginPath();
-        ctx.moveTo(path.x1, path.y1);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-      });
-
-      // Update and draw nodes
-      ctx.fillStyle = '#60a5fa';
-      nodes.forEach(node => {
-        node.pulse += node.speed * dt;
-        const scale = 1 + Math.sin(node.pulse) * 0.3;
-        
-        ctx.globalAlpha = 0.6 + Math.sin(node.pulse) * 0.2;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.size * scale, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Update and draw particles
-      ctx.fillStyle = '#93c5fd';
-      particles.forEach(particle => {
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        
-        // Wrap around edges
-        if (particle.x < 0) particle.x = window.innerWidth;
-        if (particle.x > window.innerWidth) particle.x = 0;
-        if (particle.y < 0) particle.y = window.innerHeight;
-        if (particle.y > window.innerHeight) particle.y = 0;
-
-        ctx.globalAlpha = particle.alpha;
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      ctx.globalAlpha = 1;
-      rafId = requestAnimationFrame(animate);
+    } else {
+      window.speechSynthesis.speak(utter);
     }
+  };
 
-    // Pause animation when tab is hidden
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        running = false;
-        cancelAnimationFrame(rafId);
-      } else {
-        running = true;
-        t0 = performance.now();
-        rafId = requestAnimationFrame(animate);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    rafId = requestAnimationFrame(animate);
-
-    return () => {
-      running = false;
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', resize);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [PERF.dpr, PERF.fps2d, PERF.pathCount, PERF.particleCount]);
-
-  // Voice functions
+  // -----------------------
+  // Start / Stop PTT
+  // -----------------------
   const startPTT = async (ev) => {
-    if (ev?.preventDefault) ev.preventDefault();
-      setIsTalking(true);
+    try { ev?.preventDefault?.(); ev?.stopPropagation?.(); } catch {}
+    setState('listening');
     hadSpeechRef.current = false;
     heardSpeechRef.current = false;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
-      
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 64;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-      
-      if (recognitionRef.current && !recognitionActiveRef.current) {
-      recognitionRef.current.start();
+
+      // Create analyser for visual bars
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+      } catch (err) { analyserRef.current = null; }
+
+      // Prefer SpeechRecognition
+      if (recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch (e) { console.warn('rec start failed', e); }
+        return;
       }
+
+      // Fallback: MediaRecorder
+      if (!window.MediaRecorder) {
+        setErrorMessage('Recording fallback not supported. Use Chrome/Android or implement server-side STT.');
+        return;
+      }
+
+      recordedChunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => { if (e.data?.size) recordedChunksRef.current.push(e.data); };
+      mr.onerror = (e) => console.error('MediaRecorder error', e);
+      mr.start();
     } catch (err) {
-      console.error('Microphone access error:', err);
-      setIsTalking(false);
+      console.error('startPTT mic error', err);
+      setErrorMessage('Microphone access denied or unavailable.');
+      setState('idle');
+      cleanupMedia();
     }
   };
 
   const stopPTT = async (ev) => {
-    if (ev?.preventDefault) ev.preventDefault();
-    setIsTalking(false);
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
+    try { ev?.preventDefault?.(); ev?.stopPropagation?.(); } catch {}
+    // stop analyser / tracks
+    cleanupMedia();
+
+    // If SpeechRecognition used, stop it — onresult will fire and we handle AI call there
+    if (recognitionRef.current && recognitionActiveRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) { console.warn('rec stop', e); }
+      // result handler will set thinking and call AI
+      return;
     }
-    if (recognitionRef.current) {
+
+    // If we recorded via MediaRecorder, upload and ask server-side STT
+    if (mediaRecorderRef.current) {
       try {
-        if (recognitionActiveRef.current) {
-      recognitionRef.current.stop();
+        await new Promise((resolve) => { mediaRecorderRef.current.onstop = resolve; mediaRecorderRef.current.stop(); });
+      } catch (err) { console.warn('stop recorder err', err); }
+
+      const chunks = recordedChunksRef.current || [];
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current = null;
+
+      if (!chunks.length) {
+        setState('idle');
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      // upload
+      setState('thinking');
+      try {
+        const fd = new FormData();
+        fd.append('file', blob, 'ptt.webm');
+
+        const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+        const resp = await fetch(`${getApiUrl()}/api/ai-chat/ask-audio`, {
+          method: 'POST', headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}, body: fd,
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        const finalText = data?.transcript || data?.text || '';
+        if (finalText) {
+          setTranscript(finalText);
+          await handleVoiceQuery(finalText);
+        } else if (data?.response) {
+          setAiReply(data.response);
+          await speakWithBrowserTTS(data.response);
+        } else {
+          setErrorMessage('No transcript from server.');
+          setState('idle');
         }
-      } catch (_) {}
-    }
-    analyserRef.current = null;
-
-    // If user released without any detected audio/speech, do not show noisy prompts
-    if (!hadSpeechRef.current && !heardSpeechRef.current) {
-      setAiReply('');
-    }
-  };
-
-  // Mobile-friendly toggle: tap to start, tap again to stop
-  const togglePTT = async (ev) => {
-    if (isTalking) {
-      await stopPTT(ev);
+      } catch (err) {
+        console.error('audio upload error', err);
+        setErrorMessage('Audio upload/transcription failed.');
+        setState('idle');
+      }
     } else {
-      await startPTT(ev);
+      // Nothing recorded and not using recognition, go idle
+      setState('idle');
     }
   };
 
-  // Core handler for voice queries (single ask endpoint)
+  const cleanupMedia = () => {
+    try {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(t => t.stop());
+        mediaStreamRef.current = null;
+      }
+    } catch {}
+    analyserRef.current = null;
+  };
+
+  // -----------------------
+  // handleVoiceQuery — call AI and TTS
+  // -----------------------
   const handleVoiceQuery = async (text) => {
     setTranscript(text);
     setAiReply('');
+    if (!text || !text.trim()) { setState('idle'); return; }
     try {
-      if (!text || text.trim().length === 0) return; // Empty handled on release
       const authToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
-
       const resp = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
         method: 'POST',
         headers: authToken ? { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
@@ -450,225 +307,198 @@ export default function VoiceChat() {
       let finalText = '';
       if (resp.ok) {
         const data = await resp.json();
-        finalText = (data && data.response) || '';
-      } else if (resp.status === 401 || resp.status === 403) {
-        let msg = '';
-        try { const j = await resp.json(); msg = j.message || ''; } catch (_) { try { msg = await resp.text(); } catch (_) {} }
-        finalText = msg || 'Session invalid. Please log in again.';
+        finalText = (data && (data.response || data.reply || data.message)) || '';
       } else {
-        try { const j = await resp.json(); finalText = j.message || ''; } catch (_) { try { finalText = await resp.text(); } catch (_) {} }
-        if (!finalText) finalText = 'Sorry, I could not get a response from the AI service.';
+        try { finalText = (await resp.json()).message || ''; } catch { finalText = "Sorry, I couldn't get a response."; }
       }
 
-      if (!finalText || finalText.trim().length === 0) finalText = "Sorry, I'm having trouble responding right now.";
+      if (!finalText) finalText = "Sorry, I'm having trouble responding right now.";
       setAiReply(finalText);
-      try { await speakWithBrowserTTS(finalText); } catch (_) {}
+
+      // Speak and animate
+      await speakWithBrowserTTS(finalText);
     } catch (err) {
-      console.error('Voice stream error', err);
-      const finalText = "Sorry, I'm having trouble connecting to the AI right now.";
-      setAiReply(finalText);
-      try { await speakWithBrowserTTS(finalText); } catch (_) {}
+      console.error('handleVoiceQuery error', err);
+      setErrorMessage('AI request failed.');
+      setState('idle');
     }
   };
 
-  // Voice selection
+  // -----------------------
+  // UI helper: animate bars from analyser (optional)
+  // -----------------------
+  const [levels, setLevels] = useState([0,0,0,0,0]);
   useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      voicesRef.current = voices;
-      preferredVoiceRef.current = pickPreferredVoice(voicePref);
-    };
-    
-    loadVoices();
-    if (window.speechSynthesis.onvoiceschanged) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, [voicePref]);
-
-  const pickPreferredVoice = (pref) => {
-    const voices = voicesRef.current;
-    if (!voices.length) return null;
-    
-    // Prefer clearer voices per platform; fallbacks included
-    const femalePrefs = ['Samantha', 'Victoria', 'Fiona', 'Google UK English Female', 'Microsoft Zira'];
-    const malePrefs = ['Alex', 'Daniel', 'Fred', 'Google US English', 'Microsoft David'];
-    const prefList = pref === 'female' ? femalePrefs : malePrefs;
-    const filtered = voices.filter(v =>
-      prefList.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
-    );
-    
-    return filtered.length ? filtered[0] : voices[0];
-  };
-
-  // Ensure voices are available (Chrome sometimes delays)
-  const waitForVoices = async (timeoutMs = 2000) => {
-    if (!window.speechSynthesis) return [];
-    let voices = window.speechSynthesis.getVoices();
-    if (voices && voices.length) return voices;
-    await new Promise((resolve) => {
-      const start = Date.now();
-      const iv = setInterval(() => {
-        voices = window.speechSynthesis.getVoices();
-        if (voices.length || Date.now() - start > timeoutMs) {
-          clearInterval(iv);
-          resolve();
+    let raf = 0;
+    const loop = () => {
+      try {
+        const analyser = analyserRef.current;
+        if (analyser) {
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(data);
+          // sample 5 bands
+          const step = Math.max(1, Math.floor(data.length / 5));
+          const values = [0,0,0,0,0].map((_,i)=> {
+            let sum = 0; for (let j=0;j<step;j++){ sum += data[i*step + j] || 0; } return Math.min(1, (sum / (255*step))*1.6);
+          });
+          setLevels(values);
+        } else {
+          // subtle idle animation when not listening
+          if (state === 'idle') {
+            const idleVals = [0,0,0,0,0].map((_,i)=> 0.04 + 0.02*Math.abs(Math.sin(Date.now()/600 + i)));
+            setLevels(idleVals);
+          }
         }
-      }, 120);
-    });
-    return window.speechSynthesis.getVoices() || [];
-  };
+      } catch (e) {}
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [state]);
 
-  const speakWithBrowserTTS = async (text) => {
-    if (!window.speechSynthesis) return;
-    
-    // Stop any current speech
-    window.speechSynthesis.cancel();
+  // -----------------------
+  // Pointer/touch handlers and small toggle
+  // -----------------------
+  const onPointerDown = (e) => startPTT(e);
+  const onPointerUp = (e) => stopPTT(e);
+  const onPointerCancel = (e) => stopPTT(e);
+  const onPointerLeave = (e) => { if (state === 'listening') stopPTT(e); };
 
-    // Workaround: Chrome sometimes starts paused; keep resuming briefly
-    try {
-      const resumeIv = setInterval(() => window.speechSynthesis.resume(), 200);
-      setTimeout(() => clearInterval(resumeIv), 2000);
-    } catch (_) {}
+  const togglePTT = async () => { if (state === 'listening') await stopPTT({}); else await startPTT({}); };
 
-    // Ensure voices are loaded and select preferred
-    const voices = await waitForVoices();
-    if (!voicesRef.current || !voicesRef.current.length) voicesRef.current = voices;
-    if (!preferredVoiceRef.current) preferredVoiceRef.current = pickPreferredVoice(voicePref);
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = preferredVoiceRef.current;
-    utterance.rate = Math.min(1.1, Math.max(0.7, ttsRate));
-    utterance.pitch = Math.min(2.0, Math.max(0.5, ttsPitch));
-    utterance.volume = 0.95;
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    // Split long text into chunks for better performance
-    const maxLength = 200;
-    if (text.length > maxLength) {
-      const chunks = text.match(new RegExp(`.{1,${maxLength}}(\\s|$)`, 'g')) || [text];
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = new SpeechSynthesisUtterance(chunks[i]);
-        chunk.voice = preferredVoiceRef.current;
-        chunk.rate = Math.min(1.1, Math.max(0.7, ttsRate));
-        chunk.pitch = Math.min(2.0, Math.max(0.5, ttsPitch));
-        chunk.volume = 0.95;
-        
-        if (i === 0) chunk.onstart = () => setIsSpeaking(true);
-        if (i === chunks.length - 1) chunk.onend = () => setIsSpeaking(false);
-        
-        window.speechSynthesis.speak(chunk);
-      }
-    } else {
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Animated background CSS
-  const animatedBgCss = useMemo(() => `
-    @keyframes gradientShift {
-      0%, 100% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-    }
-    .ai-voice-bg {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: -1;
-      background: radial-gradient(1000px circle at 10% 10%, rgba(59,130,246,0.25), transparent 40%),
-                  radial-gradient(900px circle at 90% 30%, rgba(37,99,235,0.2), transparent 40%),
-                  linear-gradient(120deg, #0b1020, #0e1b3a, #0a246a, #0b1020);
-      background-size: 200% 200%;
-      animation: gradientShift 12s ease-in-out infinite;
-      filter: saturate(1.2) contrast(1.05);
-    }
-    .glass {
-      background: rgba(255,255,255,0.06);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.12);
-    }
-  `, []);
+  // -----------------------
+  // Render circle UI and animations
+  // -----------------------
+  // Sizes responsive: small on mobile, big on desktop
+  const sizeClass = 'w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56';
 
   return (
-    <div className="min-h-screen relative overflow-hidden pt-16">
-      <style>{animatedBgCss}</style>
-      <div className="ai-voice-bg" style={{ zIndex: 0, position: 'fixed' }} />
-      <canvas ref={bgCanvasRef} className="fixed inset-0" style={{ zIndex: 200, pointerEvents: 'none' }} />
+    <div className="min-h-screen bg-[#0b1020] text-white flex items-center justify-center p-6">
 
-      {/* Lightweight avatar canvas */}
-      <canvas ref={avatarCanvasRef} className="fixed" style={{ zIndex: 1200, pointerEvents: 'none' }} />
+      <style>{`
+        /* bubble animations */
+        .bubble-ripple { animation: ripple 1.6s infinite; }
+        @keyframes ripple { 0% { transform: scale(1); opacity: 0.6 } 50% { transform: scale(1.14); opacity: 0.95 } 100% { transform: scale(1); opacity: 0.6 } }
 
-      {/* Top bar */}
-      <div className="fixed left-0 right-0 p-4 flex items-center justify-between" style={{ zIndex: 2000, top: 56 }}>
-        <h1 className="text-white/90 text-xl font-semibold">Voice Chat</h1>
+        .dot-pulse { animation: dotPulse 1.2s infinite; }
+        @keyframes dotPulse { 0% { transform: translateY(0); opacity: 0.6 } 50% { transform: translateY(-6px); opacity: 1 } 100% { transform: translateY(0); opacity: 0.6 } }
+
+        .thinking-dots > div { animation: thinking 1s infinite; }
+        .thinking-dots > div:nth-child(1){ animation-delay: 0s } .thinking-dots > div:nth-child(2){ animation-delay: 0.15s } .thinking-dots > div:nth-child(3){ animation-delay: 0.3s }
+        @keyframes thinking { 0%{ transform: translateY(0); opacity: 0.35 } 50%{ transform: translateY(-8px); opacity: 1 } 100%{ transform: translateY(0); opacity: 0.35 } }
+
+        .bar { transition: height 120ms linear; }
+      `}</style>
+
+      <div className="flex flex-col items-center gap-6">
+        {/* bubble */}
+        <div className={`relative flex items-center justify-center rounded-full ${sizeClass} bg-gradient-to-br from-sky-400/20 to-blue-900/40 border border-white/10 shadow-2xl`}>
+
+          {/* outer ripple when listening */}
+          <div className={`absolute rounded-full inset-0 ${state === 'listening' ? 'bubble-ripple' : ''}`} style={{ boxShadow: state === 'listening' ? '0 10px 30px rgba(59,130,246,0.15)' : 'none' }} />
+
+          {/* inner circle */}
+          <div className={`relative rounded-full bg-white/9 flex items-center justify-center ${state === 'listening' ? 'backdrop-blur-sm' : ''} w-5/6 h-5/6`}>
+
+            {/* content per state */}
+            {state === 'idle' && (
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-200 to-blue-500 flex items-center justify-center shadow-lg">
+                  <MicrophoneIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-xs text-white/70">Tap & hold to speak</div>
+              </div>
+            )}
+
+            {state === 'listening' && (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-red-500/90 flex items-center justify-center shadow-lg">
+                  <StopIcon className="w-6 h-6 text-white" />
+                </div>
+
+                {/* animated bars showing levels */}
+                <div className="flex items-end gap-1 h-8">
+                  {levels.map((v,i)=>(
+                    <div key={i} className="w-2 rounded bar bg-white" style={{ height: `${6 + v*36}px`, opacity: 0.9 }} />
+                  ))}
+                </div>
+
+                <div className="text-xs text-white/80">Listening...</div>
+              </div>
+            )}
+
+            {state === 'thinking' && (
+              <div className="flex flex-col items-center gap-2">
+                <div className="thinking-dots flex items-end gap-2">
+                  <div className="w-3 h-3 rounded-full bg-white/90" />
+                  <div className="w-3 h-3 rounded-full bg-white/70" />
+                  <div className="w-3 h-3 rounded-full bg-white/50" />
+                </div>
+                <div className="text-xs text-white/80">Thinking...</div>
+              </div>
+            )}
+
+            {state === 'speaking' && (
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-green-500/90 flex items-center justify-center shadow-lg">
+                    <SpeakerWaveIcon className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex items-end gap-1 h-8">
+                  {levels.map((v,i)=>(
+                    <div key={i} className="w-2 rounded bg-white/90 bar" style={{ height: `${8 + (0.2 + 0.8*Math.abs(Math.sin((Date.now()/200)+i)))*36}px` }} />
+                  ))}
+                </div>
+                <div className="text-xs text-white/80">Speaking...</div>
+              </div>
+            )}
+
+          </div>
+
+          {/* press/hold transparent overlay to capture pointer/touch */}
+          <button
+            aria-label="Push to Talk"
+            onPointerDown={onPointerDown}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+            onPointerLeave={onPointerLeave}
+            onClick={(e)=>{ e.preventDefault(); togglePTT(); }}
+            className="absolute inset-0 rounded-full bg-transparent"
+            style={{ touchAction: 'manipulation' }}
+          />
+        </div>
+
+        {/* transcript / ai reply */}
+        <div className="max-w-xl text-center text-sm text-white/80 px-4">
+          {state === 'listening' && (<div>Listening... {transcript ? ` — ${transcript}` : ''}</div>)}
+          {state === 'thinking' && (<div>Processing your message...</div>)}
+          {state === 'speaking' && (<div>Speaking: {aiReply ? aiReply.substring(0,120) + (aiReply.length>120? '...':'') : ''}</div>)}
+          {state === 'idle' && (<div>{transcript ? `You: ${transcript}` : 'Ready — tap & hold the circle to speak'}</div>)}
+        </div>
+
+        {/* small controls */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-xs text-white/80 max-w-lg truncate">
-            {transcript || 'Hold the mic to speak'}
+          <div className="flex items-center gap-2 bg-white/6 px-3 py-1 rounded-full border border-white/8">
+            <button onClick={() => { setVoicePref('female'); try{localStorage.setItem('LB_VOICE_PREF','female')}catch{} preferredVoiceRef.current = pickPreferredVoice('female'); }} className={`text-xs px-2 py-1 rounded-full ${voicePref === 'female' ? 'bg-white text-blue-700' : 'text-white/80'}`}>Female</button>
+            <button onClick={() => { setVoicePref('male'); try{localStorage.setItem('LB_VOICE_PREF','male')}catch{} preferredVoiceRef.current = pickPreferredVoice('male'); }} className={`text-xs px-2 py-1 rounded-full ${voicePref === 'male' ? 'bg-white text-blue-700' : 'text-white/80'}`}>Male</button>
           </div>
-          {errorMessage && (
-            <div className="text-xs px-2 py-1 rounded bg-red-500/20 border border-red-400/40 text-red-100">
-              {errorMessage}
-            </div>
-          )}
-          {/* Voice preference */}
-          <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1">
-            <button
-              onClick={() => { setVoicePref('female'); try { localStorage.setItem('LB_VOICE_PREF','female'); } catch (_) {} preferredVoiceRef.current = pickPreferredVoice('female'); }}
-              className={`text-xs px-2 py-1 rounded-full ${voicePref==='female' ? 'bg-white text-blue-700' : 'text-white/80 hover:text-white'}`}
-            >Female</button>
-            <button
-              onClick={() => { setVoicePref('male'); try { localStorage.setItem('LB_VOICE_PREF','male'); } catch (_) {} preferredVoiceRef.current = pickPreferredVoice('male'); }}
-              className={`text-xs px-2 py-1 rounded-full ${voicePref==='male' ? 'bg-white text-blue-700' : 'text-white/80 hover:text-white'}`}
-            >Male</button>
-            {/* Clarity controls */}
-            <div className="hidden md:flex items-center gap-2 ml-2 text-white/80">
-              <label className="text-[10px]">Rate</label>
-              <input type="range" min="0.7" max="1.1" step="0.05" value={ttsRate} onChange={(e)=>{ const v=parseFloat(e.target.value); setTtsRate(v); try{localStorage.setItem('LB_TTS_RATE',String(v));}catch(_){} }} />
-              <label className="text-[10px]">Pitch</label>
-              <input type="range" min="0.6" max="1.6" step="0.05" value={ttsPitch} onChange={(e)=>{ const v=parseFloat(e.target.value); setTtsPitch(v); try{localStorage.setItem('LB_TTS_PITCH',String(v));}catch(_){} }} />
-            </div>
+
+          <div className="flex items-center gap-2 text-xs text-white/70">
+            <label>Rate</label>
+            <input type="range" min="0.7" max="1.2" step="0.05" value={ttsRate} onChange={(e)=>{ const v=parseFloat(e.target.value); setTtsRate(v); try{localStorage.setItem('LB_TTS_RATE',String(v))}catch{} }} />
+            <label>Pitch</label>
+            <input type="range" min="0.6" max="1.6" step="0.05" value={ttsPitch} onChange={(e)=>{ const v=parseFloat(e.target.value); setTtsPitch(v); try{localStorage.setItem('LB_TTS_PITCH',String(v))}catch{} }} />
           </div>
-        </div>
-      </div>
 
-      {/* Reply bubble */}
-      {aiReply && (
-        <div className="fixed left-4 right-4 bottom-24 sm:left-8 sm:right-auto sm:max-w-xl p-4 rounded-2xl glass text-white/90" style={{ zIndex: 2000 }}>
-          {aiReply}
+          <button onClick={() => setIsMuted(s => !s)} className="text-xs px-3 py-1 rounded-full bg-white/6 border border-white/8">
+            {isMuted ? 'Muted' : 'TTS On'}
+          </button>
         </div>
-      )}
 
-      {/* Push-to-talk button */}
-      <div className="fixed right-4 bottom-6" style={{ zIndex: 2000 }}>
-        {isMobileDevice ? (
-          <button
-            onClick={togglePTT}
-            className={`px-6 py-4 rounded-full text-white shadow-xl transition-colors flex items-center gap-2 ${isTalking ? 'bg-red-500' : 'bg-blue-600'}`}
-            aria-label="Tap to talk"
-          >
-            {isTalking ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
-            {isTalking ? 'Tap to stop' : 'Tap to talk'}
-          </button>
-        ) : (
-          <button
-            onMouseDown={startPTT}
-            onMouseUp={stopPTT}
-            onTouchStart={startPTT}
-            onTouchEnd={stopPTT}
-            className={`px-5 py-3 rounded-full text-white shadow-xl transition-colors flex items-center gap-2 ${isTalking ? 'bg-red-500' : 'bg-blue-600'}`}
-            aria-label="Push to talk"
-          >
-            {isTalking ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
-            {isTalking ? 'Release to stop' : 'Hold to talk'}
-          </button>
-        )}
+        {errorMessage && <div className="text-xs text-red-400">{errorMessage}</div>}
+
       </div>
     </div>
   );
 }
-
-
