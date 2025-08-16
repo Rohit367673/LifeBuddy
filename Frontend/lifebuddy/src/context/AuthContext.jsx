@@ -13,6 +13,16 @@ import {
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig';
 import { getApiUrl, logConfig } from '../utils/config';
+import { 
+  setAuthToken, 
+  getAuthToken, 
+  removeAuthToken, 
+  setUserData, 
+  getUserData, 
+  removeUserData, 
+  clearAuthCookies,
+  areCookiesEnabled 
+} from '../utils/cookies';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import UsernameModal from '../components/UsernameModal';
@@ -38,12 +48,28 @@ export const AuthProvider = ({ children }) => {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const tokenExpiryTimeoutRef = useRef(null);
+  const initializingRef = useRef(false);
   const navigate = useNavigate();
+  const [authLoading, setAuthLoading] = useState(false); // Define setAuthLoading here
 
   // Get authentication token (ALWAYS use backend JWT, never Google ID token)
   const getFirebaseToken = async () => {
     // Always return the backend-issued JWT token
     return token;
+  };
+
+  // Utility: probe the Firebase handler init endpoint to know if redirect can work
+  const canUseRedirectHandler = async () => {
+    try {
+      const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`;
+      if (!authDomain) return false;
+      const url = `https://${authDomain}/__/firebase/init.json`;
+      const res = await fetch(url, { method: 'GET', mode: 'no-cors' }).catch(() => null);
+      // With no-cors we cannot read status; consider reachable only if no network error
+      return !!res;
+    } catch (_) {
+      return false;
+    }
   };
 
   // Traditional registration (without Firebase)
@@ -398,37 +424,25 @@ export const AuthProvider = ({ children }) => {
       console.log('Starting Google login...');
       console.log('Current auth state:', auth.currentUser);
       console.log('API URL:', getApiUrl());
+      console.log('Auth domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
       
-      // Check if we're in a mobile browser (Instagram, Facebook, etc.)
-      const isMobileBrowser = /Instagram|FBAN|FBAV|Facebook|Line|Twitter|LinkedInApp|WhatsApp|TelegramWebApp/i.test(navigator.userAgent);
+
+      // Try popup first, fallback to redirect if popup fails
+      console.log('Attempting popup login first...');
       
-      if (isMobileBrowser) {
-        console.log('Detected mobile browser, using redirect method');
-        // Clear any existing redirect result first
-        try {
-          await getRedirectResult(auth);
-        } catch (error) {
-          console.log('Clearing existing redirect result:', error);
-        }
-        
-        await signInWithRedirect(auth, provider);
-        // The redirect will happen here, and the result will be handled in useEffect
-        return;
-      }
-      
-      // Try popup first, fallback to redirect for desktop
       try {
-        console.log('Attempting popup login...');
         const result = await signInWithPopup(auth, provider);
         console.log('Popup login successful:', result.user.email);
-        
-        // Handle successful popup login
         const firebaseUser = result.user;
         await handleSuccessfulGoogleLogin(firebaseUser);
         setLoading(false);
-        
+        return;
       } catch (popupError) {
-        console.log('Popup failed, trying redirect:', popupError);
+        console.log('Popup failed, trying redirect method:', popupError.code);
+        
+        // If popup fails, use redirect method
+        console.log('Using redirect method for Google login');
+        setAuthLoading(true);
         
         // Clear any existing redirect result first
         try {
@@ -437,9 +451,11 @@ export const AuthProvider = ({ children }) => {
           console.log('Clearing existing redirect result:', error);
         }
         
+        // Use redirect method as fallback
         await signInWithRedirect(auth, provider);
-        // The redirect will happen here, and the result will be handled in useEffect
+        return;
       }
+
     } catch (error) {
       console.error('Google login error:', error);
       toast.error(error.message || 'Failed to login with Google');
@@ -453,11 +469,25 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Handling successful Google login for:', firebaseUser.email);
       console.log('Firebase UID:', firebaseUser.uid);
+      console.log('Firebase display name:', firebaseUser.displayName);
+      console.log('Firebase photo URL:', firebaseUser.photoURL);
+      
+      // Get Firebase token for debugging
+      let idToken = '';
+      try {
+        idToken = await firebaseUser.getIdToken(true);
+        console.log('Firebase ID token obtained successfully, length:', idToken.length);
+        console.log('First 10 chars of token:', idToken.substring(0, 10) + '...');
+      } catch (tokenError) {
+        console.error('Error getting Firebase ID token:', tokenError);
+      }
       
       const apiUrl = getApiUrl();
       console.log('Using API URL:', apiUrl);
       
       // Try to login to backend, if user doesn't exist, register them
+      console.log('Attempting backend login with Firebase UID:', firebaseUser.uid);
+      console.log('User email:', firebaseUser.email);
       let response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -465,9 +495,11 @@ export const AuthProvider = ({ children }) => {
         },
         body: JSON.stringify({
           firebaseUid: firebaseUser.uid,
-          avatar: firebaseUser.photoURL, // Always send avatar
+          avatar: firebaseUser.photoURL || '', // Always send avatar, default to empty string
+          email: firebaseUser.email || '', // Send email as backup
         }),
       });
+      console.log('Backend login attempt complete');
 
       console.log('Login response status:', response.status);
 
@@ -606,6 +638,7 @@ export const AuthProvider = ({ children }) => {
   const verifyToken = async (token) => {
     try {
       console.log('🔍 Verifying token:', token ? 'Token exists' : 'No token');
+      
       const response = await fetch(`${getApiUrl()}/api/auth/verify`, {
         method: 'GET',
         headers: {
@@ -673,41 +706,124 @@ export const AuthProvider = ({ children }) => {
   // Check for stored token on app load
   useEffect(() => {
     const initializeAuth = async () => {
+      // Prevent multiple initialization attempts
+      if (initializingRef.current) {
+        console.log('🔄 Auth initialization already in progress, skipping');
+        return;
+      }
+      
+      initializingRef.current = true;
       let userSet = false;
+      
       try {
-        // Check for stored token
-        const storedToken = localStorage.getItem('token');
-        console.log('Token found in localStorage on app load:', storedToken);
+        // Check if cookies are enabled
+        if (!areCookiesEnabled()) {
+          console.error('❌ Cookies are disabled. Authentication requires cookies.');
+          toast.error('Please enable cookies to use authentication features.');
+          setLoading(false);
+          return;
+        }
+
+        // Check for stored token in cookies
+        const storedToken = getAuthToken();
+        console.log('🔄 Auth initialization - Token found:', storedToken ? 'Yes' : 'No');
+        
         if (storedToken) {
-          const isValid = await verifyToken(storedToken);
-          console.log('Token valid?', isValid);
-          if (isValid) {
-            setToken(storedToken);
-            userSet = true;
+          // Check if token is expired before making API call
+          const decoded = decodeJwt(storedToken);
+          const isExpired = decoded && decoded.exp && decoded.exp * 1000 <= Date.now();
+          
+          console.log('🔍 Token expiry check:', isExpired ? 'Expired' : 'Valid');
+          
+          if (!isExpired) {
+            const isValid = await verifyToken(storedToken);
+            console.log('✅ Token verification result:', isValid);
+            if (isValid) {
+              setToken(storedToken);
+              // Also restore user data from cookies
+              const savedUser = getUserData();
+              if (savedUser) {
+                setUser(savedUser);
+                console.log('🍪 User data restored from cookie');
+              }
+              userSet = true;
+            } else {
+              clearAuthCookies();
+              setUser(null);
+              setToken(null);
+            }
           } else {
-            localStorage.removeItem('token');
+            console.log('❌ Token expired, clearing');
+            clearAuthCookies();
             setUser(null);
+            setToken(null);
           }
         } else {
           setUser(null);
+          setToken(null);
         }
 
         // Handle Firebase redirect result
         const handleRedirectResult = async () => {
           try {
             console.log('Checking for redirect result...');
+            console.log('Auth state:', auth ? 'Auth initialized' : 'Auth not initialized');
+            
+            if (!auth) {
+              console.log('Auth not initialized, skipping redirect check');
+              return;
+            }
+            
             const result = await getRedirectResult(auth);
-            if (result) {
+            if (result && result.user) {
               console.log('Redirect result received:', result.user.email);
-              await handleSuccessfulGoogleLogin(result.user);
-              userSet = true;
+              console.log('User UID:', result.user.uid);
+              console.log('User display name:', result.user.displayName);
+              console.log('User photo URL:', result.user.photoURL);
+              
+              // Process the successful Google login
+              const loginData = await handleSuccessfulGoogleLogin(result.user);
+              
+              if (loginData && loginData.token) {
+                console.log('Google login successful, setting user state');
+                
+                // Set the user and token immediately
+                setUser(loginData.user);
+                setToken(loginData.token);
+                // Cookies will be set automatically by useEffect hooks
+                
+                userSet = true;
+                setLoading(false);
+                
+                // Navigate to dashboard after successful login
+                setTimeout(() => {
+                  console.log('Navigating to dashboard');
+                  window.location.href = '/dashboard';
+                }, 500);
+              } else {
+                console.error('Login data incomplete:', loginData);
+                setLoading(false);
+              }
             } else {
               console.log('No redirect result found');
+              setLoading(false);
             }
           } catch (error) {
-            console.error('Error handling redirect result:', error);
-            // Don't let redirect errors break the auth flow
+            console.error('Error handling redirect result:', error.code, error.message);
+            setLoading(false);
             setUser(null);
+            setToken(null);
+            clearAuthCookies();
+            
+            // Show user-friendly error message
+            if (error.code === 'auth/popup-closed-by-user') {
+              toast.error('Login cancelled by user');
+            } else if (error.code === 'auth/network-request-failed') {
+              toast.error('Network error. Please check your connection.');
+            } else {
+              toast.error('Google login failed. Please try again.');
+            }
+            
             // Clear any stale redirect state
             try {
               await getRedirectResult(auth);
@@ -722,6 +838,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Auth initialization error:', error);
         setUser(null);
       } finally {
+        initializingRef.current = false; // Reset flag
         setLoading(false); // Only after all checks and setUser calls
       }
     };
@@ -738,18 +855,34 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  // Store token in localStorage when it changes
+  // Store token in secure cookies when it changes
   useEffect(() => {
     if (token) {
-      localStorage.setItem('token', token);
-      console.log('Token saved to localStorage:', token);
+      const currentStoredToken = getAuthToken();
+      if (currentStoredToken !== token) {
+        setAuthToken(token);
+        console.log('🍪 Token saved to secure cookie');
+      }
       scheduleAutoLogout(token);
     } else {
-      localStorage.removeItem('token');
-      console.log('Token removed from localStorage');
+      const currentStoredToken = getAuthToken();
+      if (currentStoredToken) {
+        removeAuthToken();
+        console.log('🍪 Token removed from cookie');
+      }
       clearAutoLogoutTimer();
     }
   }, [token]);
+
+  // Store user data in cookies when it changes
+  useEffect(() => {
+    if (user) {
+      setUserData(user);
+      console.log('🍪 User data saved to cookie');
+    } else {
+      removeUserData();
+    }
+  }, [user]);
 
   // Add this useEffect to check for missing username after user is set
   useEffect(() => {
