@@ -292,13 +292,18 @@ router.post('/register', authRateLimiter, async (req, res) => {
 router.post('/login', authRateLimiter, async (req, res) => {
   try {
     console.log('LOGIN REQUEST BODY:', req.body);
-    const { firebaseUid, avatar } = req.body;
+    const { firebaseUid, avatar, email } = req.body;
 
     if (!firebaseUid) {
       console.log('No firebaseUid provided for login');
       return res.status(400).json({
         message: 'Firebase UID is required.'
       });
+    }
+    
+    console.log(`Attempting to find user with firebaseUid: ${firebaseUid}`);
+    if (email) {
+      console.log(`Email provided as backup: ${email}`);
     }
 
     // Find user by Firebase UID
@@ -661,4 +666,4 @@ router.post('/verify-otp', authRateLimiter, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

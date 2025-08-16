@@ -19,7 +19,10 @@ import {
   CogIcon,
   UserGroupIcon,
   DocumentTextIcon,
-  BellIcon
+  BellIcon,
+  PlayCircleIcon,
+  ShareIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useRef } from 'react';
@@ -31,7 +34,7 @@ import FAQAccordion from '../components/FAQAccordion';
 
 const Premium = () => {
   const { subscription, features, usage, startTrial, subscribe, getPlans, hasFeature } = usePremium();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('yearly');
@@ -63,6 +66,38 @@ const Premium = () => {
       setShowTrialModal(false);
       window.location.href = '/dashboard';
     }
+  };
+
+  const handleStartTrialWithTasks = async () => {
+    try {
+      setLoading(true);
+      const resp = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/trial?requireTasks=true`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await resp.json();
+      setLoading(false);
+      if (resp.ok) {
+        toast.success('Trial unlocked for 7 days!');
+        window.location.href = '/dashboard';
+      } else {
+        toast.error(data.message || 'Complete the tasks to unlock the trial');
+      }
+    } catch (e) {
+      setLoading(false);
+      toast.error('Failed to start trial');
+    }
+  };
+
+  const callTrialTask = async (path, successMsg) => {
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/${path}`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await resp.json();
+      if (resp.ok) toast.success(successMsg);
+      else toast.error(data.message || 'Failed');
+    } catch (_) { toast.error('Failed'); }
   };
 
   const handleSubscribe = async (plan) => {
@@ -289,14 +324,53 @@ const Premium = () => {
                 <StarIcon className="h-5 w-5 mr-2" />
                 View Plans
               </button>
-              <button
-                onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              <a
+                href="#trial"
                 className="btn btn-outline btn-lg"
               >
                 <SparklesIcon className="h-5 w-5 mr-2" />
-                See Features
+                Start Trial Tasks
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Trial Tasks */}
+      <div id="trial" className="py-12 bg-white dark:bg-gray-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Unlock 7‑day Premium Trial</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">Complete these quick tasks once and enjoy full access for a week.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
+              <div className="font-semibold mb-1">Watch an ad</div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Short video to support LifeBuddy.</p>
+              <button onClick={() => callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2">
+                <PlayCircleIcon className="w-4 h-4"/> Mark as watched
               </button>
             </div>
+            <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
+              <div className="font-semibold mb-1">Follow on Instagram</div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Follow @Rohitkumar324 and come back.</p>
+              <div className="flex gap-2">
+                <a href="https://instagram.com/Rohitkumar324" target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-slate-300 flex items-center gap-2">
+                  <ArrowTopRightOnSquareIcon className="w-4 h-4"/> Open Instagram
+                </a>
+                <button onClick={() => callTrialTask('trial-tasks/follow-instagram', 'Followed ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white">I followed</button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
+              <div className="font-semibold mb-1">Share with 10 friends</div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Tell your friends about LifeBuddy.</p>
+              <button onClick={() => callTrialTask('trial-tasks/share', 'Thanks for sharing!')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2">
+                <ShareIcon className="w-4 h-4"/> Mark as shared
+              </button>
+            </div>
+          </div>
+          <div className="mt-4">
+            <button onClick={handleStartTrialWithTasks} disabled={loading} className="px-4 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60">
+              {loading ? 'Unlocking...' : 'Unlock Trial'}
+            </button>
           </div>
         </div>
       </div>
@@ -348,7 +422,7 @@ const Premium = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricingPlans.map((plan) => (
+            {plans.map((plan) => (
               <PlanCard
                 key={plan.id}
                 plan={plan}

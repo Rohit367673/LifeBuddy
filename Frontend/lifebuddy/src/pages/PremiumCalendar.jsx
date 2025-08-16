@@ -99,7 +99,7 @@ export default function PremiumCalendar() {
           <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
             Your AI Roadmap
           </h1>
-          <p className="text-slate-600">Powered by DeepSeek Intelligence</p>
+          <p className="text-slate-600">Powered by LifeBuddy AI</p>
         </div>
       </motion.div>
 

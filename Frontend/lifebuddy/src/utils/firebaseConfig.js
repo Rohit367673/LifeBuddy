@@ -24,16 +24,34 @@ let storage;
 let messaging;
 let analytics = null;
 
+// Resolve authDomain from env or from projectId as a safe fallback
+const resolveAuthDomain = () => {
+  const envDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  const isPlaceholder = (v) => !v || /your[-_ ]firebase|your[-_ ]project/i.test(String(v));
+  if (envDomain && !isPlaceholder(envDomain)) return envDomain;
+  if (projectId && !isPlaceholder(projectId)) return `${projectId}.firebaseapp.com`;
+  return null;
+};
+
 try {
   // Check if we have valid Firebase config (not placeholder values)
-  const hasValidConfig = import.meta.env.VITE_FIREBASE_API_KEY && 
-                        import.meta.env.VITE_FIREBASE_API_KEY !== 'your-actual-api-key-here' &&
-                        import.meta.env.VITE_FIREBASE_PROJECT_ID &&
-                        import.meta.env.VITE_FIREBASE_PROJECT_ID !== 'your-project-id';
+  const resolvedAuthDomain = resolveAuthDomain();
+  const missing = [];
+  if (!import.meta.env.VITE_FIREBASE_API_KEY || /your[-_ ]firebase/i.test(import.meta.env.VITE_FIREBASE_API_KEY)) missing.push('VITE_FIREBASE_API_KEY');
+  if (!import.meta.env.VITE_FIREBASE_PROJECT_ID || /your[-_ ]firebase|your[-_ ]project/i.test(import.meta.env.VITE_FIREBASE_PROJECT_ID)) missing.push('VITE_FIREBASE_PROJECT_ID');
+  if (!import.meta.env.VITE_FIREBASE_APP_ID || /your[-_ ]firebase|your[-_ ]app/i.test(import.meta.env.VITE_FIREBASE_APP_ID)) missing.push('VITE_FIREBASE_APP_ID');
+  if (!resolvedAuthDomain) missing.push('VITE_FIREBASE_AUTH_DOMAIN');
+
+  const hasValidConfig = missing.length === 0;
 
   if (hasValidConfig) {
-    // Initialize Firebase with minimal configuration to avoid 404 errors
-    app = initializeApp(firebaseConfig);
+    // Initialize Firebase with resolved configuration
+    const effectiveConfig = {
+      ...firebaseConfig,
+      authDomain: resolvedAuthDomain
+    };
+    app = initializeApp(effectiveConfig);
     
     // Initialize services
     auth = getAuth(app);
@@ -52,8 +70,8 @@ try {
     
     console.log('✅ Firebase initialized successfully');
   } else {
-    console.warn('⚠️ Firebase configuration is incomplete. Please update your .env file with valid Firebase project credentials.');
-    console.warn('📝 Go to https://console.firebase.google.com/ to create a new project and get the configuration.');
+    console.warn('⚠️ Firebase configuration is incomplete. Missing:', missing.join(', '));
+    console.warn('📝 Update Frontend/lifebuddy/.env (or .env.local) with your Firebase Web App config from the Firebase Console.');
     
     // Create null objects to prevent app crashes
     app = null;
