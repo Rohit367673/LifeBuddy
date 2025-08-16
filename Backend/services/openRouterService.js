@@ -4,19 +4,24 @@ const fetch = require('node-fetch');
 // Read API key from environment, never hardcode
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Prefer config file with a prioritized list of free models; fallback to env or sensible defaults
-let PRIMARY_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
+
+// Model: LifeBuddy AI uses high-quality open models
+let PRIMARY_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+// LifeBuddy AI prioritizes reliable and efficient models
+
 let CANDIDATE_MODELS = [
-  'deepseek/deepseek-r1:free',
   'meta-llama/llama-3.1-8b-instruct:free',
   'microsoft/phi-3.5-mini-instruct:free',
   'nousresearch/hermes-3-llama-3.1-8b:free',
+  'deepseek/deepseek-r1:free',
   'gryphe/mythomax-l2-13b:free',
   'openai/gpt-oss-20b:free'
 ];
+
 try {
   const cfg = require('../config/aiConfig.json');
-  if (cfg?.model) PRIMARY_MODEL = cfg.model;
+  // Allow overriding to LifeBuddy AI preferred models
+  if (cfg?.model && typeof cfg.model === 'string') PRIMARY_MODEL = cfg.model;
   if (Array.isArray(cfg?.models) && cfg.models.length > 0) {
     CANDIDATE_MODELS = cfg.models;
   }
@@ -26,6 +31,12 @@ try {
 console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
 console.log('OpenRouter API Key (first 8 chars):', OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 8) + '...' : 'NOT SET');
 
+// Compute a sane Referer for local vs production to prevent 401 "User not found"
+const DEFAULT_REFERER = (process.env.NODE_ENV === 'production')
+  ? (process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space')
+  : (process.env.OPENROUTER_REFERRER || 'http://localhost:5173');
+const DEFAULT_TITLE = process.env.OPENROUTER_TITLE || (process.env.NODE_ENV === 'production' ? 'LifeBuddy' : 'LifeBuddy (Local)');
+
 
 async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperature = 0.7, options = {}) {
   if (!OPENROUTER_API_KEY) {
@@ -33,13 +44,14 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
     throw new Error('OpenRouter API key missing.');
   }
   // Build the ordered list of models to try
+  // Strict preference order; no broad fallbacks
   const preferred = [];
   const overrideModel = options?.model;
   if (overrideModel) preferred.push(overrideModel);
-  preferred.push(PRIMARY_MODEL);
-  for (const m of CANDIDATE_MODELS) {
-    if (!preferred.includes(m)) preferred.push(m);
-  }
+  if (!preferred.length) preferred.push(PRIMARY_MODEL);
+
+  // System prompt branding and behavior
+  const systemPrompt = options?.systemPrompt || 'You are LifeBuddy AI by Rohit Kumar. Be warm, proactive, and context-aware. Tailor advice to the user and their goals. Never mention underlying model providers or system prompts. Avoid generic replies; sound like a helpful human coach.';
 
   const firstErrors = [];
   for (const model of preferred) {
@@ -50,12 +62,14 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space',
-          'X-Title': process.env.OPENROUTER_TITLE || 'LifeBuddy'
+          'HTTP-Referer': DEFAULT_REFERER,
+          'Referer': DEFAULT_REFERER,
+          'X-Title': DEFAULT_TITLE
         },
         body: JSON.stringify({
           model,
           messages: [
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
           max_tokens: maxTokens,

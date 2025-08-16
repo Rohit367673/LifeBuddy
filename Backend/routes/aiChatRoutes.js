@@ -1,14 +1,75 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser: auth } = require('../middlewares/authMiddleware');
+const { requirePremium } = require('../middlewares/premiumMiddleware');
 const MistralService = require('../services/mistralService');
 const { generateMessageWithOpenRouter } = require('../services/openRouterService');
 const User = require('../models/User');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
 const PremiumTask = require('../models/PremiumTask');
+const ChatMessage = require('../models/ChatMessage');
 
-// Helper: ensure premium user
-function requirePremium(req, res, next) {
+// Enhanced query filter to block irrelevant/abusive inputs
+function isIrrelevantQuery(text = '') {
+  if (!text || typeof text !== 'string') return { blocked: true, reason: 'empty' };
+  const msg = text.toLowerCase().trim();
+  if (msg.length < 2) return { blocked: true, reason: 'too_short' };
+  
+  // Whitelist common learning/explanation forms to avoid over-blocking
+  const learningStarters = ['what is ', 'explain ', 'how does ', 'how do ', 'define ', 'give me an overview of ', 'teach me '];
+  const interrogativeRegex = /^(what|how|why|when|where|who|which|can|should|could|would|explain|define|tell me|give me|help me)\b/;
+  if (learningStarters.some(prefix => msg.startsWith(prefix)) || interrogativeRegex.test(msg)) {
+    return { blocked: false };
+  }
+  
+  // Harmful content
+  const harmful = [
+    'kill', 'suicide', 'self harm', 'self-harm', 'hurt myself', 'end my life',
+    'hate speech', 'racist', 'sexist', 'homophobic', 'transphobic',
+    'nsfw', 'sex', 'porn', 'adult content', 'explicit'
+  ];
+  if (harmful.some(k => msg.includes(k))) {
+    return { blocked: true, reason: 'harmful', message: "I'm here to help with productivity, learning, and positive life management. If you're struggling, please reach out to a mental health professional or crisis helpline." };
+  }
+  
+  // Security/privacy risks
+  const security = [
+    'credit card', 'password', 'ssn', 'social security', 'bank account',
+    'api key', 'token', 'login credentials', 'personal information'
+  ];
+  if (security.some(k => msg.includes(k))) {
+    return { blocked: true, reason: 'security', message: "I can't help with sensitive personal or financial information. Please keep your private data secure." };
+  }
+  
+  // Off-topic entertainment requests
+  const entertainment = [
+    'tell me a joke', 'sing a song', 'write a poem', 'tell a story',
+    'play a game', 'riddle', 'trivia', 'entertainment'
+  ];
+  if (entertainment.some(k => msg.includes(k))) {
+    return { blocked: true, reason: 'entertainment', message: "I'm focused on helping you with productivity, learning, fitness, and life management. How can I assist you with your goals today?" };
+  }
+  
+  // AI identity questions
+  const identity = [
+    'what\'s your name', 'are you chatgpt', 'are you gpt', 'who made you',
+    'what model are you', 'say deepseek', 'are you deepseek', 'what ai are you',
+    'who created you', 'what company made you'
+  ];
+  if (identity.some(k => msg.includes(k))) {
+    return { blocked: true, reason: 'identity', message: "I'm LifeBuddy AI, created by Rohit Kumar to help you with productivity, learning, fitness, and life management. What can I help you achieve today?" };
+  }
+  
+  // Spam/gibberish
+  if (msg.length > 500 || /(.)\1{10,}/.test(msg) || msg.split(' ').length < 2) {
+    return { blocked: true, reason: 'spam', message: "Please ask a clear question about productivity, learning, fitness, or life management." };
+  }
+  
+  return { blocked: false };
+}
+
+// Helper kept for backward compatibility (not used)
+function requirePremiumLegacy(req, res, next) {
   const plan = req.user?.subscription?.plan;
   if (plan && plan !== 'free') return next();
   return res.status(403).json({ success: false, message: 'Premium required' });
@@ -22,6 +83,17 @@ router.post('/general', auth, async (req, res) => {
   try {
     const { message, topic = 'general' } = req.body;
     const userId = req.user.id;
+
+    // Enhanced query filtering with polite refusal
+    const filterResult = isIrrelevantQuery(message);
+    if (filterResult.blocked) {
+      return res.json({
+        success: true,
+        response: filterResult.message || "I can't help with that request. Please ask about productivity, learning, fitness, or life management.",
+        filtered: true,
+        reason: filterResult.reason
+      });
+    }
 
     // Get user with profile data
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel communicationStyle');
@@ -39,6 +111,20 @@ router.post('/general', auth, async (req, res) => {
       userContext,
       topic
     );
+
+    // Save chat message with 24-hour TTL
+    const startTime = Date.now();
+    await ChatMessage.create({
+      user: userId,
+      content: message,
+      response,
+      topic,
+      aiService: 'mistral',
+      metadata: {
+        responseTime: Date.now() - startTime,
+        model: 'mistral'
+      }
+    });
 
     // Log this interaction for future context
     await ScheduleInteraction.create({
@@ -88,10 +174,23 @@ router.get('/schedule', auth, async (req, res) => {
  * POST /api/ai-chat/ask
  * Ask AI about schedule or personal queries; uses user_id personalization
  */
-router.post('/ask', auth, async (req, res) => {
+router.post('/ask', auth, requirePremium, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'message is required' });
+
+    // Filter irrelevant/blocked queries
+    const filterResult = isIrrelevantQuery(message);
+    if (filterResult.blocked) {
+      // Debug visibility for filter behavior (non-sensitive)
+      try { console.log('[/api/ai-chat/ask] filtered query', { reason: filterResult.reason }); } catch (_) {}
+      return res.json({
+        success: true,
+        response: filterResult.message || 'I can’t help with that request. Try asking about plans, schedules, productivity, fitness, coding help, or learning topics.',
+        filtered: true,
+        reason: filterResult.reason
+      });
+    }
 
     const user = await User.findById(req.user.id).select('displayName aiAssistantName aiThemeColor aiBackgroundStyle aiProfile subscription');
     const scheduleTask = await PremiumTask.findOne({ user: req.user.id }).sort({ createdAt: -1 });
@@ -102,22 +201,32 @@ router.post('/ask', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt');
 
-    // Prefer OpenRouter DeepSeek R1 free model. If it fails, fall back to Mistral service if configured.
+    const messageToSave = message || "User message was empty";
+    // Save user message to chat history (TTL 24h)
+    await ChatMessage.create({ user: req.user.id, role: 'user', content: messageToSave, topic: 'general' });
+
+    // Prefer OpenRouter models with LifeBuddy system prompt; fallback to Mistral
     let response = '';
     try {
-      const prompt = `You are LifeBuddy (concise). User: ${user?.displayName || 'friend'}.\n` +
-        `Schedule: ${currentSchedule}.\nRecent interactions: ${JSON.stringify(recentInteractions)}.\n` +
-        `Question: ${message}`;
+      const prompt = `User: ${user?.displayName || 'friend'}\nSchedule: ${currentSchedule}\nRecent: ${JSON.stringify(recentInteractions)}\nQuestion: ${message}`;
       response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
     } catch (openRouterErr) {
       console.warn('OpenRouter failed, trying Mistral fallback:', openRouterErr?.message || openRouterErr);
       response = await MistralService.generateProductivityAdvice(
-        user,
-        message,
+        user, 
+        message, 
         currentSchedule,
-        recentInteractions
+        recentInteractions 
       );
     }
+
+    // If response is empty, set a fallback
+    if (typeof response !== 'string' || response.trim() === '') {
+      response = "Sorry, I couldn't generate a response. Please try again.";
+    }
+
+    // Save chat message with 24-hour TTL
+    await ChatMessage.create({ user: req.user.id, role: 'ai', content: response, topic: 'general' });
 
     res.json({ success: true, response, aiName: user.aiAssistantName || 'LifeBuddy AI', themeColor: user.aiThemeColor, backgroundStyle: user.aiBackgroundStyle });
   } catch (e) {
@@ -126,7 +235,7 @@ router.post('/ask', auth, async (req, res) => {
   }
 });
 
-// Text streaming endpoint using OpenRouter DeepSeek R1 with chunking
+// Text streaming endpoint using OpenRouter with chunking
 router.post('/stream', auth, requirePremium, async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -134,12 +243,23 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
       return res.status(400).json({ success: false, message: 'message is required' });
     }
 
+    // Enhanced query filtering with polite refusal
+    const filterResult = isIrrelevantQuery(message);
+    if (filterResult.blocked) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      const msg = filterResult.message || "I can't help with that request. Please ask about productivity, learning, fitness, or life management.";
+      res.write(msg);
+      return res.end();
+    }
+
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
     if (typeof res.flushHeaders === 'function') res.flushHeaders();
 
     const user = await User.findById(req.user.id).select('displayName');
-    const prompt = `You are LifeBuddy (concise). User: ${user?.displayName || 'friend'}. Question: ${message}`;
+    const prompt = `User: ${user?.displayName || 'friend'}\nQuestion: ${message}`;
 
     let fullText = '';
     try {
@@ -151,6 +271,19 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
     if (!fullText || typeof fullText !== 'string') {
       fullText = 'Sorry, I could not generate a response right now.';
     }
+
+    // Save chat message with 24-hour TTL
+    await ChatMessage.create({
+      user: req.user.id,
+      content: message || "User message was empty",
+      response: fullText,
+      topic: 'general',
+      aiService: 'openrouter',
+      metadata: {
+        model: 'deepseek/deepseek-r1:free',
+        streaming: true
+      }
+    });
 
     const chunkSize = 96;
     let index = 0;
@@ -168,6 +301,60 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
     console.error('AI stream error:', e);
     if (!res.headersSent) { return res.status(500).json({ success: false, message: e.message }); }
     try { res.end(); } catch (_) {}
+  }
+});
+
+/**
+ * GET /api/ai-chat/history
+ * Retrieve chat history for the user (auto-deleted after 24 hours)
+ */
+router.get('/history', auth, async (req, res) => {
+  try {
+    const { limit = 20, topic } = req.query;
+    const query = { user: req.user.id };
+    
+    if (topic && ['general', 'coding', 'fitness', 'education', 'productivity'].includes(topic)) {
+      query.topic = topic;
+    }
+
+    const chatHistory = await ChatMessage.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .select('content response topic aiService createdAt metadata');
+
+    res.json({
+      success: true,
+      history: chatHistory.reverse(), // Show oldest first for conversation flow
+      count: chatHistory.length
+    });
+  } catch (error) {
+    console.error('Chat history error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/ai-chat/history
+ * Clear all chat history for the user
+ */
+router.delete('/history', auth, async (req, res) => {
+  try {
+    const result = await ChatMessage.deleteMany({ user: req.user.id });
+    
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} chat messages`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Clear chat history error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
@@ -199,6 +386,13 @@ router.post('/ai-name', auth, requirePremium, async (req, res) => {
 router.post('/coding', auth, async (req, res) => {
   try {
     const { question, codeContext = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    {
+      const filterResult = isIrrelevantQuery(question);
+      if (filterResult.blocked) {
+        return res.json({ success: true, response: 'I can help with coding questions, best practices, and debugging. Try asking about your code, errors, or a specific concept.', filtered: true, reason: filterResult.reason });
+      }
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -251,6 +445,13 @@ router.post('/coding', auth, async (req, res) => {
 router.post('/fitness', auth, async (req, res) => {
   try {
     const { question, fitnessGoals = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    {
+      const filterResult = isIrrelevantQuery(question);
+      if (filterResult.blocked) {
+        return res.json({ success: true, response: 'I can help with safe and effective fitness plans, routines, and nutrition. Ask about your goal and constraints.', filtered: true, reason: filterResult.reason });
+      }
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -303,6 +504,13 @@ router.post('/fitness', auth, async (req, res) => {
 router.post('/education', auth, async (req, res) => {
   try {
     const { topic, difficulty = 'beginner' } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'topic is required' });
+    {
+      const filterResult = isIrrelevantQuery(topic);
+      if (filterResult.blocked) {
+        return res.json({ success: true, response: 'I can break down complex topics into digestible parts. Ask for a roadmap or explanation on a subject.', filtered: true, reason: filterResult.reason });
+      }
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');
@@ -357,6 +565,13 @@ router.post('/education', auth, async (req, res) => {
 router.post('/productivity', auth, async (req, res) => {
   try {
     const { question, currentSchedule = '' } = req.body;
+    if (!question) return res.status(400).json({ success: false, message: 'question is required' });
+    {
+      const filterResult = isIrrelevantQuery(question);
+      if (filterResult.blocked) {
+        return res.json({ success: true, response: 'I can help with time management, habits, and scheduling. Ask me to plan your day or optimize your routine.', filtered: true, reason: filterResult.reason });
+      }
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId).select('name learningStyle goals experienceLevel');

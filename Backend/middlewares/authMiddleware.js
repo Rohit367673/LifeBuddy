@@ -168,8 +168,23 @@ const createRateLimiter = (windowMs, max) => {
   });
 };
 
+// Rate limiter for authentication routes - more lenient for development
+const rateLimit = require('express-rate-limit');
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'development' ? 100 : 20, // Higher limit in development
+  message: {
+    error: 'Too many authentication attempts, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting for token verification in development
+  skip: (req) => {
+    return process.env.NODE_ENV === 'development' && req.path.includes('/verify');
+  }
+});
+
 // Specific rate limiters
-const authRateLimiter = createRateLimiter(15 * 60 * 1000, 5); // 5 requests per 15 minutes
 const generalRateLimiter = createRateLimiter(15 * 60 * 1000, 100); // 100 requests per 15 minutes
 
 module.exports = {

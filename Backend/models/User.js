@@ -301,6 +301,18 @@ const userSchema = new mongoose.Schema({
     exportablePDFs: {
       type: Boolean,
       default: false
+    },
+    aiInsights: {
+      type: Boolean,
+      default: false
+    },
+    prioritySupport: {
+      type: Boolean,
+      default: false
+    },
+    advancedAnalytics: {
+      type: Boolean,
+      default: false
     }
   },
   // Purchased items
@@ -351,6 +363,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Trial task tracking for eligibility
+  trialTasks: {
+    watchedAd: { type: Boolean, default: false },
+    followedInstagram: { type: Boolean, default: false },
+    sharedReferrals: { type: Number, default: 0 },
+    lastUpdated: { type: Date, default: Date.now }
+  },
   // Custom AI assistant display name
   aiAssistantName: {
     type: String,
@@ -399,6 +418,32 @@ const userSchema = new mongoose.Schema({
       default: true
     }
   },
+  // Free trial tracking
+  freeTrial: {
+    isEligible: {
+      type: Boolean,
+      default: true
+    },
+    hasUsed: {
+      type: Boolean,
+      default: false
+    },
+    startDate: {
+      type: Date
+    },
+    endDate: {
+      type: Date
+    }
+  },
+  // Coupon usage
+  couponsUsed: [{
+    couponCode: String,
+    usedAt: {
+      type: Date,
+      default: Date.now
+    },
+    paymentId: String
+  }]
   // Remove FCM token field
   // fcmToken: { type: String },
 }, {

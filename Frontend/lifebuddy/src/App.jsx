@@ -23,6 +23,7 @@ import PremiumCalendar from './pages/PremiumCalendar';
 import MySchedule from './pages/MySchedule';
 import AIChat from './components/AIChat';
 import VoiceChat from './pages/VoiceChat';
+import AdminCouponPanel from './components/AdminCouponPanel';
 
 function App() {
   return (
@@ -41,6 +42,8 @@ function App() {
                 <Route path="/profile/:identifier" element={<PublicProfile />} />
                 {/* Direct voice route (also added inside MainLayout below) */}
                 <Route path="/ai-voice" element={<VoiceChat />} />
+                <Route path="/voice-chat" element={<VoiceChat />} />
+                <Route path="/voice-chat" element={<VoiceChat />} />
 
                 {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
@@ -58,6 +61,7 @@ function App() {
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/admin/coupons" element={<AdminCouponPanel />} />
                 </Route>
                 {/* Fallback */}
                 <Route path="*" element={<div style={{ padding: 16 }}>Page not found</div>} />

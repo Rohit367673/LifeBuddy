@@ -5,17 +5,23 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5001',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    port: 5173 // Set explicit port
   },
   define: {
     // Make environment variables available to the client
     'process.env': {}
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020'
+    }
+  },
+  build: {
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks: {}
+      }
+    }
   }
 })

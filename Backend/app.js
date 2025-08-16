@@ -25,6 +25,9 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const premiumTaskRoutes = require('./routes/premiumTaskRoutes');
 const aiChatRoutes = require('./routes/aiChatRoutes');
+const couponRoutes = require('./routes/couponRoutes');
+const trialRoutes = require('./routes/trialRoutes');
+const adminCouponRoutes = require('./routes/adminCouponRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -90,6 +93,9 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/store', storeRoutes);
 app.use('/api/premium-tasks', premiumTaskRoutes);
 app.use('/api/ai-chat', aiChatRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/trial', trialRoutes);
+app.use('/api/admin-coupons', adminCouponRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
