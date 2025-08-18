@@ -251,6 +251,41 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
   }
 });
 
+// Backward compatible alias expected by Dashboard.jsx
+router.get('/progress', authenticateUser, async (req, res) => {
+  try {
+    const userAchievements = await Achievement.find({ user: req.user._id });
+    const earnedTypes = userAchievements.map(a => a.type);
+
+    const availableAchievements = Achievement.getAvailableAchievements();
+    const progressData = [];
+
+    for (const achievement of availableAchievements) {
+      const existing = userAchievements.find(a => a.type === achievement.type);
+
+      if (existing) {
+        progressData.push({
+          ...achievement,
+          progress: existing.progress,
+          isEarned: existing.isEarned,
+          earnedAt: existing.earnedAt
+        });
+      } else {
+        progressData.push({
+          ...achievement,
+          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
+          isEarned: false
+        });
+      }
+    }
+
+    res.json(progressData);
+  } catch (error) {
+    console.error('Error fetching achievement progress (alias):', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Test badge unlock system
 router.post('/test-badge-system', authenticateUser, async (req, res) => {
   try {

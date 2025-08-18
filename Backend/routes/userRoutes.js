@@ -242,43 +242,82 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
 router.get('/stats', authenticateUser, async (req, res) => {
   try {
     const userId = req.user._id;
-    const { period = '30' } = req.query; // days
+    const { period = '30' } = req.query; // days or the special value 'prev'
 
+    // Handle previous period quick stats for comparison cards
+    if (String(period).toLowerCase() === 'prev') {
+      const days = 7;
+      const endPrev = new Date();
+      endPrev.setDate(endPrev.getDate() - days);
+      const startPrev = new Date();
+      startPrev.setDate(startPrev.getDate() - days * 2);
+
+      const [completedPrev, achievements] = await Promise.all([
+        Task.countDocuments({
+          user: userId,
+          status: 'completed',
+          completedAt: { $gte: startPrev, $lt: endPrev }
+        }),
+        // All achievements represent earned ones in our system
+        require('../models/Achievement').find({ user: userId }).select('points').lean()
+      ]);
+
+      const totalPoints = (achievements || []).reduce((sum, a) => sum + (a.points || 0), 0);
+      return res.json({ completedTasks: completedPrev, totalPoints });
+    }
+
+    const periodDays = isNaN(parseInt(period)) ? 30 : parseInt(period);
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
+    startDate.setDate(startDate.getDate() - periodDays);
+    const now = new Date();
 
-    // Get events created in period
-    const eventsInPeriod = await Event.find({
-      user: userId,
-      createdAt: { $gte: startDate },
-      isArchived: false
-    }).lean();
-
-    // Get tasks completed in period
-    const completedTasksInPeriod = await Task.find({
-      user: userId,
-      status: 'completed',
-      completedAt: { $gte: startDate }
-    }).lean();
-
-    // Get tasks by category
-    const tasksByCategory = await Task.aggregate([
-      { $match: { user: userId } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // Period-based metrics
+    const [eventsInPeriod, completedTasksInPeriod] = await Promise.all([
+      Event.find({ user: userId, createdAt: { $gte: startDate }, isArchived: false }).lean(),
+      Task.find({ user: userId, status: 'completed', completedAt: { $gte: startDate } }).lean()
     ]);
 
-    // Get events by type
-    const eventsByType = await Event.aggregate([
-      { $match: { user: userId, isArchived: false } },
-      { $group: { _id: '$type', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // Lifetime and current snapshot metrics for dashboard cards
+    const [
+      totalEvents,
+      activeEvents,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      overdueTasks,
+      achievements
+    ] = await Promise.all([
+      Event.countDocuments({ user: userId, isArchived: false }),
+      Event.countDocuments({ user: userId, status: { $in: ['planning', 'in-progress'] }, isArchived: false }),
+      Task.countDocuments({ user: userId }),
+      Task.countDocuments({ user: userId, status: 'completed' }),
+      Task.countDocuments({ user: userId, status: { $ne: 'completed' } }),
+      Task.countDocuments({ user: userId, status: { $ne: 'completed' }, dueDate: { $lt: now } }),
+      require('../models/Achievement').find({ user: userId }).select('points').lean()
     ]);
 
-    // Calculate productivity trends
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const totalPoints = (achievements || []).reduce((sum, a) => sum + (a.points || 0), 0);
+
+    // By category/type breakdowns (lifetime)
+    const [tasksByCategory, eventsByType] = await Promise.all([
+      Task.aggregate([
+        { $match: { user: userId } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+      Event.aggregate([
+        { $match: { user: userId, isArchived: false } },
+        { $group: { _id: '$eventType', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ])
+    ]);
+
+    // Productivity trend over the requested period (per-day completed tasks)
     const productivityData = [];
-    for (let i = parseInt(period) - 1; i >= 0; i--) {
+    for (let i = periodDays - 1; i >= 0; i--) {
       const date = new Date();
+      date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() - i);
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
@@ -294,8 +333,31 @@ router.get('/stats', authenticateUser, async (req, res) => {
       });
     }
 
+    // Optional mood and task streak info from user stats
+    const [userDoc, streak] = await Promise.all([
+      User.findById(userId).select('stats.moodStreak'),
+      User.getUserStreak(userId)
+    ]);
+    const moodStreak = userDoc?.stats?.moodStreak || 0;
+    const currentStreak = streak?.currentStreak || 0;
+    const longestStreak = streak?.longestStreak || 0;
+
     res.json({
-      period: parseInt(period),
+      // Card stats expected by dashboard
+      totalEvents,
+      activeEvents,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      overdueTasks,
+      completionRate,
+      totalPoints,
+      moodStreak,
+      currentStreak,
+      longestStreak,
+
+      // Additional analytics used elsewhere
+      period: periodDays,
       eventsInPeriod: eventsInPeriod.length,
       completedTasksInPeriod: completedTasksInPeriod.length,
       tasksByCategory,
@@ -309,6 +371,68 @@ router.get('/stats', authenticateUser, async (req, res) => {
       message: 'Error fetching statistics.',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
+  }
+});
+
+// Recent activity feed (combined)
+router.get('/activity', authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+
+    const [recentCompletedTasks, recentEvents, recentMoods, recentAchievements] = await Promise.all([
+      Task.find({ user: userId, status: 'completed' }).sort({ completedAt: -1 }).limit(limit).lean(),
+      Event.find({ user: userId }).sort({ createdAt: -1 }).limit(limit).lean(),
+      require('../models/Mood').find({ user: userId }).sort({ date: -1 }).limit(limit).lean(),
+      require('../models/Achievement').find({ user: userId }).sort({ createdAt: -1 }).limit(limit).lean()
+    ]);
+
+    const toItem = [];
+    const items = [
+      ...recentCompletedTasks.map(t => ({ type: 'task_completed', title: t.title, date: t.completedAt || t.updatedAt })),
+      ...recentEvents.map(e => ({ type: 'event_created', title: e.title, date: e.createdAt })),
+      ...recentMoods.map(m => ({ type: 'mood_logged', title: m.mood?.label || 'Mood entry', date: m.date })),
+      ...recentAchievements.map(a => ({ type: 'achievement_earned', title: a.title, date: a.createdAt }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
+
+    res.json(items);
+  } catch (error) {
+    console.error('Get activity error:', error);
+    res.status(500).json({ message: 'Error fetching activity.' });
+  }
+});
+
+// Streak info (tasks)
+router.get('/streak', authenticateUser, async (req, res) => {
+  try {
+    const streak = await User.getUserStreak(req.user._id);
+    res.json({ current: streak.currentStreak || 0, longest: streak.longestStreak || 0, type: 'tasks' });
+  } catch (error) {
+    console.error('Get streak error:', error);
+    res.status(500).json({ message: 'Error fetching streak.' });
+  }
+});
+
+// Simple productivity score (0-100) over last 7 days
+router.get('/productivity-score', authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+
+    const [completed, moods, createdEvents, overdue] = await Promise.all([
+      Task.countDocuments({ user: userId, status: 'completed', completedAt: { $gte: start } }),
+      require('../models/Mood').countDocuments({ user: userId, date: { $gte: start } }),
+      Event.countDocuments({ user: userId, createdAt: { $gte: start } }),
+      Task.countDocuments({ user: userId, status: { $ne: 'completed' }, dueDate: { $lt: new Date() } })
+    ]);
+
+    let score = completed * 5 + moods * 2 + createdEvents * 3 - overdue * 2;
+    score = Math.max(0, Math.min(100, score));
+    res.json({ score });
+  } catch (error) {
+    console.error('Get productivity score error:', error);
+    res.status(500).json({ message: 'Error computing productivity score.' });
   }
 });
 
