@@ -202,11 +202,12 @@ router.get('/recent/list', authenticateUser, async (req, res) => {
   try {
     const { limit = 5 } = req.query;
     
+    // Find achievements where current progress meets or exceeds target
     const recentAchievements = await Achievement.find({
       user: req.user._id,
-      'progress.current': { $gte: '$progress.target' } // Only earned achievements
+      $expr: { $gte: ['$progress.current', '$progress.target'] }
     })
-    .sort({ earnedAt: -1 })
+    .sort({ earnedAt: -1, createdAt: -1 })
     .limit(parseInt(limit));
     
     res.json(recentAchievements);
@@ -231,14 +232,21 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
       if (existing) {
         progressData.push({
           ...achievement,
-          progress: existing.progress,
-          isEarned: existing.isEarned,
+          progress: existing.progress || { current: 0, target: 1 },
+          isEarned: existing.isEarned || false,
           earnedAt: existing.earnedAt
         });
       } else {
+        // Safe fallback for criteria
+        let target = 1;
+        if (achievement.criteria && Object.keys(achievement.criteria).length > 0) {
+          const firstKey = Object.keys(achievement.criteria)[0];
+          target = achievement.criteria[firstKey] || 1;
+        }
+        
         progressData.push({
           ...achievement,
-          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
+          progress: { current: 0, target },
           isEarned: false
         });
       }
@@ -247,7 +255,49 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
     res.json(progressData);
   } catch (error) {
     console.error('Error fetching achievement progress:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+// Backward compatible alias expected by Dashboard.jsx
+router.get('/progress', authenticateUser, async (req, res) => {
+  try {
+    const userAchievements = await Achievement.find({ user: req.user._id });
+    const earnedTypes = userAchievements.map(a => a.type);
+
+    const availableAchievements = Achievement.getAvailableAchievements();
+    const progressData = [];
+
+    for (const achievement of availableAchievements) {
+      const existing = userAchievements.find(a => a.type === achievement.type);
+
+      if (existing) {
+        progressData.push({
+          ...achievement,
+          progress: existing.progress || { current: 0, target: 1 },
+          isEarned: existing.isEarned || false,
+          earnedAt: existing.earnedAt
+        });
+      } else {
+        // Safe fallback for criteria
+        let target = 1;
+        if (achievement.criteria && Object.keys(achievement.criteria).length > 0) {
+          const firstKey = Object.keys(achievement.criteria)[0];
+          target = achievement.criteria[firstKey] || 1;
+        }
+        
+        progressData.push({
+          ...achievement,
+          progress: { current: 0, target },
+          isEarned: false
+        });
+      }
+    }
+
+    res.json(progressData);
+  } catch (error) {
+    console.error('Error fetching achievement progress (alias):', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
 

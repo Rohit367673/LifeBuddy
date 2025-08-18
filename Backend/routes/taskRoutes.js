@@ -8,7 +8,7 @@ const User = require('../models/User');
 // Get all tasks for a user
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, priority, eventId } = req.query;
+    const { page = 1, limit = 20, status, priority, eventId, sort } = req.query;
     
     const query = { user: req.user._id };
     
@@ -27,8 +27,15 @@ router.get('/', authenticateUser, async (req, res) => {
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
-      sort: { createdAt: -1 }
     };
+    // Allow sorting by field, default to createdAt desc; support 'dueDate' used by dashboard
+    if (sort) {
+      const direction = sort.startsWith('-') ? -1 : 1;
+      const field = sort.replace(/^[-+]/, '');
+      options.sort = { [field]: direction };
+    } else {
+      options.sort = { createdAt: -1 };
+    }
     
     const tasks = await Task.find(query)
       .sort(options.sort)

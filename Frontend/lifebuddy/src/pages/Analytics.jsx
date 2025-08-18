@@ -88,7 +88,8 @@ const Analytics = () => {
           eventStats.byStatus[event.status] = (eventStats.byStatus[event.status] || 0) + 1;
           
           // Type distribution
-          eventStats.byType[event.type] = (eventStats.byType[event.type] || 0) + 1;
+          const typeKey = event.eventType || event.type;
+          eventStats.byType[typeKey] = (eventStats.byType[typeKey] || 0) + 1;
           
           // Monthly distribution
           const month = new Date(event.startDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });

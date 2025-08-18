@@ -264,7 +264,7 @@ const Dashboard = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setUpcomingDeadlines(data);
+        setUpcomingDeadlines(data.tasks || []);
       }
     } catch (error) {
       console.error('Error loading upcoming deadlines:', error);
