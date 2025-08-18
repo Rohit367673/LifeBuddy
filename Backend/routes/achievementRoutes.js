@@ -202,11 +202,12 @@ router.get('/recent/list', authenticateUser, async (req, res) => {
   try {
     const { limit = 5 } = req.query;
     
+    // Find achievements where current progress meets or exceeds target
     const recentAchievements = await Achievement.find({
       user: req.user._id,
-      'progress.current': { $gte: '$progress.target' } // Only earned achievements
+      $expr: { $gte: ['$progress.current', '$progress.target'] }
     })
-    .sort({ earnedAt: -1 })
+    .sort({ earnedAt: -1, createdAt: -1 })
     .limit(parseInt(limit));
     
     res.json(recentAchievements);
