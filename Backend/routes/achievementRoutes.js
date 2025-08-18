@@ -231,14 +231,21 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
       if (existing) {
         progressData.push({
           ...achievement,
-          progress: existing.progress,
-          isEarned: existing.isEarned,
+          progress: existing.progress || { current: 0, target: 1 },
+          isEarned: existing.isEarned || false,
           earnedAt: existing.earnedAt
         });
       } else {
+        // Safe fallback for criteria
+        let target = 1;
+        if (achievement.criteria && Object.keys(achievement.criteria).length > 0) {
+          const firstKey = Object.keys(achievement.criteria)[0];
+          target = achievement.criteria[firstKey] || 1;
+        }
+        
         progressData.push({
           ...achievement,
-          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
+          progress: { current: 0, target },
           isEarned: false
         });
       }
@@ -247,7 +254,7 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
     res.json(progressData);
   } catch (error) {
     console.error('Error fetching achievement progress:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
 
@@ -266,14 +273,21 @@ router.get('/progress', authenticateUser, async (req, res) => {
       if (existing) {
         progressData.push({
           ...achievement,
-          progress: existing.progress,
-          isEarned: existing.isEarned,
+          progress: existing.progress || { current: 0, target: 1 },
+          isEarned: existing.isEarned || false,
           earnedAt: existing.earnedAt
         });
       } else {
+        // Safe fallback for criteria
+        let target = 1;
+        if (achievement.criteria && Object.keys(achievement.criteria).length > 0) {
+          const firstKey = Object.keys(achievement.criteria)[0];
+          target = achievement.criteria[firstKey] || 1;
+        }
+        
         progressData.push({
           ...achievement,
-          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
+          progress: { current: 0, target },
           isEarned: false
         });
       }
@@ -282,7 +296,7 @@ router.get('/progress', authenticateUser, async (req, res) => {
     res.json(progressData);
   } catch (error) {
     console.error('Error fetching achievement progress (alias):', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
 

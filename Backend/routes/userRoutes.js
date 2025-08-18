@@ -244,6 +244,8 @@ router.get('/stats', authenticateUser, async (req, res) => {
     const userId = req.user._id;
     const { period = '30' } = req.query; // days or the special value 'prev'
 
+    console.log('🔍 Stats request for user:', userId, 'period:', period);
+
     // Handle previous period quick stats for comparison cards
     if (String(period).toLowerCase() === 'prev') {
       const days = 7;
@@ -263,6 +265,7 @@ router.get('/stats', authenticateUser, async (req, res) => {
       ]);
 
       const totalPoints = (achievements || []).reduce((sum, a) => sum + (a.points || 0), 0);
+      console.log('📊 Prev period stats:', { completedTasks: completedPrev, totalPoints });
       return res.json({ completedTasks: completedPrev, totalPoints });
     }
 
@@ -271,11 +274,15 @@ router.get('/stats', authenticateUser, async (req, res) => {
     startDate.setDate(startDate.getDate() - periodDays);
     const now = new Date();
 
+    console.log('📅 Period:', periodDays, 'days, from:', startDate.toISOString());
+
     // Period-based metrics
     const [eventsInPeriod, completedTasksInPeriod] = await Promise.all([
       Event.find({ user: userId, createdAt: { $gte: startDate }, isArchived: false }).lean(),
       Task.find({ user: userId, status: 'completed', completedAt: { $gte: startDate } }).lean()
     ]);
+
+    console.log('📈 Period metrics:', { eventsInPeriod: eventsInPeriod.length, completedTasksInPeriod: completedTasksInPeriod.length });
 
     // Lifetime and current snapshot metrics for dashboard cards
     const [
@@ -296,6 +303,8 @@ router.get('/stats', authenticateUser, async (req, res) => {
       require('../models/Achievement').find({ user: userId }).select('points').lean()
     ]);
 
+    console.log('📊 Lifetime metrics:', { totalEvents, activeEvents, totalTasks, completedTasks, pendingTasks, overdueTasks });
+
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     const totalPoints = (achievements || []).reduce((sum, a) => sum + (a.points || 0), 0);
 
@@ -312,6 +321,8 @@ router.get('/stats', authenticateUser, async (req, res) => {
         { $sort: { count: -1 } }
       ])
     ]);
+
+    console.log('🏷️ Breakdowns:', { tasksByCategory, eventsByType });
 
     // Productivity trend over the requested period (per-day completed tasks)
     const productivityData = [];
@@ -342,7 +353,7 @@ router.get('/stats', authenticateUser, async (req, res) => {
     const currentStreak = streak?.currentStreak || 0;
     const longestStreak = streak?.longestStreak || 0;
 
-    res.json({
+    const response = {
       // Card stats expected by dashboard
       totalEvents,
       activeEvents,
@@ -363,10 +374,13 @@ router.get('/stats', authenticateUser, async (req, res) => {
       tasksByCategory,
       eventsByType,
       productivityData
-    });
+    };
+
+    console.log('✅ Final response:', response);
+    res.json(response);
 
   } catch (error) {
-    console.error('Get stats error:', error);
+    console.error('❌ Get stats error:', error);
     res.status(500).json({
       message: 'Error fetching statistics.',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
