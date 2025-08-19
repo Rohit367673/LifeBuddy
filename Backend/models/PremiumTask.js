@@ -32,7 +32,7 @@ const premiumTaskSchema = new mongoose.Schema({
   generatedSchedule: [subtaskSchema],
   consentGiven: { type: Boolean, default: false },
   currentDay: { type: Number, default: 1 }, // Track current day in roadmap
-  scheduleSource: { type: String, enum: ['OpenRouter', 'Mistral AI'], default: 'OpenRouter' }, // Track which AI service generated the schedule
+  scheduleSource: { type: String, enum: ['OpenRouter'], default: 'OpenRouter' }, // Track which AI service generated the schedule
   streak: { type: Number, default: 0 },
   stats: {
     completed: { type: Number, default: 0 },

@@ -6,7 +6,6 @@ const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
 const { generateScheduleWithOpenRouter } = require('../services/openRouterService');
-const MistralService = require('../services/mistralService');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
 
 // Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
@@ -34,39 +33,10 @@ async function sendDailyTaskNotification(userId, task, dayNumber) {
   }
 }
 
-// Helper: Generate schedule via OpenRouter, fallback to Mistral
+// Helper: Generate schedule via OpenRouter DeepSeek R1 exclusively
 async function generateScheduleWithFallback(title, requirements, startDate, endDate, userContext) {
-  try {
-    // Try OpenRouter first
-    const schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
-    return { schedule, source: 'OpenRouter' };
-  } catch (openRouterError) {
-    console.log('⚠️ OpenRouter failed, falling back to Mistral AI:', openRouterError.message);
-    // If Mistral key is available, use it; otherwise propagate the OpenRouter error
-    if (process.env.MISTRAL_API_KEY) {
-      const content = await MistralService.generateScheduleWithMistral(title, requirements, startDate, endDate, userContext);
-      // Convert long-form content into structured days in a minimal compatible shape
-      const days = Math.min(31, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000*60*60*24)) + 1);
-      const schedule = Array.from({ length: days }, (_, idx) => ({
-        date: new Date(new Date(startDate).getTime() + idx * 24*60*60*1000),
-        subtask: idx === 0 ? `Kickoff: ${title}` : `Day ${idx + 1} Plan`,
-        notes: idx === 0 ? content : '',
-        resources: [],
-        exercises: [],
-        tips: '',
-        duration: '',
-        motivation: '',
-        day: idx + 1,
-        status: 'pending',
-        prerequisiteMet: idx === 0,
-        quiz: null,
-        quizAnswered: false,
-        quizCorrect: false,
-      }));
-      return { schedule, source: 'Mistral AI' };
-    }
-    throw openRouterError;
-  }
+  const schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
+  return { schedule, source: 'OpenRouter' };
 }
 
 // Create a new premium task and trigger schedule generation
@@ -107,7 +77,7 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       notificationPlatform: ctxUser.notificationPlatform || 'email'
     };
 
-    // Generate schedule with fallback
+    // Generate schedule (OpenRouter DeepSeek R1 only)
     let schedule, scheduleSource;
     try {
       const result = await generateScheduleWithFallback(title, requirements, startDate, endDate, userContext);
@@ -115,7 +85,7 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       scheduleSource = result.source;
       console.log(`✅ Schedule generated with ${scheduleSource}`);
     } catch (err) {
-      console.error('❌ All AI services failed:', err.message);
+      console.error('❌ OpenRouter failed:', err.message);
       return res.status(500).json({ 
         message: `Failed to generate schedule: ${err.message}`,
         suggestion: 'Please check your API keys or try again later.'
@@ -222,7 +192,7 @@ router.post('/:id/mark', authenticateUser, requirePremium, async (req, res) => {
     } else if (status === 'skipped') {
       task.stats.skipped += 1;
       task.stats.currentStreak = 0; // streak broken
-      // Regenerate schedule via fallback
+      // Regenerate schedule (OpenRouter only)
       const ctxUser = await User.findById(req.user._id).lean();
       const userContext = {
         userId: String(ctxUser._id),

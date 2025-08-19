@@ -1,0 +1,285 @@
+import React, { useEffect, useRef, useState } from 'react';
+
+// AIChatPage.jsx
+// Requirements it satisfies:
+// - Voice button placed at bottom next to Send so user doesn't need to scroll up
+// - When a conversation reaches 10 user queries, show a modal asking to start a new chat
+//   and offer to download the chat before deletion
+// - Uses existing backend endpoints: GET /api/ai-chat/history, POST /api/ai-chat/general, DELETE /api/ai-chat/history
+// - Tailwind CSS classes used for quick styling (you can adapt to your CSS system)
+
+export default function AIChatPage({ authToken /* optional: string token for Authorization */ }) {
+  const [messages, setMessages] = useState([]); // {role: 'user'|'ai', content}
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [userQueryCount, setUserQueryCount] = useState(0);
+  const recognitionRef = useRef(null);
+  const [listening, setListening] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Utility: show ephemeral toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Fetch initial history (oldest first) and calculate userQueryCount
+  useEffect(() => {
+    let mounted = true;
+    setIsMounted(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/ai-chat/history?limit=100', {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          credentials: authToken ? 'omit' : 'include'
+        });
+        const data = await res.json();
+        if (mounted && data?.success) {
+          setMessages(data.history || []);
+          const userCount = (data.history || []).filter(m => m.role === 'user' || m.content).length; // approximate
+          setUserQueryCount(userCount);
+        }
+      } catch (e) {
+        console.error('history load failed', e);
+        setToast('Could not load chat history');
+      }
+    })();
+    return () => { mounted = false; setIsMounted(false); };
+  }, [authToken]);
+
+  // Setup Web Speech API recognition if available
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const rec = new SpeechRecognition();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (ev) => {
+      const text = ev.results[0][0].transcript;
+      setInput(prev => (prev ? prev + ' ' + text : text));
+      setListening(false);
+      try { rec.stop(); } catch(_){}
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = (e) => { console.error('Speech recognition error', e); setListening(false); setToast('Voice recognition error'); };
+    recognitionRef.current = rec;
+  }, []);
+
+  function toggleListen() {
+    const rec = recognitionRef.current;
+    if (!rec) {
+      setToast('Voice recognition not supported in this browser');
+      return;
+    }
+    if (listening) {
+      rec.stop();
+      setListening(false);
+    } else {
+      try {
+        rec.start();
+        setListening(true);
+      } catch (e) {
+        console.warn('Could not start recognition', e);
+        setToast('Could not start voice recognition');
+      }
+    }
+  }
+
+  async function handleSend(e) {
+    if (e) e.preventDefault();
+    const trimmed = (input || '').trim();
+    if (!trimmed) return;
+
+    // push user message locally for instant UX
+    const userMsg = { role: 'user', content: trimmed };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    // increment counter and check threshold
+    setUserQueryCount(prev => {
+      const next = prev + 1;
+      if (next >= 10) {
+        // show modal offering to start new chat
+        setTimeout(() => setShowModal(true), 250);
+      }
+      return next;
+    });
+
+    try {
+      const res = await fetch('/api/ai-chat/general', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify({ message: trimmed })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        const aiMsg = { role: 'ai', content: data.response };
+        setMessages(prev => [...prev, aiMsg]);
+      } else {
+        setMessages(prev => [...prev, { role: 'ai', content: data?.response || 'Sorry, something went wrong.' }]);
+      }
+    } catch (err) {
+      console.error('send failed', err);
+      setMessages(prev => [...prev, { role: 'ai', content: 'Network error: could not send message.' }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Download chat from backend (fresh copy) and then optionally delete
+  async function downloadChatAndMaybeDelete({ deleteAfter = false } = {}) {
+    try {
+      // get full history
+      const res = await fetch('/api/ai-chat/history?limit=1000', {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        credentials: authToken ? 'omit' : 'include'
+      });
+      const data = await res.json();
+      if (!data?.success) throw new Error('Could not fetch history');
+
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        count: data.history.length,
+        history: data.history
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-export-${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setToast('Chat downloaded');
+
+      if (deleteAfter) {
+        const del = await fetch('/api/ai-chat/history', {
+          method: 'DELETE',
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          credentials: authToken ? 'omit' : 'include'
+        });
+        const delData = await del.json();
+        if (delData?.success) {
+          setMessages([]);
+          setUserQueryCount(0);
+          setToast('Previous chat removed');
+        } else {
+          setToast('Could not delete chat');
+        }
+      }
+    } catch (e) {
+      console.error('download failed', e);
+      setToast('Failed to download chat');
+    }
+  }
+
+  async function startNewChat(deletePrevious = true) {
+    if (deletePrevious) {
+      try {
+        const del = await fetch('/api/ai-chat/history', { method: 'DELETE', headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined, credentials: authToken ? 'omit' : 'include' });
+        const delData = await del.json();
+        if (delData?.success) {
+          setMessages([]);
+          setUserQueryCount(0);
+          setToast('New chat started');
+          setShowModal(false);
+        } else {
+          setToast('Could not start new chat');
+        }
+      } catch (e) {
+        console.error('delete failed', e);
+        setToast('Could not start new chat');
+      }
+    } else {
+      // just clear local view, keep server history
+      setMessages([]);
+      setUserQueryCount(0);
+      setToast('New chat started (server history kept)');
+      setShowModal(false);
+    }
+  }
+
+  return (
+    
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white shadow-sm">
+        <h2 className="text-lg font-semibold">LifeBuddy AI Chat</h2>
+        <div className="space-x-2">
+          <button onClick={() => { setShowModal(true); }} className="px-3 py-1 rounded bg-orange-500 text-white">Start New Chat</button>
+        </div>
+      </div>
+      
+
+      {/* Conversation area */}
+      <div className="flex-1 overflow-auto p-4" id="chat-scrollable">
+        <div className="max-w-3xl mx-auto space-y-3">
+          {messages.map((m, idx) => (
+            <div key={idx} className={`p-3 rounded-lg ${m.role === 'user' ? 'bg-white self-end shadow' : 'bg-gray-100 shadow-sm'}`}>
+              <div className="whitespace-pre-wrap">{m.content}</div>
+            </div>
+          ))}
+          {loading && (
+            <div className="p-3 rounded-lg bg-gray-100 shadow-sm">AI is typing...</div>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed bottom input area (voice + input + send) */}
+      <form onSubmit={handleSend} className="w-full fixed bottom-4 left-0 px-4">
+        <div className="max-w-3xl mx-auto flex items-end gap-2">
+          {/* Voice button */}
+          <button type="button" onClick={toggleListen} className={`p-3 rounded-full shadow ${listening ? 'bg-red-500 text-white' : 'bg-white'}`} aria-label="toggle-voice">
+            {/* simple mic icon - replace with heroicons if available */}
+            {listening ? '🔴' : '🎤'}
+          </button>
+
+          {/* Text input */}
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            rows={1}
+            placeholder="Type a message or use voice..."
+            className="flex-1 resize-none p-3 rounded-lg border border-gray-200 shadow-sm"
+          />
+
+          {/* Send button */}
+          <button type="submit" disabled={loading} className="px-4 py-3 rounded-lg bg-green-600 text-white font-semibold shadow">
+            {loading ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      </form>
+
+      {/* Modal: prompt to start new chat and offer download */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <h3 className="text-lg font-bold mb-2">You've reached 10 queries</h3>
+            <p className="mb-4">Would you like to start a new chat? You can download the existing chat before it gets removed.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setShowModal(false); }} className="px-3 py-2 rounded border">Cancel</button>
+              <button onClick={() => downloadChatAndMaybeDelete({ deleteAfter: false })} className="px-3 py-2 rounded border">Download Only</button>
+              <button onClick={() => downloadChatAndMaybeDelete({ deleteAfter: true })} className="px-3 py-2 rounded bg-orange-500 text-white">Download & Start New</button>
+              <button onClick={() => startNewChat(true)} className="px-3 py-2 rounded bg-red-600 text-white">Start New (Delete)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Simple toast */}
+      {toast && (
+        <div className="fixed right-4 bottom-24 bg-black text-white px-4 py-2 rounded shadow z-50">{toast}</div>
+      )}
+    </div>
+  );
+}

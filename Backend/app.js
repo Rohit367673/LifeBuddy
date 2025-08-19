@@ -6,8 +6,18 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-// Set default environment variables if not provided
-process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+// Environment verification
+console.log('[ENV] NODE_ENV:', process.env.NODE_ENV);
+console.log('[ENV] OPENROUTER_API_KEY present:', !!process.env.OPENROUTER_API_KEY);
+console.log('[ENV] OPENROUTER_API_KEY prefix:', process.env.OPENROUTER_API_KEY ? process.env.OPENROUTER_API_KEY.substring(0,8) + '...' : 'Not set');
+console.log('[ENV] OPENROUTER_REFERRER:', process.env.OPENROUTER_REFERRER || 'Not set');
+console.log('[ENV] OPENROUTER_TITLE:', process.env.OPENROUTER_TITLE || 'Not set');
+console.log('[ENV] OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Not set');
+
+// Set default environment variables if not provided (do NOT set fake OpenRouter keys)
+if (!process.env.OPENROUTER_API_KEY) {
+  console.warn('[Startup] OPENROUTER_API_KEY is not set. AI features will fail with 401 until you add it to .env');
+}
 process.env.TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '6644184480:AAH1234567890abcdefghijklmnopqrstuvwxyz';
 process.env.WHATSAPP_SANDBOX_CODE = process.env.WHATSAPP_SANDBOX_CODE || 'GBmQD7SB';
 process.env.WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || 'your-whatsapp-phone-number-id';
@@ -28,6 +38,7 @@ const aiChatRoutes = require('./routes/aiChatRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const trialRoutes = require('./routes/trialRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
+const Activity = require('./models/Activity');
 
 const app = express();
 const PORT = process.env.PORT || 5001;

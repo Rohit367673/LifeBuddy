@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { authenticateUser: auth } = require('../middlewares/authMiddleware');
 const { requirePremium } = require('../middlewares/premiumMiddleware');
-const MistralService = require('../services/mistralService');
 const { generateMessageWithOpenRouter } = require('../services/openRouterService');
 const User = require('../models/User');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
@@ -104,25 +103,30 @@ router.post('/general', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    // Generate personalized response
-    const response = await MistralService.generatePersonalizedResponse(
-      user,
-      message,
-      userContext,
-      topic
-    );
+    // Generate personalized response with DeepSeek R1 via OpenRouter
+    const prompt = `You are LifeBuddy AI. Personalize your answer using the user's profile and recent interactions.
+User Profile: ${JSON.stringify(user)}
+Recent Interactions: ${JSON.stringify(userContext)}
+Topic: ${topic}
+User Message: ${message}
 
-    // Save chat message with 24-hour TTL
+Respond clearly, concisely, and helpfully. Provide step-by-step guidance if relevant.`;
+    const response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+
+    // Save chat messages with 24-hour TTL
     const startTime = Date.now();
+    // user message
+    await ChatMessage.create({ user: userId, role: 'user', content: message, topic, aiService: 'openrouter' });
+    // ai message
     await ChatMessage.create({
       user: userId,
-      content: message,
-      response,
+      role: 'ai',
+      content: response,
       topic,
-      aiService: 'mistral',
+      aiService: 'openrouter',
       metadata: {
         responseTime: Date.now() - startTime,
-        model: 'mistral'
+        model: 'deepseek/deepseek-r1:free'
       }
     });
 
@@ -136,7 +140,7 @@ router.post('/general', auth, async (req, res) => {
         topic,
         query: message,
         responseLength: response.length,
-        model: 'mistral'
+        model: 'deepseek/deepseek-r1:free'
       }
     });
 
@@ -205,19 +209,14 @@ router.post('/ask', auth, requirePremium, async (req, res) => {
     // Save user message to chat history (TTL 24h)
     await ChatMessage.create({ user: req.user.id, role: 'user', content: messageToSave, topic: 'general' });
 
-    // Prefer OpenRouter models with LifeBuddy system prompt; fallback to Mistral
+    // Use OpenRouter DeepSeek R1 exclusively
     let response = '';
     try {
       const prompt = `User: ${user?.displayName || 'friend'}\nSchedule: ${currentSchedule}\nRecent: ${JSON.stringify(recentInteractions)}\nQuestion: ${message}`;
       response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
     } catch (openRouterErr) {
-      console.warn('OpenRouter failed, trying Mistral fallback:', openRouterErr?.message || openRouterErr);
-      response = await MistralService.generateProductivityAdvice(
-        user, 
-        message, 
-        currentSchedule,
-        recentInteractions 
-      );
+      console.warn('OpenRouter failed:', openRouterErr?.message || openRouterErr);
+      response = 'Sorry, I could not generate a response right now. Please try again in a moment.';
     }
 
     // If response is empty, set a fallback
@@ -272,17 +271,15 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
       fullText = 'Sorry, I could not generate a response right now.';
     }
 
-    // Save chat message with 24-hour TTL
+    // Save chat messages with 24-hour TTL (role-based)
+    await ChatMessage.create({ user: req.user.id, role: 'user', content: message || "User message was empty", topic: 'general', aiService: 'openrouter' });
     await ChatMessage.create({
       user: req.user.id,
-      content: message || "User message was empty",
-      response: fullText,
+      role: 'ai',
+      content: fullText,
       topic: 'general',
       aiService: 'openrouter',
-      metadata: {
-        model: 'deepseek/deepseek-r1:free',
-        streaming: true
-      }
+      metadata: { model: 'deepseek/deepseek-r1:free', streaming: true }
     });
 
     const chunkSize = 96;
@@ -401,12 +398,13 @@ router.post('/coding', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    const response = await MistralService.generateCodingHelp(
-      user,
-      question,
-      codeContext,
-      userContext
-    );
+    const codingPrompt = `You are LifeBuddy AI coding assistant. Be precise and practical.
+User Profile: ${JSON.stringify(user)}
+Question: ${question}
+Code Context:\n${codeContext || '(none)'}
+
+Explain reasoning briefly, then provide steps and example code if useful.`;
+    const response = await generateMessageWithOpenRouter(codingPrompt, 800, 0.5, { model: 'deepseek/deepseek-r1:free' });
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -460,12 +458,13 @@ router.post('/fitness', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    const response = await MistralService.generateFitnessAdvice(
-      user,
-      question,
-      fitnessGoals,
-      userContext
-    );
+    const fitnessPrompt = `You are LifeBuddy AI fitness coach. Give safe, evidence-based advice.
+User Profile: ${JSON.stringify(user)}
+Goals: ${fitnessGoals || '(not provided)'}
+Question: ${question}
+
+Provide actionable steps, cautions, and a simple plan.`;
+    const response = await generateMessageWithOpenRouter(fitnessPrompt, 700, 0.7, { model: 'deepseek/deepseek-r1:free' });
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -519,12 +518,12 @@ router.post('/education', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    const response = await MistralService.generateEducationalContent(
-      user,
-      topic,
-      difficulty,
-      userContext
-    );
+    const educationPrompt = `You are LifeBuddy AI educator. Teach the topic clearly for a ${difficulty} learner.
+User Profile: ${JSON.stringify(user)}
+Topic: ${topic}
+
+Break it down into key points, examples/analogies, and resources.`;
+    const response = await generateMessageWithOpenRouter(educationPrompt, 800, 0.6, { model: 'deepseek/deepseek-r1:free' });
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -580,12 +579,13 @@ router.post('/productivity', auth, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    const response = await MistralService.generateProductivityAdvice(
-      user,
-      question,
-      currentSchedule,
-      userContext
-    );
+    const productivityPrompt = `You are LifeBuddy AI productivity coach.
+User Profile: ${JSON.stringify(user)}
+Current Schedule Context: ${currentSchedule || '(none)'}
+Question: ${question}
+
+Give concrete steps, prioritization tips, and time-block suggestions.`;
+    const response = await generateMessageWithOpenRouter(productivityPrompt, 700, 0.6, { model: 'deepseek/deepseek-r1:free' });
 
     // Log interaction
     await ScheduleInteraction.create({

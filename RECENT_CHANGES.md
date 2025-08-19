@@ -54,7 +54,7 @@ This document captures what changed and how the full ‘Premium AI Scheduling + 
 
 ## 6) Configuration
 Backend env:
-- OPENROUTER_API_KEY (required), OPENROUTER_MODEL (e.g., openai/gpt-oss-20b).
+- OPENROUTER_API_KEY (required), OPENROUTER_MODEL (default: deepseek/deepseek-r1:free).
 - OPENROUTER_REFERRER, OPENROUTER_TITLE (optional).
 - TELEGRAM_BOT_TOKEN, BACKEND_URL, JWT_SECRET.
 - OPENAI_API_KEY, OPENAI_BASE_MODEL (for OpenAI fine‑tune).
@@ -80,36 +80,35 @@ Frontend env:
 ## 10) Next
 - Frontend capture everywhere; admin training dashboard; per‑user adapter inference service; privacy/consent UI.
 
-## 11) Mistral AI Integration (Alternative to Fine-tuning)
+## 11) AI Integration Update (DeepSeek R1 via OpenRouter)
 
 ### Context-Based Personalization
-- **Mistral AI Service**: Integration with Mistral AI's hosted models for cost-effective AI responses
-- **Smart Prompt Engineering**: Dynamic prompts that include user profile, learning style, and interaction history
-- **Topic-Specific Specialization**: Dedicated AI assistants for coding, fitness, education, and productivity
+- **OpenRouter DeepSeek R1**: Exclusive provider for AI responses across chat and scheduling
+- **Smart Prompt Engineering**: Dynamic prompts include user profile, learning style, and interaction history
+- **Topic Specialization**: Dedicated flows for coding, fitness, education, and productivity
 
 ### User Profile Enhancement
-- **AI Profile Fields**: Added learning style, experience level, communication preferences, and goals
-- **Context-Aware Responses**: AI considers user's background and previous interactions
-- **Personalized Recommendations**: Tailored advice based on user's specific needs and preferences
+- **AI Profile Fields**: Learning style, experience level, communication prefs, and goals
+- **Context-Aware Responses**: Considers background and previous interactions
+- **Personalized Recommendations**: Tailored advice based on individual needs
 
 ### Frontend AI Chat Interface
-- **Topic Selection**: Choose between general, coding, fitness, education, and productivity
+- **Topic Selection**: General, coding, fitness, education, and productivity
 - **Real-time Chat**: Interactive chat interface with message history and user context
-- **Responsive Design**: Mobile-friendly chat interface with smooth animations
-- **Context Display**: Show user's AI profile and recent interaction history
+- **Responsive Design**: Mobile-friendly with smooth animations
+- **Context Display**: Shows AI profile and recent interaction history
 
 ### Backend Implementation
-- **MistralService**: Handles API calls to Mistral AI with personalized prompts
-- **AI Chat Routes**: Dedicated endpoints for different topic areas
+- **openRouterService**: Handles all OpenRouter API calls with DeepSeek R1
+- **AI Chat Routes**: All endpoints call OpenRouter with DeepSeek R1; no fallbacks
 - **Context Injection**: Automatically includes user profile and interaction history
-- **Interaction Logging**: Records all AI chat interactions for future personalization
+- **Interaction Logging**: Records chat interactions for personalization
 
 ### Environment Variables
-- **MISTRAL_API_KEY**: Your Mistral AI API key
-- **MISTRAL_MODEL**: Model to use (default: mistral-large-latest)
+- **OPENROUTER_API_KEY**: Your OpenRouter API key
+- **OPENROUTER_MODEL**: Defaults to deepseek/deepseek-r1:free
 
 ### Usage
-- Navigate to `/ai-chat` in the app
-- Select a topic area (coding, fitness, education, productivity, or general)
-- Chat with the AI and get personalized responses
-- AI learns from your interactions to provide better advice over time
+- Navigate to `/ai-chat`
+- Select a topic (coding, fitness, education, productivity, or general)
+- Chat with LifeBuddy AI and receive personalized responses
