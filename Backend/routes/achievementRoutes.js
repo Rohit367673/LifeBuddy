@@ -236,10 +236,15 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
           earnedAt: existing.earnedAt
         });
       } else {
+        const userStats = await User.getUserStats(req.user._id);
+        const currentProgress = Achievement.getCurrentProgress(achievement.criteria, userStats);
+        const targetProgress = Achievement.getTargetProgress(achievement.criteria);
+        
         progressData.push({
           ...achievement,
-          progress: { current: 0, target: achievement.criteria[Object.keys(achievement.criteria)[0]] || 1 },
-          isEarned: false
+          progress: { current: currentProgress, target: targetProgress },
+          isEarned: currentProgress >= targetProgress,
+          earnedAt: null
         });
       }
     }
@@ -247,6 +252,44 @@ router.get('/progress/overview', authenticateUser, async (req, res) => {
     res.json(progressData);
   } catch (error) {
     console.error('Error fetching achievement progress:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.get('/progress', authenticateUser, async (req, res) => {
+  try {
+    const userAchievements = await Achievement.find({ user: req.user._id });
+    const earnedTypes = userAchievements.map(a => a.type);
+    const availableAchievements = Achievement.getAvailableAchievements();
+    const progressData = [];
+
+    for (const achievement of availableAchievements) {
+      const existing = userAchievements.find(a => a.type === achievement.type);
+      if (existing) {
+        progressData.push({
+          type: achievement.type,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          progress: existing.progress,
+          earned: existing.earned,
+          earnedDate: existing.earnedDate
+        });
+      } else {
+        progressData.push({
+          type: achievement.type,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          progress: { current: 0, target: achievement.target },
+          earned: false
+        });
+      }
+    }
+
+    res.json(progressData);
+  } catch (error) {
+    console.error('Error fetching achievement progress overview:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

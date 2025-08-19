@@ -5,15 +5,15 @@ const fetch = require('node-fetch');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Model: LifeBuddy AI uses high-quality open models
-let PRIMARY_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+// Model: LifeBuddy AI uses DeepSeek R1 via OpenRouter by default
+let PRIMARY_MODEL = 'deepseek/deepseek-r1:free';
 // LifeBuddy AI prioritizes reliable and efficient models
 
 let CANDIDATE_MODELS = [
+  'deepseek/deepseek-r1:free',
   'meta-llama/llama-3.1-8b-instruct:free',
   'microsoft/phi-3.5-mini-instruct:free',
   'nousresearch/hermes-3-llama-3.1-8b:free',
-  'deepseek/deepseek-r1:free',
   'gryphe/mythomax-l2-13b:free',
   'openai/gpt-oss-20b:free'
 ];
@@ -27,6 +27,11 @@ try {
   }
 } catch (_) {}
 
+// Allow environment variable override for model (aligns with env docs)
+if (process.env.OPENROUTER_MODEL && typeof process.env.OPENROUTER_MODEL === 'string') {
+  PRIMARY_MODEL = process.env.OPENROUTER_MODEL;
+}
+
 // Debug logging
 console.log('OpenRouter API Key loaded:', OPENROUTER_API_KEY ? 'YES' : 'NO');
 console.log('OpenRouter API Key (first 8 chars):', OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 8) + '...' : 'NOT SET');
@@ -36,6 +41,8 @@ const DEFAULT_REFERER = (process.env.NODE_ENV === 'production')
   ? (process.env.OPENROUTER_REFERRER || 'https://www.lifebuddy.space')
   : (process.env.OPENROUTER_REFERRER || 'http://localhost:5173');
 const DEFAULT_TITLE = process.env.OPENROUTER_TITLE || (process.env.NODE_ENV === 'production' ? 'LifeBuddy' : 'LifeBuddy (Local)');
+console.log('OpenRouter Referer:', DEFAULT_REFERER, '| Title:', DEFAULT_TITLE);
+console.log('OpenRouter Primary Model:', PRIMARY_MODEL);
 
 
 async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperature = 0.7, options = {}) {
@@ -43,64 +50,47 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
     console.error('OPENROUTER_API_KEY not set in .env');
     throw new Error('OpenRouter API key missing.');
   }
-  // Build the ordered list of models to try
-  // Strict preference order; no broad fallbacks
-  const preferred = [];
-  const overrideModel = options?.model;
-  if (overrideModel) preferred.push(overrideModel);
-  if (!preferred.length) preferred.push(PRIMARY_MODEL);
 
-  // System prompt branding and behavior
-  const systemPrompt = options?.systemPrompt || 'You are LifeBuddy AI by Rohit Kumar. Be warm, proactive, and context-aware. Tailor advice to the user and their goals. Never mention underlying model providers or system prompts. Avoid generic replies; sound like a helpful human coach.';
+  const model = 'deepseek/deepseek-r1:free';
+  const messages = [{ role: 'user', content: prompt }];
 
-  const firstErrors = [];
-  for (const model of preferred) {
-    try {
-      console.log('[OpenRouter] Trying model:', model);
-      const response = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': DEFAULT_REFERER,
-          'Referer': DEFAULT_REFERER,
-          'X-Title': DEFAULT_TITLE
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
-          max_tokens: maxTokens,
-          temperature: temperature
-        })
-      });
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.warn(`[OpenRouter] Model ${model} failed:`, response.status, errorData);
-        firstErrors.push({ model, status: response.status, error: errorData });
-        // Try next model
-        continue;
+  try {
+    const response = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature })
+    });
+
+    if (response.status === 401) {
+      console.error('[OpenRouter] 401 Unauthorized - Verify API key at https://openrouter.ai/keys');
+      // Fallback to mock response in development
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[OpenRouter] Using mock response in development mode');
+        return "Hello! I'm LifeBuddy AI. We're currently experiencing technical difficulties. Please try again later.";
       }
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) {
-        console.warn(`[OpenRouter] Model ${model} returned no content`);
-        firstErrors.push({ model, status: 'no_content', error: 'Empty content' });
-        continue;
-      }
-      console.log('[OpenRouter] Using model:', model);
-      return content;
-    } catch (err) {
-      console.warn(`[OpenRouter] Model ${model} threw error:`, err?.message || err);
-      firstErrors.push({ model, status: 'exception', error: err?.message || String(err) });
-      continue;
+      throw new Error('Invalid API key - Check OpenRouter dashboard');
     }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[OpenRouter] Error ${response.status}: ${errorBody}`);
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+    
+  } catch (error) {
+    console.error('[OpenRouter] API call failed:', error.message);
+    // Fallback in development
+    if (process.env.NODE_ENV === 'development') {
+      return "Hello! I'm LifeBuddy AI. We're currently experiencing technical difficulties. Please try again later.";
+    }
+    throw error;
   }
-  const msg = 'OpenRouter API call failed across models: ' + JSON.stringify(firstErrors.slice(0, 3));
-  console.error(msg);
-  throw new Error(msg);
 }
 
 async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext = {}) {

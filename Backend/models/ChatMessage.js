@@ -23,8 +23,8 @@ const chatMessageSchema = new mongoose.Schema({
   },
   aiService: {
     type: String,
-    enum: ['mistral', 'openrouter'],
-    default: 'mistral'
+    enum: ['openrouter'],
+    default: 'openrouter'
   },
   metadata: {
     responseTime: Number,

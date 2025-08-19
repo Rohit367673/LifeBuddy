@@ -7,6 +7,7 @@ const Achievement = require('../models/Achievement');
 const jwt = require('jsonwebtoken');
 const { MessagingService } = require('../services/messagingService');
 const { exportUserTrainingData, fineTuneUserModel, exportUserSFT, runLocalLoraTraining } = require('../services/trainingService');
+const Activity = require('../models/Activity'); // Fixed import path
 
 const router = express.Router();
 
@@ -24,17 +25,31 @@ router.get('/profile', authenticateUser, async (req, res) => {
     const achievements = await Achievement.find({ user: req.user._id }).sort({ createdAt: -1 });
     const earnedBadges = achievements.map(achievement => achievement.badgeType).filter(Boolean);
     
-    // Get streak information
+    // Get streak information (prefer precomputed stats on user for accuracy)
     const streak = await User.getUserStreak(req.user._id);
+    const currentStreak = (user?.stats?.taskStreak ?? streak.currentStreak) || 0;
+    const longestStreak = (user?.stats?.longestStreak ?? streak.longestStreak) || 0;
+
+    // Build task completion dates for monthly calendar and activity
+    const taskHistory = (user?.stats?.taskCompletionHistory || []).map(d => new Date(d));
+    const dayCountsMap = {};
+    for (const d of taskHistory) {
+      const ds = new Date(d).toISOString().slice(0, 10);
+      dayCountsMap[ds] = (dayCountsMap[ds] || 0) + 1;
+    }
+    const completedTaskDates = Object.keys(dayCountsMap);
+    const completedTaskDatesDetailed = completedTaskDates.map(date => ({ date, completedCount: dayCountsMap[date] }));
     
     res.json({
       ...user.toObject(),
       stats,
       badges: earnedBadges,
-      currentStreak: streak.currentStreak || 0,
-      longestStreak: streak.longestStreak || 0,
+      currentStreak,
+      longestStreak,
       totalTasks: stats.totalTasks || 0,
-      completedTasks: stats.completedTasks || 0
+      completedTasks: stats.completedTasks || 0,
+      completedTaskDates,
+      completedTaskDatesDetailed
     });
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -147,7 +162,7 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
     // Get recent events
     const recentEvents = await Event.find({ 
       user: userId, 
-      isArchived: false 
+      status: { $ne: 'archived' } 
     })
       .sort('-createdAt')
       .limit(5)
@@ -194,13 +209,12 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
     // Calculate quick stats
     const totalEvents = await Event.countDocuments({ 
       user: userId, 
-      isArchived: false 
+      status: { $ne: 'archived' } 
     });
     
     const activeEvents = await Event.countDocuments({ 
       user: userId, 
-      status: { $in: ['planning', 'in-progress'] },
-      isArchived: false 
+      status: { $in: ['planning', 'in-progress'] }
     });
 
     const totalTasks = await Task.countDocuments({ user: userId });
@@ -242,65 +256,110 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
 router.get('/stats', authenticateUser, async (req, res) => {
   try {
     const userId = req.user._id;
-    const { period = '30' } = req.query; // days
+    const { period } = req.query;
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
+    // Handle previous-period stats specifically requested by frontend
+    if (period === 'prev') {
+      // Define previous 7-day window (excluding current 7 days)
+      const endOfPrevWindow = new Date();
+      endOfPrevWindow.setHours(0, 0, 0, 0);
+      const startOfCurrentWindow = new Date(endOfPrevWindow);
+      startOfCurrentWindow.setDate(startOfCurrentWindow.getDate() - 7);
+      const startOfPrevWindow = new Date(startOfCurrentWindow);
+      startOfPrevWindow.setDate(startOfPrevWindow.getDate() - 7);
 
-    // Get events created in period
-    const eventsInPeriod = await Event.find({
-      user: userId,
-      createdAt: { $gte: startDate },
-      isArchived: false
-    }).lean();
+      const [completedTasksPrev, totalPointsPrevAgg] = await Promise.all([
+        Task.countDocuments({
+          user: userId,
+          status: 'completed',
+          completedAt: { $gte: startOfPrevWindow, $lt: startOfCurrentWindow }
+        }),
+        Achievement.aggregate([
+          { $match: { user: userId, createdAt: { $gte: startOfPrevWindow, $lt: startOfCurrentWindow } } },
+          { $group: { _id: null, total: { $sum: { $ifNull: ['$points', 0] } } } }
+        ])
+      ]);
 
-    // Get tasks completed in period
-    const completedTasksInPeriod = await Task.find({
-      user: userId,
-      status: 'completed',
-      completedAt: { $gte: startDate }
-    }).lean();
+      const totalPointsPrev = totalPointsPrevAgg?.[0]?.total || 0;
+      return res.json({ completedTasks: completedTasksPrev, totalPoints: totalPointsPrev });
+    }
 
-    // Get tasks by category
-    const tasksByCategory = await Task.aggregate([
-      { $match: { user: userId } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // Default: return overall dashboard stats expected by frontend
+    const now = new Date();
+    const [
+      totalEvents,
+      activeEvents,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      overdueTasks,
+      userDoc,
+      totalPointsAgg
+    ] = await Promise.all([
+      Event.countDocuments({ user: userId, status: { $ne: 'archived' } }),
+      Event.countDocuments({ user: userId, status: { $in: ['planning', 'in-progress'] } }),
+      Task.countDocuments({ user: userId }),
+      Task.countDocuments({ user: userId, status: 'completed' }),
+      Task.countDocuments({ user: userId, status: { $ne: 'completed' } }),
+      Task.countDocuments({ user: userId, status: { $ne: 'completed' }, dueDate: { $lt: now } }),
+      User.findById(userId).select('stats.moodStreak'),
+      Achievement.aggregate([
+        { $match: { user: userId } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$points', 0] } } } }
+      ])
     ]);
 
-    // Get events by type
-    const eventsByType = await Event.aggregate([
-      { $match: { user: userId, isArchived: false } },
-      { $group: { _id: '$type', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
+    const totalPoints = totalPointsAgg?.[0]?.total || 0;
+    const moodStreak = userDoc?.stats?.moodStreak || 0;
 
-    // Calculate productivity trends
-    const productivityData = [];
-    for (let i = parseInt(period) - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
+    // Optional: productivity data (daily completed tasks) for last N days
+    let productivityData;
+    const periodNum = parseInt(period, 10);
+    if (!Number.isNaN(periodNum) && periodNum > 0) {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - (periodNum - 1));
 
-      const tasksCompleted = completedTasksInPeriod.filter(task => {
-        const taskDate = new Date(task.completedAt);
-        return taskDate >= date && taskDate < nextDate;
-      }).length;
+      const byDay = await Task.aggregate([
+        { 
+          $match: { 
+            user: userId, 
+            status: 'completed', 
+            completedAt: { $gte: start } 
+          } 
+        },
+        { 
+          $project: { 
+            day: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } } 
+          } 
+        },
+        { $group: { _id: '$day', count: { $sum: 1 } } }
+      ]);
 
-      productivityData.push({
-        date: date.toISOString().split('T')[0],
-        tasksCompleted
-      });
+      const countMap = {};
+      for (const row of byDay) countMap[row._id] = row.count;
+
+      const days = [];
+      for (let i = periodNum - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - i);
+        const ds = d.toISOString().slice(0, 10);
+        days.push({ date: ds, completed: countMap[ds] || 0 });
+      }
+      productivityData = days;
     }
 
     res.json({
-      period: parseInt(period),
-      eventsInPeriod: eventsInPeriod.length,
-      completedTasksInPeriod: completedTasksInPeriod.length,
-      tasksByCategory,
-      eventsByType,
-      productivityData
+      totalEvents,
+      activeEvents,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      overdueTasks,
+      moodStreak,
+      totalPoints,
+      ...(productivityData ? { productivityData } : {})
     });
 
   } catch (error) {
@@ -688,6 +747,40 @@ router.post('/test-all-messaging', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Multi-platform test error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Add new endpoints
+router.get('/activity', authenticateUser, async (req, res) => {
+  try {
+    const { limit = 5 } = req.query;
+    const activities = await Activity.find({ user: req.user._id })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit));
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.get('/streak', authenticateUser, async (req, res) => {
+  try {
+    const result = await User.getUserStreak(req.user._id);
+    const current = result?.currentStreak || 0;
+    const longest = result?.longestStreak || 0;
+    res.json({ current, longest, type: 'tasks' });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.get('/productivity-score', authenticateUser, async (req, res) => {
+  try {
+    // Placeholder: return a random score for now
+    const score = Math.floor(Math.random() * 100);
+    res.json({ score });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 

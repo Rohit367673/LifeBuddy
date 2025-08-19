@@ -108,7 +108,10 @@ const Dashboard = () => {
       const token = await getFirebaseToken();
       console.log('🔑 Token available:', !!token);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/stats`, {
+      const url = `${import.meta.env.VITE_API_URL}/api/users/stats`;
+      console.log('📊 Fetching stats from:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -121,7 +124,8 @@ const Dashboard = () => {
         console.log('📊 Stats loaded:', data);
         setStats(data);
       } else {
-        console.error('❌ Stats API error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Stats API error:', response.status, response.statusText, errorText);
       }
     } catch (error) {
       console.error('❌ Error loading stats:', error);
