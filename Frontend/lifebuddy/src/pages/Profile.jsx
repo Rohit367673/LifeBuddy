@@ -92,6 +92,7 @@ const Profile = () => {
   const [personalQuote, setPersonalQuote] = useState('');
   const [achievementStats, setAchievementStats] = useState({});
   const [productivityData, setProductivityData] = useState([]);
+  const [productivityScore, setProductivityScore] = useState(0);
   const [loginHistory, setLoginHistory] = useState([]);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
@@ -255,6 +256,7 @@ const Profile = () => {
     });
     loadAchievements();
     loadProductivityData();
+    loadProductivityScore();
     loadLoginHistory();
     loadCalendarStatus();
 
@@ -366,6 +368,28 @@ const Profile = () => {
     } catch (error) {
       console.error('Error loading productivity data:', error);
     }
+  };
+
+  const loadProductivityScore = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/productivity-score`, {
+        headers: {
+          'Authorization': `Bearer ${await getFirebaseToken()}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProductivityScore(data.score || 0);
+      }
+    } catch (error) {
+      console.error('Error loading productivity score:', error);
+    }
+  };
+
+  const getProductivityColor = (score) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const loadLoginHistory = async () => {
@@ -887,6 +911,16 @@ const Profile = () => {
                 <div className="text-center">
                   <div className="text-xl font-bold text-green-500">{completionRate}%</div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">Completion Rate</div>
+                </div>
+              </div>
+              {/* Productivity Score */}
+              <div className="mt-2">
+                <div className="text-center">
+                  <div className={`text-xl font-bold ${getProductivityColor(productivityScore)}`}>{productivityScore}%</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">Productivity Score</div>
+                </div>
+                <div className="mt-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full" style={{ width: `${productivityScore}%` }}></div>
                 </div>
               </div>
               {/* Achievement Stats */}

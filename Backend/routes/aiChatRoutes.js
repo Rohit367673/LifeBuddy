@@ -78,7 +78,7 @@ function requirePremiumLegacy(req, res, next) {
  * POST /api/ai-chat/general
  * General AI chat with personalization
  */
-router.post('/general', auth, async (req, res) => {
+router.post('/general', auth, requirePremium, async (req, res) => {
   try {
     const { message, topic = 'general' } = req.body;
     const userId = req.user.id;
@@ -164,7 +164,7 @@ Respond clearly, concisely, and helpfully. Provide step-by-step guidance if rele
  * GET /api/ai-chat/schedule
  * Fetch current premium schedule for the user (for AI context)
  */
-router.get('/schedule', auth, async (req, res) => {
+router.get('/schedule', auth, requirePremium, async (req, res) => {
   try {
     const task = await PremiumTask.findOne({ user: req.user.id }).sort({ createdAt: -1 });
     if (!task) return res.status(404).json({ success: false, message: 'No schedule found' });
@@ -284,16 +284,33 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
 
     const chunkSize = 96;
     let index = 0;
+    const startTs = Date.now();
+    const maxMs = 30000; // 30s safety timeout
+    let ended = false;
+    const endStream = () => {
+      if (ended) return;
+      ended = true;
+      try { res.write('\n'); } catch (_) {}
+      try { res.end(); } catch (_) {}
+    };
     const timer = setInterval(() => {
       if (index >= fullText.length) {
         clearInterval(timer);
-        try { res.write('\n'); res.end(); } catch (_) {}
+        endStream();
+        return;
+      }
+      if (Date.now() - startTs > maxMs) {
+        // Guard against long-running steps
+        clearInterval(timer);
+        endStream();
         return;
       }
       const chunk = fullText.slice(index, index + chunkSize);
       index += chunkSize;
-      try { res.write(chunk); } catch (e) { clearInterval(timer); try { res.end(); } catch (_) {} }
+      try { res.write(chunk); } catch (e) { clearInterval(timer); endStream(); }
     }, 25);
+    // Ensure we clean up if client disconnects
+    try { res.on('close', () => { try { clearInterval(timer); } catch (_) {} endStream(); }); } catch (_) {}
   } catch (e) {
     console.error('AI stream error:', e);
     if (!res.headersSent) { return res.status(500).json({ success: false, message: e.message }); }
@@ -380,7 +397,7 @@ router.post('/ai-name', auth, requirePremium, async (req, res) => {
  * POST /api/ai-chat/coding
  * Coding-specific AI help
  */
-router.post('/coding', auth, async (req, res) => {
+router.post('/coding', auth, requirePremium, async (req, res) => {
   try {
     const { question, codeContext = '' } = req.body;
     if (!question) return res.status(400).json({ success: false, message: 'question is required' });
@@ -440,7 +457,7 @@ Explain reasoning briefly, then provide steps and example code if useful.`;
  * POST /api/ai-chat/fitness
  * Fitness-specific AI advice
  */
-router.post('/fitness', auth, async (req, res) => {
+router.post('/fitness', auth, requirePremium, async (req, res) => {
   try {
     const { question, fitnessGoals = '' } = req.body;
     if (!question) return res.status(400).json({ success: false, message: 'question is required' });
@@ -500,7 +517,7 @@ Provide actionable steps, cautions, and a simple plan.`;
  * POST /api/ai-chat/education
  * Education-specific AI content
  */
-router.post('/education', auth, async (req, res) => {
+router.post('/education', auth, requirePremium, async (req, res) => {
   try {
     const { topic, difficulty = 'beginner' } = req.body;
     if (!topic) return res.status(400).json({ success: false, message: 'topic is required' });
@@ -561,7 +578,7 @@ Break it down into key points, examples/analogies, and resources.`;
  * POST /api/ai-chat/productivity
  * Productivity-specific AI advice
  */
-router.post('/productivity', auth, async (req, res) => {
+router.post('/productivity', auth, requirePremium, async (req, res) => {
   try {
     const { question, currentSchedule = '' } = req.body;
     if (!question) return res.status(400).json({ success: false, message: 'question is required' });

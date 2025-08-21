@@ -2,14 +2,13 @@ const express = require('express');
 const router = express.Router();
 const PremiumTask = require('../models/PremiumTask');
 const { authenticateUser } = require('../middlewares/authMiddleware');
-const { checkPremiumFeature } = require('../middlewares/premiumMiddleware');
+const { requirePremium } = require('../middlewares/premiumMiddleware');
 const User = require('../models/User');
 const { MessagingService } = require('../services/messagingService');
 const { generateScheduleWithOpenRouter } = require('../services/openRouterService');
 const ScheduleInteraction = require('../models/ScheduleInteraction');
 
-// Use checkPremiumFeature('premiumMotivationalMessages') as requirePremium
-const requirePremium = checkPremiumFeature('premiumMotivationalMessages');
+// Use global requirePremium middleware (premium plan, active trial, or admin bypass)
 
 // Send daily task notification via user's preferred platform
 async function sendDailyTaskNotification(userId, task, dayNumber) {

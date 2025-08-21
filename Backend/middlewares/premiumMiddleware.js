@@ -1,5 +1,20 @@
 const User = require('../models/User');
 
+// Admin helpers
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'rohit367673@gmail.com')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdmin = (user) => {
+  try {
+    const email = user?.email?.toLowerCase();
+    return !!email && ADMIN_EMAILS.includes(email);
+  } catch (_) {
+    return false;
+  }
+};
+
 // Check if user has premium feature
 const checkPremiumFeature = (feature) => {
   return async (req, res, next) => {
@@ -106,7 +121,10 @@ const checkTrialStatus = async (req, res, next) => {
           profileInsights: false,
           fullCalendarSync: false,
           adFree: false,
-          exportablePDFs: false
+          exportablePDFs: false,
+          aiInsights: false,
+          prioritySupport: false,
+          advancedAnalytics: false
         };
         await user.save();
       }
@@ -123,6 +141,7 @@ const checkTrialStatus = async (req, res, next) => {
 const requirePremium = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
+    if (isAdmin(user)) return next();
     const plan = user?.subscription?.plan;
     const status = user?.subscription?.status;
     const isPremium = plan && plan !== 'free';
@@ -141,6 +160,6 @@ module.exports = {
 
   checkTrialStatus,
 
-  requirePremium
-
+  requirePremium,
+  isAdmin
 }; 

@@ -20,9 +20,7 @@ import {
   UserGroupIcon,
   DocumentTextIcon,
   BellIcon,
-  PlayCircleIcon,
-  ShareIcon,
-  ArrowTopRightOnSquareIcon
+  PlayCircleIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useRef } from 'react';
@@ -42,6 +40,11 @@ const Premium = () => {
   const [showTrialModal, setShowTrialModal] = useState(false);
   const pricingRef = useRef(null);
   const featuresRef = useRef(null);
+  const [watchedAd, setWatchedAd] = useState(false);
+  const [reward, setReward] = useState({ sessionId: '', status: 'idle' });
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const IS_PROD = import.meta.env.MODE === 'production';
 
   useEffect(() => {
     const loadPlans = async () => {
@@ -58,9 +61,40 @@ const Premium = () => {
     }
   }, []);
 
+  // Load Google Publisher Tag (GPT) for Rewarded Ads in production
+  useEffect(() => {
+    if (!IS_PROD) return;
+    if (window.googletag && window.googletag.apiReady) return;
+    window.googletag = window.googletag || { cmd: [] };
+    const scriptId = 'gpt-js';
+    if (!document.getElementById(scriptId)) {
+      const g = document.createElement('script');
+      g.id = scriptId;
+      g.async = true;
+      g.src = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
+      document.head.appendChild(g);
+    }
+  }, [IS_PROD]);
+
+  // Load trial progress
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/progress`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setWatchedAd(!!data?.trialTasks?.watchedAd);
+        }
+      } catch {}
+    })();
+  }, [token]);
+
   const handleStartTrial = async () => {
     setLoading(true);
-    const success = await startTrial();
+    const success = await startTrial({ requireTasks: true });
     setLoading(false);
     if (success) {
       setShowTrialModal(false);
@@ -91,13 +125,80 @@ const Premium = () => {
 
   const callTrialTask = async (path, successMsg) => {
     try {
-      const resp = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/${path}`, {
+      const resp = await fetch(`${API_BASE}/api/subscriptions/${path}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await resp.json();
-      if (resp.ok) toast.success(successMsg);
+      if (resp.ok) {
+        toast.success(successMsg);
+        if (path === 'trial-tasks/watch-ad') setWatchedAd(true);
+      }
       else toast.error(data.message || 'Failed');
     } catch (_) { toast.error('Failed'); }
+  };
+
+  // Start rewarded ad session and poll for reward (production)
+  const startRewarded = async () => {
+    try {
+      setReward({ sessionId: '', status: 'starting' });
+      const s = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!s.ok) throw new Error('Failed to start session');
+      const { sessionId } = await s.json();
+      setReward({ sessionId, status: 'pending' });
+      // Show a GPT Rewarded ad and pass sessionId for SSV correlation
+      try {
+        window.googletag = window.googletag || { cmd: [] };
+        window.googletag.cmd.push(() => {
+          const adUnitPath = import.meta.env.VITE_GAM_REWARDED_AD_UNIT; // e.g. '/1234567/rewarded_web'
+          if (!adUnitPath) {
+            console.warn('VITE_GAM_REWARDED_AD_UNIT not set. Skipping GPT rewarded request.');
+            return;
+          }
+          const slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
+          if (!slot) {
+            console.warn('Failed to define rewarded slot');
+            return;
+          }
+          slot.addService(googletag.pubads());
+          try { googletag.pubads().setPublisherProvidedId(sessionId); } catch {}
+          try { slot.setTargeting('session_id', sessionId); } catch {}
+          googletag.pubads().addEventListener('rewardedSlotReady', (event) => {
+            try { event.makeRewardedVisible(); } catch {}
+          });
+          googletag.enableServices();
+          googletag.display(slot);
+        });
+      } catch (e) {
+        console.warn('GPT rewarded error', e);
+      }
+
+      let attempts = 0;
+      const timer = setInterval(async () => {
+        attempts++;
+        try {
+          const r = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/status/${sessionId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (!r.ok) return;
+          const { status } = await r.json();
+          if (status === 'rewarded') {
+            clearInterval(timer);
+            setReward((prev) => ({ ...prev, status: 'rewarded' }));
+            setWatchedAd(true);
+            toast.success('Ad watched ✓');
+          }
+        } catch {}
+        if (attempts > 120) {
+          clearInterval(timer);
+          setReward((r) => ({ ...r, status: 'timeout' }));
+        }
+      }, 2000);
+    } catch {
+      setReward({ sessionId: '', status: 'error' });
+    }
   };
 
   const handleSubscribe = async (plan) => {
@@ -340,31 +441,27 @@ const Premium = () => {
       <div id="trial" className="py-12 bg-white dark:bg-gray-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Unlock 7‑day Premium Trial</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">Complete these quick tasks once and enjoy full access for a week.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <p className="text-gray-600 dark:text-gray-300 mb-6">Watch one ad to enjoy full access for a week.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-              <div className="font-semibold mb-1">Watch an ad</div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Short video to support LifeBuddy.</p>
-              <button onClick={() => callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2">
-                <PlayCircleIcon className="w-4 h-4"/> Mark as watched
-              </button>
-            </div>
-            <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-              <div className="font-semibold mb-1">Follow on Instagram</div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Follow @Rohitkumar324 and come back.</p>
-              <div className="flex gap-2">
-                <a href="https://instagram.com/Rohitkumar324" target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg border border-slate-300 flex items-center gap-2">
-                  <ArrowTopRightOnSquareIcon className="w-4 h-4"/> Open Instagram
-                </a>
-                <button onClick={() => callTrialTask('trial-tasks/follow-instagram', 'Followed ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white">I followed</button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold mb-1">Watch an ad</div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Short video to support LifeBuddy.</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded ${watchedAd ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>{watchedAd ? 'Done' : 'Pending'}</span>
               </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-              <div className="font-semibold mb-1">Share with 10 friends</div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Tell your friends about LifeBuddy.</p>
-              <button onClick={() => callTrialTask('trial-tasks/share', 'Thanks for sharing!')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2">
-                <ShareIcon className="w-4 h-4"/> Mark as shared
-              </button>
+              <div className="mt-3 flex justify-end">
+                {IS_PROD ? (
+                  <button disabled={watchedAd || reward.status==='starting' || reward.status==='pending'} onClick={startRewarded} className="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
+                    {reward.status==='rewarded' ? 'Rewarded ✓' : 'Watch rewarded ad'}
+                  </button>
+                ) : (
+                  <button disabled={watchedAd} onClick={() => callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50">
+                    <PlayCircleIcon className="w-4 h-4"/> I watched the ad
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="mt-4">
