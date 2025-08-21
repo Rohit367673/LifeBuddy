@@ -45,9 +45,11 @@ export const PremiumProvider = ({ children }) => {
   };
 
   // Start free trial
-  const startTrial = async () => {
+  const startTrial = async (options = {}) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/trial`, {
+      const base = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}`;
+      const qs = options.requireTasks ? '?requireTasks=true' : '';
+      const response = await fetch(`${base}/api/subscriptions/trial${qs}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -59,6 +61,8 @@ export const PremiumProvider = ({ children }) => {
         const data = await response.json();
         setSubscription(prev => ({ ...prev, ...data }));
         setFeatures(data.features);
+        // Refresh server state to ensure isPremium flips everywhere
+        fetchSubscriptionStatus();
         toast.success('Free trial started! Enjoy premium features for 7 days.');
         return true;
       } else {
@@ -135,6 +139,15 @@ export const PremiumProvider = ({ children }) => {
     // Premium users have all features
     return subscription.plan === 'monthly' || subscription.plan === 'yearly' || subscription.status === 'trial';
   };
+
+  // Derived flag for easy premium checks (monthly/yearly plan or active trial)
+  const isPremium = !!(
+    subscription && (
+      subscription.plan === 'monthly' ||
+      subscription.plan === 'yearly' ||
+      subscription.status === 'trial'
+    )
+  );
 
   // Check usage limits
   const checkUsageLimit = (limitType) => {
@@ -284,6 +297,7 @@ export const PremiumProvider = ({ children }) => {
     features,
     usage,
     loading,
+    isPremium,
     hasFeature,
     checkUsageLimit,
     showUpgradePrompt,

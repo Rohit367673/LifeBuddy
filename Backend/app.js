@@ -29,6 +29,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const userRoutes = require('./routes/userRoutes');
 const moodRoutes = require('./routes/moodRoutes');
 const achievementRoutes = require('./routes/achievementRoutes');
+const referralRoutes = require('./routes/referralRoutes');
 const motivationalRoutes = require('./routes/motivationalRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
@@ -39,6 +40,9 @@ const couponRoutes = require('./routes/couponRoutes');
 const trialRoutes = require('./routes/trialRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
 const Activity = require('./models/Activity');
+const ReferralCode = require('./models/ReferralCode');
+const ReferralHit = require('./models/ReferralHit');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -107,10 +111,36 @@ app.use('/api/ai-chat', aiChatRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/trial', trialRoutes);
 app.use('/api/admin-coupons', adminCouponRoutes);
+app.use('/api/referrals', referralRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'LifeBuddy API is running' });
+});
+
+// Referral redirect endpoint: /r/:code -> logs unique hit per IP (24h) and redirects to frontend
+app.get('/r/:code', async (req, res) => {
+  const code = req.params.code;
+  const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
+  try {
+    const rc = await ReferralCode.findOne({ code });
+    if (!rc) return res.redirect(frontend);
+
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0] || req.ip || 'unknown';
+    const ua = req.get('user-agent') || '';
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existing = await ReferralHit.findOne({ code, ip, createdAt: { $gte: since } });
+    if (!existing) {
+      await ReferralHit.create({ code, ip, ua });
+      await User.findByIdAndUpdate(rc.user, {
+        $inc: { 'trialTasks.sharedReferrals': 1 },
+        $set: { 'trialTasks.lastUpdated': new Date() }
+      });
+    }
+  } catch (err) {
+    console.warn('Referral redirect error:', err.message);
+  }
+  return res.redirect(frontend + '/?ref=' + encodeURIComponent(code));
 });
 
 // Error handling middleware

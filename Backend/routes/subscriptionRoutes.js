@@ -5,6 +5,7 @@ const { checkTrialStatus } = require('../middlewares/premiumMiddleware');
 const Coupon = require('../models/Coupon');
 
 const router = express.Router();
+const RewardedSession = require('../models/RewardedSession');
 
 // Get subscription status
 router.get('/status', authenticateUser, checkTrialStatus, async (req, res) => {
@@ -26,7 +27,7 @@ router.get('/status', authenticateUser, checkTrialStatus, async (req, res) => {
   }
 });
 
-// Start free trial
+// Start free trial (always enforce trial tasks gating)
 router.post('/trial', authenticateUser, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
@@ -37,14 +38,13 @@ router.post('/trial', authenticateUser, async (req, res) => {
       });
     }
 
-    // Optional: enforce trial tasks requirements
-    const { requireTasks = false } = req.query;
-    if (String(requireTasks) === 'true') {
-      const t = user.trialTasks || {};
-      const ok = !!t.watchedAd && !!t.followedInstagram && (t.sharedReferrals || 0) >= 10;
-      if (!ok) {
-        return res.status(403).json({ message: 'Complete the trial tasks to unlock 7-day premium: watch an ad, follow on Instagram (@Rohitkumar324), and share with 10 friends.' });
-      }
+    // Enforce trial tasks requirements (server-side)
+    // Now only require a verified rewarded ad watch
+    const t = user.trialTasks || {};
+    const ok = !!t.watchedAd;
+    if (!ok) {
+      const msg = 'Complete the trial task to unlock 7-day premium: watch a rewarded ad.';
+      return res.status(403).json({ message: msg });
     }
 
     // Set trial for 7 days
@@ -193,7 +193,7 @@ router.post('/cancel', authenticateUser, async (req, res) => {
     }
     
     // Set subscription to cancel at end of current period
-    user.subscription.status = 'cancelled';
+    user.subscription.status = 'canceled';
     user.subscription.cancelledAt = new Date();
     
     await user.save();
@@ -210,6 +210,10 @@ router.post('/cancel', authenticateUser, async (req, res) => {
 // Trial task completion endpoints
 router.post('/trial-tasks/watch-ad', authenticateUser, async (req, res) => {
   try {
+    // In production, direct self-claim is blocked; SSV must set this flag.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'Use rewarded SSV to verify ad watch in production.' });
+    }
     const user = await User.findById(req.user._id);
     user.trialTasks = { ...(user.trialTasks || {}), watchedAd: true, lastUpdated: new Date() };
     await user.save();
@@ -219,6 +223,10 @@ router.post('/trial-tasks/watch-ad', authenticateUser, async (req, res) => {
 
 router.post('/trial-tasks/follow-instagram', authenticateUser, async (req, res) => {
   try {
+    // In production, auto-verification is not supported via official APIs.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'Instagram follow auto-verification not supported in production.' });
+    }
     const user = await User.findById(req.user._id);
     user.trialTasks = { ...(user.trialTasks || {}), followedInstagram: true, lastUpdated: new Date() };
     await user.save();
@@ -228,6 +236,9 @@ router.post('/trial-tasks/follow-instagram', authenticateUser, async (req, res) 
 
 router.post('/trial-tasks/share', authenticateUser, async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'Sharing progress is tracked via referral link clicks only in production.' });
+    }
     const { count = 1 } = req.body;
     const user = await User.findById(req.user._id);
     const current = user.trialTasks?.sharedReferrals || 0;
@@ -235,6 +246,60 @@ router.post('/trial-tasks/share', authenticateUser, async (req, res) => {
     await user.save();
     res.json({ success: true, trialTasks: user.trialTasks });
   } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Get trial task progress (from user.trialTasks)
+router.get('/trial-tasks/progress', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('trialTasks');
+    res.json({ success: true, trialTasks: user?.trialTasks || {} });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Rewarded ads SSV flow
+router.post('/trial-tasks/rewarded/start', authenticateUser, async (req, res) => {
+  try {
+    const sessionId = `r_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    await RewardedSession.create({ user: req.user._id, sessionId, status: 'pending', meta: {} });
+    // Client will load the rewarded ad using Ad Manager and pass sessionId/custom_data
+    res.json({ success: true, sessionId, ssvCallback: `${process.env.PUBLIC_BASE_URL || 'http://localhost:5001'}/api/subscriptions/trial-tasks/rewarded/ssv` });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+router.get('/trial-tasks/rewarded/status/:sessionId', authenticateUser, async (req, res) => {
+  try {
+    const sess = await RewardedSession.findOne({ sessionId: req.params.sessionId, user: req.user._id });
+    if (!sess) return res.status(404).json({ message: 'Session not found' });
+    res.json({ success: true, status: sess.status });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Google Ad Manager SSV callback (no auth; secured by shared secret or signature)
+router.post('/trial-tasks/rewarded/ssv', async (req, res) => {
+  try {
+    const secret = process.env.AD_SSV_SECRET;
+    const { sessionId, userId, sig } = req.body || {};
+    if (!secret || sig !== secret) {
+      return res.status(403).json({ message: 'Invalid SSV signature' });
+    }
+    const sess = await RewardedSession.findOne({ sessionId });
+    if (!sess) return res.status(404).json({ message: 'Session not found' });
+    if (String(sess.user) !== String(userId)) {
+      return res.status(400).json({ message: 'User mismatch' });
+    }
+    if (sess.status !== 'rewarded') {
+      sess.status = 'rewarded';
+      await sess.save();
+    }
+    const user = await User.findById(sess.user);
+    user.trialTasks = { ...(user.trialTasks || {}), watchedAd: true, lastUpdated: new Date() };
+    await user.save();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 });
 
 // Get billing history

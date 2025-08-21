@@ -66,12 +66,24 @@ router.post('/complete-task', auth, async (req, res) => {
     const hasCompletedAll = await TrialTask.hasCompletedAllTasks(req.user.id);
     
     if (hasCompletedAll) {
-      // Activate trial subscription
+      // Activate trial subscription (align with User schema)
       await User.findByIdAndUpdate(req.user.id, {
         'subscription.status': 'trial',
-        'subscription.plan': 'premium',
-        'subscription.trialStartDate': new Date(),
-        'subscription.trialEndDate': new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        'subscription.trialEndDate': new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        features: {
+          unlimitedEvents: true,
+          advancedBudgetTracking: true,
+          fullMoodHistory: true,
+          customChecklists: true,
+          premiumMotivationalMessages: true,
+          profileInsights: true,
+          fullCalendarSync: true,
+          adFree: true,
+          exportablePDFs: true,
+          aiInsights: true,
+          prioritySupport: true,
+          advancedAnalytics: true
+        }
       });
     }
 
@@ -127,9 +139,21 @@ router.post('/verify-share', auth, async (req, res) => {
     if (hasCompletedAll) {
       await User.findByIdAndUpdate(req.user.id, {
         'subscription.status': 'trial',
-        'subscription.plan': 'premium',
-        'subscription.trialStartDate': new Date(),
-        'subscription.trialEndDate': new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        'subscription.trialEndDate': new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        features: {
+          unlimitedEvents: true,
+          advancedBudgetTracking: true,
+          fullMoodHistory: true,
+          customChecklists: true,
+          premiumMotivationalMessages: true,
+          profileInsights: true,
+          fullCalendarSync: true,
+          adFree: true,
+          exportablePDFs: true,
+          aiInsights: true,
+          prioritySupport: true,
+          advancedAnalytics: true
+        }
       });
     }
 

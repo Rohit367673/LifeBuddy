@@ -2,15 +2,20 @@ import { CheckCircleIcon, CalendarIcon, SparklesIcon, ClockIcon, LightBulbIcon, 
 import { useAuth } from '../context/AuthContext';
 import { usePremium } from '../context/PremiumContext';
 import { Link, useNavigate } from 'react-router-dom';
+import AISchedulingUpsell from '../components/AISchedulingUpsell';
 // import PremiumCalendar from './PremiumCalendar';
 import React, { useState, useEffect } from 'react';
 import { getApiUrl } from '../utils/config';
 
 export default function Productivity() {
   const { user, token } = useAuth();
-  const { subscription, loading: premiumLoading } = usePremium();
-  const isAdmin = user && user.email === 'rohit367673@gmail.com';
-  const isPremium = subscription && subscription.plan && subscription.plan !== 'free';
+  const { isPremium, loading: premiumLoading } = usePremium();
+  const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || 'rohit367673@gmail.com';
+  const adminEmails = adminEmailsEnv
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
   const navigate = useNavigate();
   const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'lifebuddy_AI_bot';
 
@@ -111,7 +116,7 @@ export default function Productivity() {
       const data = await res.json();
       console.log('Schedule created:', data);
       alert('Schedule created successfully! We will send your plan to your selected platform.');
-      navigate('/myschedule');
+      navigate('/my-schedule');
     } catch (error) {
       console.error('Error submitting form:', error);
       alert(error.message || 'Failed to create schedule. Please try again.');
@@ -184,7 +189,10 @@ export default function Productivity() {
           Let our AI create a personalized schedule for your tasks. We'll send the plan to your preferred messaging platform.
         </p>
       </header>
-
+      {/* Inline Upsell for all non-premium users */}
+      {!premiumLoading && !isPremium && (
+        <AISchedulingUpsell />
+      )}
       {/* Main Form Section */}
       <section className="w-full py-8 sm:py-12">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
@@ -312,7 +320,7 @@ export default function Productivity() {
               {currentStep === 2 && (
                 <div className="space-y-6 pb-24 sm:pb-0">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <DocumentTextIcon className="w-5 h-5 text-blue-500" />
                     Task Description
                   </label>
@@ -326,7 +334,7 @@ export default function Productivity() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
@@ -377,7 +385,7 @@ export default function Productivity() {
               {currentStep === 3 && (
                 <div className="space-y-6 pb-24 sm:pb-0">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                       <PhoneIcon className="w-5 h-5 text-green-500" />
                       Preferred Platform
                     </label>

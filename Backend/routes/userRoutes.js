@@ -776,8 +776,59 @@ router.get('/streak', authenticateUser, async (req, res) => {
 
 router.get('/productivity-score', authenticateUser, async (req, res) => {
   try {
-    // Placeholder: return a random score for now
-    const score = Math.floor(Math.random() * 100);
+    const userId = req.user._id;
+    const now = new Date();
+    const start7 = new Date(now);
+    start7.setHours(0, 0, 0, 0);
+    start7.setDate(start7.getDate() - 6); // last 7 days including today
+    const start30 = new Date(now);
+    start30.setHours(0, 0, 0, 0);
+    start30.setDate(start30.getDate() - 30);
+
+    // Fetch required aggregates in parallel
+    const [
+      totalTasks,
+      completedTasks,
+      tasksCompletedLast7,
+      userDoc,
+      streakObj,
+      pointsLast30Agg,
+      activityLast7
+    ] = await Promise.all([
+      Task.countDocuments({ user: userId }),
+      Task.countDocuments({ user: userId, status: 'completed' }),
+      Task.countDocuments({ user: userId, status: 'completed', completedAt: { $gte: start7 } }),
+      User.findById(userId).select('stats.taskStreak stats.longestStreak'),
+      User.getUserStreak(userId),
+      Achievement.aggregate([
+        { $match: { user: userId, createdAt: { $gte: start30 } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$points', 0] } } } }
+      ]),
+      Activity.countDocuments({ user: userId, timestamp: { $gte: start7 } })
+    ]);
+
+    const totalPointsLast30 = pointsLast30Agg?.[0]?.total || 0;
+    const streakFromStats = userDoc?.stats?.taskStreak;
+    const taskStreak = (typeof streakFromStats === 'number' && streakFromStats >= 0)
+      ? streakFromStats
+      : (streakObj?.currentStreak || 0);
+
+    // Sub-scores (0-100)
+    const completionRateScore = totalTasks > 0 ? Math.min(100, (completedTasks / totalTasks) * 100) : 0;
+    const tasksRecentScore = Math.min(100, (tasksCompletedLast7 / 14) * 100); // cap: 14 tasks/week ~ 2 per day
+    const streakScore = Math.min(100, (taskStreak / 30) * 100); // cap: 30-day streak
+    const achievementsScore = Math.min(100, (totalPointsLast30 / 200) * 100); // cap: 200 points in 30 days
+    const activityScore = Math.min(100, (activityLast7 / 20) * 100); // cap: 20 activities/week
+
+    // Weights
+    const score = Math.round(
+      0.40 * completionRateScore +
+      0.25 * tasksRecentScore +
+      0.20 * streakScore +
+      0.10 * achievementsScore +
+      0.05 * activityScore
+    );
+
     res.json({ score });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });

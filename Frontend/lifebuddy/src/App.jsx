@@ -24,6 +24,8 @@ import MySchedule from './pages/MySchedule';
 import AIChat from './components/AIChat';
 import VoiceChat from './pages/VoiceChat';
 import AdminCouponPanel from './components/AdminCouponPanel';
+import ProtectedRoute from './components/ProtectedRoute';
+import AISchedulingUpsell from './components/AISchedulingUpsell';
 
 function App() {
   return (
@@ -47,7 +49,13 @@ function App() {
 
                 {/* Main layout with nested routes */}
                 <Route element={<MainLayout />}>
-                  <Route path="/productivity" element={<Productivity />} />
+                  <Route path="/productivity" element={
+                    <ProtectedRoute
+                      inlineFallback={<AISchedulingUpsell />}
+                    >
+                      <Productivity />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/ai-chat" element={<AIChat />} />
                   <Route path="/ai-voice" element={<VoiceChat />} />
                   <Route path="/store" element={<Store />} />
