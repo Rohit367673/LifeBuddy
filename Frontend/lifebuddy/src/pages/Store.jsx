@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { loadAdSenseScript, pushAd } from '../utils/ads';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShoppingBagIcon,
@@ -54,25 +55,16 @@ const Store = () => {
     setSchedAdCount(Number.isFinite(savedSched) ? savedSched : 0);
   }, []);
 
-  // Load AdSense script once (if client is configured). If already present, mark ready.
+  // Load AdSense script once (prod only) and mark ready
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!import.meta.env.PROD) return; // never load in dev
     const client = import.meta.env.VITE_ADSENSE_CLIENT;
-    if (!client) return; // no adsense configured
-
-    const existing = document.querySelector('script[src*="googlesyndication.com/pagead/js/adsbygoogle.js"]');
-    if (existing) {
-      setAdsenseReady(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}`;
-    script.crossOrigin = 'anonymous';
-    script.onload = () => setAdsenseReady(true);
-    script.onerror = () => console.warn('Failed to load AdSense');
-    document.head.appendChild(script);
-    // do not remove script on cleanup to avoid breaking other ad slots
+    const slot = import.meta.env.VITE_ADSENSE_SLOT;
+    if (!client || !slot) return; // require config
+    loadAdSenseScript()
+      .then(() => setAdsenseReady(true))
+      .catch(() => console.warn('Failed to load AdSense'));
   }, []);
 
   const fetchProducts = async () => {
@@ -111,11 +103,11 @@ const Store = () => {
     }
   };
 
-  // Rewarded ad simulation: show a 15s modal, then mark 1 completed view for the selected type
+  // Rewarded ad simulation: show a 30s modal, then mark 1 completed view for the selected type
   const watchAd = async (type) => {
     // In production, you should start a rewarded session and rely on SSV.
     // For now we simulate a rewarded ad with a 15s countdown and then ping backend.
-    setCountdown(15);
+    setCountdown(30);
     setWatchingType(type === 'schedule' ? 'schedule' : 'ai');
     setAdSlotKey((k) => k + 1); // force fresh <ins> node
     setIsWatchingAd(true);
@@ -127,13 +119,13 @@ const Store = () => {
     return () => clearTimeout(t);
   }, [isWatchingAd, countdown]);
 
-  // After a fresh <ins> mounts, request exactly ONE ad render
+  // After a fresh <ins> mounts, request exactly ONE ad render (prod only)
   useEffect(() => {
+    if (!import.meta.env.PROD) return;
     if (!isWatchingAd || !adsenseReady) return;
     const t = setTimeout(() => {
       try {
-        // eslint-disable-next-line no-undef
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        pushAd();
       } catch (e) {
         console.warn('AdSense push error:', e);
       }
@@ -509,7 +501,7 @@ const Store = () => {
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md text-center">
             <h3 className="text-xl font-bold mb-2">Watching Ad</h3>
             <p className="text-gray-600 mb-4">Please stay for the full ad to earn progress.</p>
-            {/* Inline AdSense unit (placed above the timer). In dev, force a fixed-size test ad for visibility. */}
+            {/* Inline AdSense unit (placed above the timer). In dev, show placeholder only. */}
             <div className="mb-4 flex justify-center">
               {(!import.meta.env.VITE_ADSENSE_CLIENT || !import.meta.env.VITE_ADSENSE_SLOT) ? (
                 <div className="text-sm text-red-500">
