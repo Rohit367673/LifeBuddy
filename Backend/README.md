@@ -10,7 +10,7 @@ A Node.js/Express backend for the LifeBuddy life management application.
 - **User Profiles**: Manage user preferences and statistics
 - **Dashboard Analytics**: Track progress and productivity
 - **Security**: Rate limiting, CORS, and input validation
-- **AI Model**: OpenRouter (DeepSeek R1) for schedule, reminders, and motivational message generation (exclusive)
+- **AI Model**: OpenRouter (configurable primary model with fallback and branded system prompts) for schedule, reminders, and motivational message generation
 
 ## Tech Stack
 
@@ -55,7 +55,7 @@ A Node.js/Express backend for the LifeBuddy life management application.
    JWT_EXPIRE=7d
    FRONTEND_URL=http://localhost:5173
    OPENROUTER_API_KEY=your-openrouter-api-key-here
-  OPENROUTER_MODEL=deepseek/deepseek-r1:free
+   OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
    ```
 
 4. **Start the server**
@@ -166,7 +166,7 @@ Backend/
 | `JWT_EXPIRE` | JWT expiration time | 7d |
 | `FRONTEND_URL` | Frontend URL for CORS | http://localhost:5173 |
 | `OPENROUTER_API_KEY` | OpenRouter API key for AI schedule/motivation | required |
-| `OPENROUTER_MODEL` | OpenRouter model identifier (defaults to DeepSeek R1) | deepseek/deepseek-r1:free |
+| `OPENROUTER_MODEL` | Primary OpenRouter model identifier (overrides config if set) | meta-llama/llama-3.1-8b-instruct:free |
 
 ## Telegram Connect Flow
 - Users now connect Telegram by clicking a button in the app and sending /start to the bot (@lifebuddy_AI_bot).

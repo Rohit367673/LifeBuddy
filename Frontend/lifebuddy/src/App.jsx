@@ -26,8 +26,55 @@ import VoiceChat from './pages/VoiceChat';
 import AdminCouponPanel from './components/AdminCouponPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import AISchedulingUpsell from './components/AISchedulingUpsell';
+import AdManager from './components/AdManager';
+import PromoVideo from './components/PromoVideo';
+import { getApiUrl } from './utils/config';
+import React, { useState, useEffect } from 'react';
+import { daysSince } from './utils/dates';
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [promoActive, setPromoActive] = useState(false);
+
+  useEffect(() => {
+    // Fetch user data
+    const fetchUser = async () => {
+      try {
+        const response = await fetch(`${getApiUrl()}/api/user`);
+        const data = await response.json();
+        setUser(data);
+        // Check if promo should be active
+        if (data && !data.isPremium) {
+          const signupDate = new Date(data.signupDate);
+          const days = daysSince(signupDate);
+          setPromoActive(days <= 7);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  const handleUpgrade = () => {
+    // Placeholder for upgrade function
+    console.log('Upgrade to premium');
+  };
+
+  const handlePromoClose = () => {
+    setPromoActive(false);
+  };
+
+  // Only show ads if promo is not active
+  const showAds = !promoActive;
+
   return (
     <Router>
       <AuthProvider>
@@ -74,6 +121,13 @@ function App() {
                 {/* Fallback */}
                 <Route path="*" element={<div style={{ padding: 16 }}>Page not found</div>} />
               </Routes>
+              <AdManager user={user} promoActive={promoActive} />
+              <PromoVideo 
+                user={user} 
+                onUpgrade={handleUpgrade}
+                onClose={handlePromoClose}
+                isActive={promoActive}
+              />
             </div>
           </PremiumProvider>
         </ThemeProvider>

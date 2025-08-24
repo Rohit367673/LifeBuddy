@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/config';
+import { loadAdSenseScript } from '../utils/ads';
 import { 
   CheckCircleIcon, 
   PlayIcon, 
   ShareIcon, 
   HeartIcon,
   SparklesIcon,
-  ClockIcon
+  ClockIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 export default function TrialTasks({ onTrialActivated }) {
@@ -16,13 +18,33 @@ export default function TrialTasks({ onTrialActivated }) {
   const [loading, setLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState(null);
   const [shareCode, setShareCode] = useState('');
+  const [adLoaded, setAdLoaded] = useState(false);
+  const [adError, setAdError] = useState(false);
+  const [adCompleted, setAdCompleted] = useState(false);
 
   useEffect(() => {
     fetchProgress();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      const adContainer = document.getElementById('trial-ad-container');
+      if (adContainer) {
+        document.body.removeChild(adContainer);
+      }
+    };
+  }, []);
+
   const fetchProgress = async () => {
     try {
+      // Load AdSense script
+      loadAdSenseScript()
+        .then(() => setAdLoaded(true))
+        .catch(err => {
+          console.error('Failed to load AdSense:', err);
+          setAdError(true);
+        });
+      
       const response = await fetch(`${getApiUrl()}/api/trial/progress`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -90,18 +112,59 @@ export default function TrialTasks({ onTrialActivated }) {
     }
   };
 
-  const watchAd = () => {
-    // Simulate ad watching with a 30-second timer
+  const watchAd = async () => {
+    if (!adLoaded) {
+      setAdError(true);
+      return;
+    }
+
     setCompletingTask('watch_ad');
-    let timeLeft = 30;
-    
-    const adInterval = setInterval(() => {
-      timeLeft--;
-      if (timeLeft <= 0) {
-        clearInterval(adInterval);
-        completeTask('watch_ad', { adProvider: 'demo', adDuration: 30 });
-      }
-    }, 1000);
+    try {
+      // Show AdSense ad
+      window.adsbygoogle = window.adsbygoogle || [];
+      window.adsbygoogle.push({
+        overlays: {bottom: true},
+        params: {
+          'client': 'ca-pub-7023789007176202',
+          'adtest': 'on',
+          'format': 'autorelaxed'
+        }
+      });
+      
+      // Create ad container
+      let adContainer = document.createElement('div');
+      adContainer.id = 'trial-ad-container';
+      adContainer.innerHTML = `
+        <ins class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-7023789007176202"
+          data-ad-slot="1234567890"
+          data-ad-format="auto"
+          data-full-width-responsive="true">
+        </ins>
+      `;
+      
+      document.body.appendChild(adContainer);
+      
+      // Listen for ad completion
+      adContainer.addEventListener('adViewable', () => {
+        setTimeout(() => {
+          try {
+            completeTask('watch_ad', { adProvider: 'adsense' });
+            setAdCompleted(true);
+          } finally {
+            if (adContainer) {
+              document.body.removeChild(adContainer);
+              adContainer = null;
+            }
+          }
+        }, 1000);
+      });
+    } catch (err) {
+      console.error('Ad failed to load:', err);
+      setAdError(true);
+      setCompletingTask(null);
+    }
   };
 
   if (loading) {
@@ -117,7 +180,7 @@ export default function TrialTasks({ onTrialActivated }) {
       id: 'watch_ad',
       title: 'Watch Advertisement',
       description: 'Watch a 30-second ad to support LifeBuddy',
-      icon: PlayIcon,
+      icon: adCompleted ? CheckCircleIcon : PlayIcon,
       color: 'bg-red-500',
       action: watchAd,
       buttonText: completingTask === 'watch_ad' ? 'Watching...' : 'Watch Ad'
@@ -220,10 +283,20 @@ export default function TrialTasks({ onTrialActivated }) {
                         : 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105'
                     }`}
                   >
-                    {isWorking && task.id === 'watch_ad' && (
-                      <ClockIcon className="w-4 h-4 inline mr-2" />
-                    )}
                     {task.buttonText}
+                    
+                    {task.id === 'watch_ad' && adError && (
+                      <div className="mt-2 text-red-600 text-sm flex items-center">
+                        <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
+                        Ad failed to load
+                      </div>
+                    )}
+                    
+                    {task.id === 'watch_ad' && !adLoaded && !adError && (
+                      <div className="mt-2 text-yellow-600 text-sm">
+                        Loading ad system...
+                      </div>
+                    )}
                   </button>
                 )}
               </div>

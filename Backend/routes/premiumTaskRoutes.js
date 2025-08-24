@@ -32,7 +32,7 @@ async function sendDailyTaskNotification(userId, task, dayNumber) {
   }
 }
 
-// Helper: Generate schedule via OpenRouter DeepSeek R1 exclusively
+// Helper: Generate schedule via OpenRouter (configured model; service handles model fallback)
 async function generateScheduleWithFallback(title, requirements, startDate, endDate, userContext) {
   const schedule = await generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext);
   return { schedule, source: 'OpenRouter' };
@@ -76,7 +76,7 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       notificationPlatform: ctxUser.notificationPlatform || 'email'
     };
 
-    // Generate schedule (OpenRouter DeepSeek R1 only)
+    // Generate schedule via OpenRouter (configured model)
     let schedule, scheduleSource;
     try {
       const result = await generateScheduleWithFallback(title, requirements, startDate, endDate, userContext);
