@@ -5,12 +5,12 @@ const fetch = require('node-fetch');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Model: LifeBuddy AI uses DeepSeek R1 via OpenRouter by default
+// Model selection via config/env; default prioritizes reliability and cost
+// Use neutral, widely available free models as fallbacks (no vendor branding)
 let PRIMARY_MODEL = 'deepseek/deepseek-r1:free';
 // LifeBuddy AI prioritizes reliable and efficient models
 
 let CANDIDATE_MODELS = [
-  'deepseek/deepseek-r1:free',
   'meta-llama/llama-3.1-8b-instruct:free',
   'microsoft/phi-3.5-mini-instruct:free',
   'nousresearch/hermes-3-llama-3.1-8b:free',
@@ -51,46 +51,97 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
     throw new Error('OpenRouter API key missing.');
   }
 
-  const model = 'deepseek/deepseek-r1:free';
-  const messages = [{ role: 'user', content: prompt }];
+  const preferredModel = (options && options.model) ? options.model : PRIMARY_MODEL;
+  const modelsToTry = [preferredModel, ...CANDIDATE_MODELS.filter(m => m !== preferredModel)];
 
-  try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature })
-    });
+  const systemMessage = options.systemPrompt ||
+    "You are LifeBuddy AI by Rohit Kumar. Be concise, supportive, privacy-first, and on-brand. If a request is unsafe or irrelevant to life productivity, politely decline.";
 
-    if (response.status === 401) {
-      console.error('[OpenRouter] 401 Unauthorized - Verify API key at https://openrouter.ai/keys');
-      // Fallback to mock response in development
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[OpenRouter] Using mock response in development mode');
-        return "Hello! I'm LifeBuddy AI. We're currently experiencing technical difficulties. Please try again later.";
+  const messages = [
+    { role: 'system', content: systemMessage },
+    { role: 'user', content: prompt }
+  ];
+
+  let lastError;
+  for (const model of modelsToTry) {
+    try {
+      console.log(`[OpenRouter] Attempting model: ${model}`);
+      const response = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          // Required by OpenRouter to associate requests with your app/site
+          'HTTP-Referer': DEFAULT_REFERER,
+          // Some proxies ignore non-standard headers; include standard Referer too
+          'Referer': DEFAULT_REFERER,
+          'X-Title': DEFAULT_TITLE
+        },
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature })
+      });
+
+      // Handle common auth/plan/limit errors explicitly for clarity
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          // Try to parse JSON error first
+          const errJson = await response.clone().json();
+          errorText = JSON.stringify(errJson);
+        } catch (_) {
+          try { errorText = await response.text(); } catch (_) { errorText = ''; }
+        }
+
+        if (response.status === 401) {
+          console.error('[OpenRouter] 401 Unauthorized - Verify API key at https://openrouter.ai/keys');
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[OpenRouter] Dev note: continuing to next model after 401. Body:', errorText?.slice(0, 400));
+          }
+          lastError = new Error('Invalid API key - Check OpenRouter dashboard');
+          // try next model
+          continue;
+        }
+
+        if ([402, 403].includes(response.status)) {
+          console.error(`[OpenRouter] ${response.status} (Payment/Forbidden). Body:`, errorText?.slice(0, 400));
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[OpenRouter] Dev note: continuing to next model after 402/403');
+          }
+          lastError = new Error(`Access denied by OpenRouter (${response.status}).`);
+          continue;
+        }
+
+        if (response.status === 429) {
+          console.warn('[OpenRouter] 429 Too Many Requests. Body:', errorText?.slice(0, 400));
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[OpenRouter] Dev note: continuing to next model after 429');
+          }
+          lastError = new Error('Rate limited by OpenRouter (429).');
+          continue;
+        }
+
+        console.error(`[OpenRouter] Error ${response.status} for model ${model}: ${errorText?.slice(0, 400)}`);
+        lastError = new Error(`API request failed: ${response.status}`);
+        continue;
       }
-      throw new Error('Invalid API key - Check OpenRouter dashboard');
-    }
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`[OpenRouter] Error ${response.status}: ${errorBody}`);
-      throw new Error(`API request failed: ${response.status}`);
-    }
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content?.trim?.() || '';
+      console.log(`[OpenRouter] Success with model: ${model} | chars: ${content.length}`);
+      return content;
 
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
-    
-  } catch (error) {
-    console.error('[OpenRouter] API call failed:', error.message);
-    // Fallback in development
-    if (process.env.NODE_ENV === 'development') {
-      return "Hello! I'm LifeBuddy AI. We're currently experiencing technical difficulties. Please try again later.";
+    } catch (error) {
+      console.error(`[OpenRouter] API call failed for model ${model}:`, error.message);
+      lastError = error;
+      // try next model
+      continue;
     }
-    throw error;
   }
+
+  // If all models failed
+  if (process.env.NODE_ENV === 'development') {
+    return "Hello! I'm LifeBuddy AI. We're currently experiencing technical difficulties. Please try again later.";
+  }
+  throw lastError || new Error('All model attempts failed.');
 }
 
 async function generateScheduleWithOpenRouter(title, requirements, startDate, endDate, userContext = {}) {

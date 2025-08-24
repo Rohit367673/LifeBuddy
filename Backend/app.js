@@ -4,7 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 // Environment verification
 console.log('[ENV] NODE_ENV:', process.env.NODE_ENV);
@@ -43,6 +44,7 @@ const Activity = require('./models/Activity');
 const ReferralCode = require('./models/ReferralCode');
 const ReferralHit = require('./models/ReferralHit');
 const User = require('./models/User');
+const { authenticateUser } = require('./middlewares/authMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -112,6 +114,37 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/trial', trialRoutes);
 app.use('/api/admin-coupons', adminCouponRoutes);
 app.use('/api/referrals', referralRoutes);
+
+// Minimal current user endpoint for frontend checks
+app.get('/api/user', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('displayName username avatar personalQuote subscription createdAt stats');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isTrial = user?.subscription?.status === 'trial';
+    const isPaid = user?.subscription?.plan && user.subscription.plan !== 'free' && user.subscription.status === 'active';
+    const premium = !!(isTrial || isPaid);
+    const tier = isTrial ? 'Trial' : (isPaid ? 'Premium' : 'Free');
+
+    res.json({
+      id: user._id,
+      displayName: user.displayName || '',
+      username: user.username || '',
+      avatar: user.avatar || '',
+      personalQuote: user.personalQuote || '',
+      premium,
+      tier,
+      currentStreak: user?.stats?.taskStreak || 0,
+      joinedAt: user.createdAt
+    });
+  } catch (err) {
+    console.error('Error fetching current user:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

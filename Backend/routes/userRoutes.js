@@ -133,6 +133,14 @@ router.get('/profile/:identifier', async (req, res) => {
     const achievements = await Achievement.find({ user: user._id }).sort({ createdAt: -1 });
     const earnedBadges = achievements.map(achievement => achievement.badgeType).filter(Boolean);
     const streak = await User.getUserStreak(user._id);
+    // Prefer precomputed streaks on user.stats for accuracy, fallback to calculated
+    const currentStreak = (user?.stats?.taskStreak ?? streak.currentStreak) || 0;
+    const longestStreak = (user?.stats?.longestStreak ?? streak.longestStreak) || 0;
+    // Minimal, non-sensitive premium signal for badges/UI
+    const isTrial = user?.subscription?.status === 'trial';
+    const isPaid = user?.subscription?.plan && user.subscription.plan !== 'free' && user.subscription.status === 'active';
+    const premium = !!(isTrial || isPaid);
+    const tier = isTrial ? 'Trial' : (isPaid ? 'Premium' : 'Free');
     const isOwner = user.email === 'rohit367673@gmail.com' && (user.username === 'rohit' || (user.displayName && user.displayName.toLowerCase() === 'rohit'));
     // Ensure all required fields are present
     res.json({
@@ -140,12 +148,14 @@ router.get('/profile/:identifier', async (req, res) => {
       username: user.username || '',
       avatar: user.avatar || '',
       personalQuote: user.personalQuote || '',
-      currentStreak: streak.currentStreak || 0,
-      longestStreak: streak.longestStreak || 0,
+      currentStreak,
+      longestStreak,
       totalTasks: stats.totalTasks || 0,
       completedTasks: stats.completedTasks || 0,
       badges: earnedBadges,
       joinedAt: user.createdAt,
+      premium,
+      tier,
       ...(isOwner ? { owner: true, ownerEmail: user.email } : {})
     });
   } catch (error) {
@@ -835,4 +845,25 @@ router.get('/productivity-score', authenticateUser, async (req, res) => {
   }
 });
 
-module.exports = router; 
+// GET /api/user - Return current user for demo
+router.get('/api/user', authenticateUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('isPremium signupDate consentGiven');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // For demo, return example user object
+    res.json({
+      id: user._id,
+      isPremium: user.isPremium,
+      signupDate: user.signupDate,
+      consentGiven: user.consentGiven || true // Default to true for demo
+    });
+  } catch (err) {
+    console.error('Error fetching user:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;

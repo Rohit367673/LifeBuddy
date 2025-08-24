@@ -23,10 +23,56 @@ const Store = () => {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [showProducts, setShowProducts] = useState(false);
+
+  // Watch-2-ads gating for unlocking AI & Scheduling
+  const [aiAdCount, setAiAdCount] = useState(0);
+  const [schedAdCount, setSchedAdCount] = useState(0);
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [watchingType, setWatchingType] = useState(null); // 'ai' | 'schedule' | null
+  const [countdown, setCountdown] = useState(0);
+  const [adsenseReady, setAdsenseReady] = useState(false);
+  const [adSlotKey, setAdSlotKey] = useState(0);
+
+  const ADS_AI_KEY = 'lb_unlock_ads_count_ai';
+  const ADS_SCHED_KEY = 'lb_unlock_ads_count_sched';
 
   useEffect(() => {
     fetchProducts();
     fetchPurchases();
+    // preload local ad counts
+    try {
+      // Cleanup legacy combined key so it doesn't confuse progress
+      const LEGACY_KEY = 'lb_unlock_ads_count';
+      if (localStorage.getItem(LEGACY_KEY) != null) {
+        localStorage.removeItem(LEGACY_KEY);
+      }
+    } catch {}
+    const savedAi = Number(localStorage.getItem(ADS_AI_KEY) || 0);
+    const savedSched = Number(localStorage.getItem(ADS_SCHED_KEY) || 0);
+    setAiAdCount(Number.isFinite(savedAi) ? savedAi : 0);
+    setSchedAdCount(Number.isFinite(savedSched) ? savedSched : 0);
+  }, []);
+
+  // Load AdSense script once (if client is configured). If already present, mark ready.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const client = import.meta.env.VITE_ADSENSE_CLIENT;
+    if (!client) return; // no adsense configured
+
+    const existing = document.querySelector('script[src*="googlesyndication.com/pagead/js/adsbygoogle.js"]');
+    if (existing) {
+      setAdsenseReady(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}`;
+    script.crossOrigin = 'anonymous';
+    script.onload = () => setAdsenseReady(true);
+    script.onerror = () => console.warn('Failed to load AdSense');
+    document.head.appendChild(script);
+    // do not remove script on cleanup to avoid breaking other ad slots
   }, []);
 
   const fetchProducts = async () => {
@@ -62,6 +108,92 @@ const Store = () => {
       }
     } catch (error) {
       console.error('Error fetching purchases:', error);
+    }
+  };
+
+  // Rewarded ad simulation: show a 15s modal, then mark 1 completed view for the selected type
+  const watchAd = async (type) => {
+    // In production, you should start a rewarded session and rely on SSV.
+    // For now we simulate a rewarded ad with a 15s countdown and then ping backend.
+    setCountdown(15);
+    setWatchingType(type === 'schedule' ? 'schedule' : 'ai');
+    setAdSlotKey((k) => k + 1); // force fresh <ins> node
+    setIsWatchingAd(true);
+  };
+
+  useEffect(() => {
+    if (!isWatchingAd || countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [isWatchingAd, countdown]);
+
+  // After a fresh <ins> mounts, request exactly ONE ad render
+  useEffect(() => {
+    if (!isWatchingAd || !adsenseReady) return;
+    const t = setTimeout(() => {
+      try {
+        // eslint-disable-next-line no-undef
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.warn('AdSense push error:', e);
+      }
+    }, 50);
+    return () => clearTimeout(t);
+  }, [adSlotKey, adsenseReady, isWatchingAd]);
+
+  useEffect(() => {
+    const completeAdIfDone = async () => {
+      if (!isWatchingAd || countdown > 0) return;
+      try {
+        // Dev-mode endpoint to mark a watch; in production use Rewarded SSV
+        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/trial-tasks/watch-ad`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (e) {
+        // Non-fatal: continue client-side count
+        console.warn('watch-ad ping failed (non-fatal in dev):', e);
+      }
+      if (watchingType === 'schedule') {
+        setSchedAdCount(prev => {
+          const next = Math.min(2, prev + 1);
+          localStorage.setItem(ADS_SCHED_KEY, String(next));
+          return next;
+        });
+      } else {
+        setAiAdCount(prev => {
+          const next = Math.min(2, prev + 1);
+          localStorage.setItem(ADS_AI_KEY, String(next));
+          return next;
+        });
+      }
+      setIsWatchingAd(false);
+      setWatchingType(null);
+    };
+    completeAdIfDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWatchingAd, countdown]);
+
+  const unlockNow = async (type) => {
+    const countOk = type === 'schedule' ? schedAdCount >= 2 : aiAdCount >= 2;
+    if (!countOk) return toast.error('Please watch 2 ads to unlock.');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/subscriptions/trial`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return toast.error(err.message || 'Failed to unlock.');
+      }
+      const data = await res.json();
+      toast.success(data.message || 'Unlocked! Enjoy premium features.');
+    } catch (e) {
+      console.error(e);
+      toast.error('Something went wrong while unlocking.');
     }
   };
 
@@ -137,6 +269,7 @@ const Store = () => {
 
   return (
     <div className="space-y-8 mt-8">
+
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 text-white rounded-2xl p-8">
         <div className="text-center">
@@ -155,7 +288,71 @@ const Store = () => {
         </div>
       </div>
 
+      {/* Unlock Cards (AI + Scheduling) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* AI Assistant Card */}
+        <div className="relative bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-purple-100">
+              <SparklesIcon className="w-8 h-8 text-purple-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">AI Assistant</h3>
+            <p className="text-gray-600 mb-4">Personalized AI by Rohit Kumar for planning, insights, and coaching.</p>
+            <div className="text-sm text-gray-700 mb-4">
+              Unlock by watching 2 ads • Progress: <span className="font-semibold">{aiAdCount}/2</span>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => watchAd('ai')}
+                disabled={isWatchingAd || aiAdCount >= 2}
+                className={`px-5 py-3 rounded-lg font-medium text-white ${aiAdCount >= 2 ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
+              >
+                {isWatchingAd && watchingType === 'ai' ? 'Watching…' : aiAdCount >= 2 ? 'Ads Completed' : 'Watch Ad'}
+              </button>
+              <button
+                onClick={() => unlockNow('ai')}
+                disabled={aiAdCount < 2}
+                className={`px-5 py-3 rounded-lg font-medium ${aiAdCount < 2 ? 'bg-gray-100 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+              >
+                Unlock Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Smart Scheduling Card */}
+        <div className="relative bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-blue-100">
+              <AcademicCapIcon className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Smart Scheduling</h3>
+            <p className="text-gray-600 mb-4">Auto-generate schedules and reminders tailored to your goals.</p>
+            <div className="text-sm text-gray-700 mb-4">
+              Unlock by watching 2 ads • Progress: <span className="font-semibold">{schedAdCount}/2</span>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => watchAd('schedule')}
+                disabled={isWatchingAd || schedAdCount >= 2}
+                className={`px-5 py-3 rounded-lg font-medium text-white ${schedAdCount >= 2 ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {isWatchingAd && watchingType === 'schedule' ? 'Watching…' : schedAdCount >= 2 ? 'Ads Completed' : 'Watch Ad'}
+              </button>
+              <button
+                onClick={() => unlockNow('schedule')}
+                disabled={schedAdCount < 2}
+                className={`px-5 py-3 rounded-lg font-medium ${schedAdCount < 2 ? 'bg-gray-100 text-gray-500' : 'bg-green-600 text-white hover:bg-green-700'}`}
+              >
+                Unlock Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Category Filter */}
+      {showProducts && (
       <div className="flex flex-wrap gap-4 justify-center">
         {['all', 'eventPacks', 'checklistTemplates', 'profileThemes'].map((category) => (
           <button
@@ -174,8 +371,10 @@ const Store = () => {
           </button>
         ))}
       </div>
+      )}
 
       {/* Products Grid */}
+      {showProducts && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {getCategoryProducts().map((product) => {
           const IconComponent = getProductIcon(product.id);
@@ -268,9 +467,10 @@ const Store = () => {
           );
         })}
       </div>
+      )}
 
       {/* Empty State */}
-      {getCategoryProducts().length === 0 && (
+      {showProducts && getCategoryProducts().length === 0 && (
         <div className="text-center py-12">
           <ShoppingBagIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-900 mb-2">No products found</h3>
@@ -280,14 +480,64 @@ const Store = () => {
 
       {/* Bottom CTA */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Need Something Custom?</h2>
-        <p className="text-gray-600 mb-6">
-          Can't find what you're looking for? We can create custom templates and themes just for you.
-        </p>
-        <button className="bg-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors">
-          Request Custom Product
-        </button>
+        {!showProducts ? (
+          <>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">More Templates and Packs</h2>
+            <p className="text-gray-600 mb-6">
+              Prefer one-time purchases? Browse our full store of templates, themes, and packs.
+            </p>
+            <button onClick={() => setShowProducts(true)} className="bg-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors">
+              Show All Products
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Need Something Custom?</h2>
+            <p className="text-gray-600 mb-6">
+              Can't find what you're looking for? We can create custom templates and themes just for you.
+            </p>
+            <button className="bg-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors">
+              Request Custom Product
+            </button>
+          </>
+        )}
       </div>
+
+      {/* Rewarded Ad Simulation Modal */}
+      {isWatchingAd && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md text-center">
+            <h3 className="text-xl font-bold mb-2">Watching Ad</h3>
+            <p className="text-gray-600 mb-4">Please stay for the full ad to earn progress.</p>
+            {/* Inline AdSense unit (placed above the timer). In dev, force a fixed-size test ad for visibility. */}
+            <div className="mb-4 flex justify-center">
+              {(!import.meta.env.VITE_ADSENSE_CLIENT || !import.meta.env.VITE_ADSENSE_SLOT) ? (
+                <div className="text-sm text-red-500">
+                  AdSense not configured. Set VITE_ADSENSE_CLIENT and VITE_ADSENSE_SLOT in .env and restart dev server.
+                </div>
+              ) : (
+                <ins
+                  key={adSlotKey}
+                  className="adsbygoogle"
+                  style={import.meta.env.MODE !== 'production'
+                    ? { display: 'block', width: '300px', height: '250px', background: '#f0f0f0' }
+                    : { display: 'block', width: '100%' }}
+                  data-ad-client={import.meta.env.VITE_ADSENSE_CLIENT}
+                  data-ad-slot={import.meta.env.VITE_ADSENSE_SLOT}
+                  data-ad-format={import.meta.env.MODE !== 'production' ? undefined : 'auto'}
+                  data-full-width-responsive={import.meta.env.MODE !== 'production' ? undefined : 'true'}
+                  data-adtest={import.meta.env.MODE !== 'production' ? 'on' : undefined}
+                ></ins>
+              )}
+            </div>
+            <div className="text-5xl font-bold text-purple-600 mb-4">{countdown}s</div>
+            <div className="text-sm text-gray-500 mb-6">
+              Ad is served via Google AdSense. Completion is tracked by the timer for now.
+            </div>
+            <button disabled className="px-5 py-3 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed w-full">Finishes automatically</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

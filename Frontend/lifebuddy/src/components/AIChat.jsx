@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/config';
-import { PaperAirplaneIcon, MicrophoneIcon, ClipboardDocumentIcon, CheckIcon, LockClosedIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, ClipboardDocumentIcon, CheckIcon, LockClosedIcon, SparklesIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { usePremium } from '../context/PremiumContext';
 
 export default function AIChat() {
@@ -16,7 +16,12 @@ export default function AIChat() {
   const endRef = useRef(null);
   const abortRef = useRef(null);
   const textareaRef = useRef(null);
-
+ 
+  const [showNotice, setShowNotice] = useState(() => {
+    try { return localStorage.getItem('LB_CHAT_24H_NOTICE') !== 'dismissed'; } catch (_) { return true; }
+  });
+  const dismissNotice = () => { try { localStorage.setItem('LB_CHAT_24H_NOTICE', 'dismissed'); } catch (_) {} setShowNotice(false); };
+ 
   const aiName = user?.aiAssistantName || 'LifeBuddy AI';
   const isPremium = subscription?.plan && subscription.plan !== 'free' || subscription?.status === 'trial';
 
@@ -86,6 +91,21 @@ export default function AIChat() {
     try { await navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 1200); } catch (_) {}
   };
 
+  const newChat = async () => {
+    // Optimistic UI: clear local state and storage immediately
+    setMessages([]);
+    try { localStorage.removeItem('LB_CHAT_HISTORY'); } catch (_) {}
+    // Try to clear backend chat history as well (best-effort, ignore errors)
+    try {
+      if (token) {
+        await fetch(`${getApiUrl()}/api/ai-chat/history`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+    } catch (_) {}
+  };
+
   if (!isPremium) {
     return (
       <div className="min-h-screen pt-16 flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -134,7 +154,7 @@ export default function AIChat() {
         <div className="floating-orb absolute bottom-40 left-20 w-40 h-40 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-xl" style={{animationDelay: '4s'}}></div>
       </div>
       {/* Premium Header */}
-      <div className="sticky top-14 z-20 premium-glass border-b border-white/30">
+      <div className="fixed top-14 left-0 right-0 z-20 premium-glass border-b border-white/30">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -153,13 +173,29 @@ export default function AIChat() {
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
               Online
             </div>
-            <a href="/ai-voice" className="premium-gradient text-white px-4 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 text-sm font-medium">
-              <MicrophoneIcon className="w-4 h-4"/>
-              Voice Chat
-            </a>
+            <button onClick={newChat} disabled={sending} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-300 flex items-center gap-2 text-sm font-medium disabled:opacity-60">
+              <PlusIcon className="w-4 h-4" />
+              New Chat
+            </button>
           </div>
         </div>
       </div>
+      {/* Spacer for fixed header height */}
+      <div className="h-16"></div>
+
+      {showNotice && (
+        <div className="max-w-4xl mx-auto px-4 mt-4">
+          <div className="premium-glass rounded-xl px-4 py-3 text-sm flex items-start justify-between gap-3 border border-white/30">
+            <div className="flex items-start gap-2">
+              <LockClosedIcon className="w-4 h-4 text-slate-600 mt-0.5" />
+              <p className="text-slate-700">
+                For your privacy, chats are stored temporarily and auto-delete after 24 hours.
+              </p>
+            </div>
+            <button onClick={dismissNotice} className="text-slate-500 hover:text-slate-700 text-xs">Dismiss</button>
+          </div>
+        </div>
+      )}
 
       {/* Chat */}
       <div className="max-w-4xl mx-auto px-4">

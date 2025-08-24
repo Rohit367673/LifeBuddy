@@ -103,7 +103,7 @@ router.post('/general', auth, requirePremium, async (req, res) => {
       .limit(10)
       .select('action description occurredAt metadata');
 
-    // Generate personalized response with DeepSeek R1 via OpenRouter
+    // Generate personalized response via OpenRouter (configured model)
     const prompt = `You are LifeBuddy AI. Personalize your answer using the user's profile and recent interactions.
 User Profile: ${JSON.stringify(user)}
 Recent Interactions: ${JSON.stringify(userContext)}
@@ -111,7 +111,7 @@ Topic: ${topic}
 User Message: ${message}
 
 Respond clearly, concisely, and helpfully. Provide step-by-step guidance if relevant.`;
-    const response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+    const response = await generateMessageWithOpenRouter(prompt, 600, 0.7);
 
     // Save chat messages with 24-hour TTL
     const startTime = Date.now();
@@ -125,8 +125,7 @@ Respond clearly, concisely, and helpfully. Provide step-by-step guidance if rele
       topic,
       aiService: 'openrouter',
       metadata: {
-        responseTime: Date.now() - startTime,
-        model: 'deepseek/deepseek-r1:free'
+        responseTime: Date.now() - startTime
       }
     });
 
@@ -139,8 +138,7 @@ Respond clearly, concisely, and helpfully. Provide step-by-step guidance if rele
       metadata: {
         topic,
         query: message,
-        responseLength: response.length,
-        model: 'deepseek/deepseek-r1:free'
+        responseLength: response.length
       }
     });
 
@@ -209,11 +207,11 @@ router.post('/ask', auth, requirePremium, async (req, res) => {
     // Save user message to chat history (TTL 24h)
     await ChatMessage.create({ user: req.user.id, role: 'user', content: messageToSave, topic: 'general' });
 
-    // Use OpenRouter DeepSeek R1 exclusively
+    // Use OpenRouter (configured model)
     let response = '';
     try {
       const prompt = `User: ${user?.displayName || 'friend'}\nSchedule: ${currentSchedule}\nRecent: ${JSON.stringify(recentInteractions)}\nQuestion: ${message}`;
-      response = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+      response = await generateMessageWithOpenRouter(prompt, 600, 0.7);
     } catch (openRouterErr) {
       console.warn('OpenRouter failed:', openRouterErr?.message || openRouterErr);
       response = 'Sorry, I could not generate a response right now. Please try again in a moment.';
@@ -262,7 +260,7 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
 
     let fullText = '';
     try {
-      fullText = await generateMessageWithOpenRouter(prompt, 600, 0.7, { model: 'deepseek/deepseek-r1:free' });
+      fullText = await generateMessageWithOpenRouter(prompt, 600, 0.7);
     } catch (err) {
       // If OpenRouter fails, send a friendly message instead of 404/500 to keep UX smooth
       fullText = 'Sorry, my AI brain is busy right now. Please try again in a moment.';
@@ -279,7 +277,7 @@ router.post('/stream', auth, requirePremium, async (req, res) => {
       content: fullText,
       topic: 'general',
       aiService: 'openrouter',
-      metadata: { model: 'deepseek/deepseek-r1:free', streaming: true }
+      metadata: { streaming: true }
     });
 
     const chunkSize = 96;
@@ -421,7 +419,7 @@ Question: ${question}
 Code Context:\n${codeContext || '(none)'}
 
 Explain reasoning briefly, then provide steps and example code if useful.`;
-    const response = await generateMessageWithOpenRouter(codingPrompt, 800, 0.5, { model: 'deepseek/deepseek-r1:free' });
+    const response = await generateMessageWithOpenRouter(codingPrompt, 800, 0.5);
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -481,7 +479,7 @@ Goals: ${fitnessGoals || '(not provided)'}
 Question: ${question}
 
 Provide actionable steps, cautions, and a simple plan.`;
-    const response = await generateMessageWithOpenRouter(fitnessPrompt, 700, 0.7, { model: 'deepseek/deepseek-r1:free' });
+    const response = await generateMessageWithOpenRouter(fitnessPrompt, 700, 0.7);
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -540,7 +538,7 @@ User Profile: ${JSON.stringify(user)}
 Topic: ${topic}
 
 Break it down into key points, examples/analogies, and resources.`;
-    const response = await generateMessageWithOpenRouter(educationPrompt, 800, 0.6, { model: 'deepseek/deepseek-r1:free' });
+    const response = await generateMessageWithOpenRouter(educationPrompt, 800, 0.6);
 
     // Log interaction
     await ScheduleInteraction.create({
@@ -602,7 +600,7 @@ Current Schedule Context: ${currentSchedule || '(none)'}
 Question: ${question}
 
 Give concrete steps, prioritization tips, and time-block suggestions.`;
-    const response = await generateMessageWithOpenRouter(productivityPrompt, 700, 0.6, { model: 'deepseek/deepseek-r1:free' });
+    const response = await generateMessageWithOpenRouter(productivityPrompt, 700, 0.6);
 
     // Log interaction
     await ScheduleInteraction.create({
