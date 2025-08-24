@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { loadAdSenseScript, pushAd } from '../utils/ads';
 
 const AdManager = ({ user, promoActive }) => {
   const [adInitialized, setAdInitialized] = useState(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return; // Skip on server
+    if (!import.meta.env.PROD) return; // Only load/show in production
     
     // Conditions for showing ads
     const shouldShowAd = user && !user.isPremium && user.consentGiven && !promoActive;
@@ -12,54 +15,49 @@ const AdManager = ({ user, promoActive }) => {
     if (!shouldShowAd) {
       // Cleanup if conditions change
       if (adInitialized) {
-        // Remove any existing ad containers
-        const adContainers = document.querySelectorAll('.adsbygoogle');
-        adContainers.forEach(container => container.remove());
+        // Remove only ads within this component's container
+        const root = containerRef.current;
+        if (root) {
+          const adContainers = root.querySelectorAll('.adsbygoogle');
+          adContainers.forEach(container => container.remove());
+        }
         setAdInitialized(false);
       }
       return;
     }
     
-    // Inject AdSense script
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${import.meta.env.VITE_ADSENSE_CLIENT}`;
-    script.crossOrigin = "anonymous";
-    
-    script.onload = () => {
-      window.adsbygoogle = window.adsbygoogle || [];
-      try {
-        window.adsbygoogle.push({});
-        setAdInitialized(true);
-      } catch (err) {
-        console.error('AdSense push error:', err);
-      }
-    };
-    
-    script.onerror = () => {
-      console.error('Failed to load AdSense script');
-    };
-    
-    document.head.appendChild(script);
+    // Load AdSense via shared utility (no-ops if already present)
+    loadAdSenseScript()
+      .then(() => {
+        try {
+          pushAd();
+          setAdInitialized(true);
+        } catch (err) {
+          console.error('AdSense push error:', err);
+        }
+      })
+      .catch(() => {
+        // Non-fatal, skip ads
+      });
     
     return () => {
-      // Cleanup script
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
+      // Remove only this component's ad containers
+      const root = containerRef.current;
+      if (root) {
+        const adContainers = root.querySelectorAll('.adsbygoogle');
+        adContainers.forEach(container => container.remove());
       }
-      // Remove ad containers
-      const adContainers = document.querySelectorAll('.adsbygoogle');
-      adContainers.forEach(container => container.remove());
       setAdInitialized(false);
     };
   }, [user, promoActive]);
 
+  if (!import.meta.env.PROD) return null;
   if (!user || user.isPremium || !user.consentGiven || promoActive) {
     return null;
   }
 
   return (
-    <div className="ad-container">
+    <div className="ad-container" ref={containerRef}>
       <ins
         className="adsbygoogle"
         style={{ display: 'block' }}

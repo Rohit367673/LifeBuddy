@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/config';
 import { loadAdSenseScript } from '../utils/ads';
+import { pushAd } from '../utils/ads';
 import { 
   CheckCircleIcon, 
   PlayIcon, 
@@ -39,7 +40,10 @@ export default function TrialTasks({ onTrialActivated }) {
     try {
       // Load AdSense script
       loadAdSenseScript()
-        .then(() => setAdLoaded(true))
+        .then(() => {
+          const configured = Boolean(import.meta.env.VITE_ADSENSE_CLIENT && import.meta.env.VITE_ADSENSE_SLOT);
+          setAdLoaded(import.meta.env.PROD && configured);
+        })
         .catch(err => {
           console.error('Failed to load AdSense:', err);
           setAdError(true);
@@ -113,6 +117,21 @@ export default function TrialTasks({ onTrialActivated }) {
   };
 
   const watchAd = async () => {
+    // In development, simulate completion without loading AdSense
+    if (!import.meta.env.PROD) {
+      setCompletingTask('watch_ad');
+      setTimeout(async () => {
+        try {
+          await completeTask('watch_ad', { adProvider: 'simulated_dev' });
+          setAdCompleted(true);
+        } finally {
+          setCompletingTask(null);
+        }
+      }, 10000);
+      return;
+    }
+
+    // Production: require configured and loaded AdSense
     if (!adLoaded) {
       setAdError(true);
       return;
@@ -120,46 +139,38 @@ export default function TrialTasks({ onTrialActivated }) {
 
     setCompletingTask('watch_ad');
     try {
-      // Show AdSense ad
-      window.adsbygoogle = window.adsbygoogle || [];
-      window.adsbygoogle.push({
-        overlays: {bottom: true},
-        params: {
-          'client': 'ca-pub-7023789007176202',
-          'adtest': 'on',
-          'format': 'autorelaxed'
-        }
-      });
-      
-      // Create ad container
+      // Create ad container with official AdSense ins block
       let adContainer = document.createElement('div');
       adContainer.id = 'trial-ad-container';
       adContainer.innerHTML = `
         <ins class="adsbygoogle"
           style="display:block"
-          data-ad-client="ca-pub-7023789007176202"
-          data-ad-slot="1234567890"
+          data-ad-client="${import.meta.env.VITE_ADSENSE_CLIENT || ''}"
+          data-ad-slot="${import.meta.env.VITE_ADSENSE_SLOT || ''}"
           data-ad-format="auto"
           data-full-width-responsive="true">
         </ins>
       `;
-      
+
       document.body.appendChild(adContainer);
-      
-      // Listen for ad completion
-      adContainer.addEventListener('adViewable', () => {
-        setTimeout(() => {
-          try {
-            completeTask('watch_ad', { adProvider: 'adsense' });
-            setAdCompleted(true);
-          } finally {
-            if (adContainer) {
-              document.body.removeChild(adContainer);
-              adContainer = null;
-            }
+
+      try {
+        pushAd();
+      } catch {}
+
+      // Fallback completion after 30s of viewing
+      setTimeout(async () => {
+        try {
+          await completeTask('watch_ad', { adProvider: 'adsense' });
+          setAdCompleted(true);
+        } finally {
+          if (adContainer) {
+            document.body.removeChild(adContainer);
+            adContainer = null;
           }
-        }, 1000);
-      });
+          setCompletingTask(null);
+        }
+      }, 30000);
     } catch (err) {
       console.error('Ad failed to load:', err);
       setAdError(true);

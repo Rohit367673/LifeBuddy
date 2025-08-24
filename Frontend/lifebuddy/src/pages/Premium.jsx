@@ -29,6 +29,7 @@ import PlanCard from '../components/PlanCard';
 import FeatureComparison from '../components/FeatureComparison';
 import TestimonialCard from '../components/TestimonialCard';
 import FAQAccordion from '../components/FAQAccordion';
+import { loadAdSenseScript, pushAd } from '../utils/ads';
 
 const Premium = () => {
   const { subscription, features, usage, startTrial, subscribe, getPlans, hasFeature } = usePremium();
@@ -46,6 +47,11 @@ const Premium = () => {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   const IS_PROD = import.meta.env.MODE === 'production';
 
+  // AdSense viewing state (production only)
+  const [isWatching, setIsWatching] = useState(false);
+  const [adKey, setAdKey] = useState(0);
+  const [countdown, setCountdown] = useState(30);
+
   useEffect(() => {
     const loadPlans = async () => {
       const plansData = await getPlans();
@@ -61,20 +67,26 @@ const Premium = () => {
     }
   }, []);
 
-  // Load Google Publisher Tag (GPT) for Rewarded Ads in production
+  // Load AdSense when watching (prod only)
   useEffect(() => {
-    if (!IS_PROD) return;
-    if (window.googletag && window.googletag.apiReady) return;
-    window.googletag = window.googletag || { cmd: [] };
-    const scriptId = 'gpt-js';
-    if (!document.getElementById(scriptId)) {
-      const g = document.createElement('script');
-      g.id = scriptId;
-      g.async = true;
-      g.src = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
-      document.head.appendChild(g);
-    }
-  }, [IS_PROD]);
+    if (!IS_PROD || !isWatching) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadAdSenseScript();
+        if (cancelled) return;
+        setTimeout(() => { try { pushAd(); } catch {} }, 100);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [IS_PROD, isWatching]);
+
+  // Countdown tick for ad watching
+  useEffect(() => {
+    if (!isWatching || countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [isWatching, countdown]);
 
   // Load trial progress
   useEffect(() => {
@@ -137,68 +149,22 @@ const Premium = () => {
     } catch (_) { toast.error('Failed'); }
   };
 
-  // Start rewarded ad session and poll for reward (production)
-  const startRewarded = async () => {
-    try {
-      setReward({ sessionId: '', status: 'starting' });
-      const s = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/start`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!s.ok) throw new Error('Failed to start session');
-      const { sessionId } = await s.json();
-      setReward({ sessionId, status: 'pending' });
-      // Show a GPT Rewarded ad and pass sessionId for SSV correlation
-      try {
-        window.googletag = window.googletag || { cmd: [] };
-        window.googletag.cmd.push(() => {
-          const adUnitPath = import.meta.env.VITE_GAM_REWARDED_AD_UNIT; // e.g. '/1234567/rewarded_web'
-          if (!adUnitPath) {
-            console.warn('VITE_GAM_REWARDED_AD_UNIT not set. Skipping GPT rewarded request.');
-            return;
-          }
-          const slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
-          if (!slot) {
-            console.warn('Failed to define rewarded slot');
-            return;
-          }
-          slot.addService(googletag.pubads());
-          try { googletag.pubads().setPublisherProvidedId(sessionId); } catch {}
-          try { slot.setTargeting('session_id', sessionId); } catch {}
-          googletag.pubads().addEventListener('rewardedSlotReady', (event) => {
-            try { event.makeRewardedVisible(); } catch {}
-          });
-          googletag.enableServices();
-          googletag.display(slot);
-        });
-      } catch (e) {
-        console.warn('GPT rewarded error', e);
-      }
-
-      let attempts = 0;
-      const timer = setInterval(async () => {
-        attempts++;
-        try {
-          const r = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/status/${sessionId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (!r.ok) return;
-          const { status } = await r.json();
-          if (status === 'rewarded') {
-            clearInterval(timer);
-            setReward((prev) => ({ ...prev, status: 'rewarded' }));
-            setWatchedAd(true);
-            toast.success('Ad watched ✓');
-          }
-        } catch {}
-        if (attempts > 120) {
-          clearInterval(timer);
-          setReward((r) => ({ ...r, status: 'timeout' }));
-        }
-      }, 2000);
-    } catch {
-      setReward({ sessionId: '', status: 'error' });
+  // Start AdSense-based watch flow (30s) and then mark task complete
+  const startWatchAd = async () => {
+    if (!IS_PROD) {
+      await callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓');
+      return;
     }
+    setReward({ sessionId: '', status: 'starting' });
+    setIsWatching(true);
+    setAdKey((k) => k + 1);
+    setCountdown(30);
+    setTimeout(async () => {
+      await callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓');
+      setIsWatching(false);
+      setReward({ sessionId: '', status: 'rewarded' });
+      setWatchedAd(true);
+    }, 30000);
   };
 
   const handleSubscribe = async (plan) => {
@@ -451,15 +417,36 @@ const Premium = () => {
                 </div>
                 <span className={`text-xs px-2 py-1 rounded ${watchedAd ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>{watchedAd ? 'Done' : 'Pending'}</span>
               </div>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3">
                 {IS_PROD ? (
-                  <button disabled={watchedAd || reward.status==='starting' || reward.status==='pending'} onClick={startRewarded} className="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
-                    {reward.status==='rewarded' ? 'Rewarded ✓' : 'Watch rewarded ad'}
-                  </button>
+                  <div>
+                    {!isWatching ? (
+                      <div className="flex justify-end">
+                        <button disabled={watchedAd} onClick={startWatchAd} className="px-3 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
+                          {reward.status==='rewarded' ? 'Rewarded ✓' : 'Watch ad'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="mb-2 text-xs text-gray-600 dark:text-gray-300">Please keep this open {countdown}s…</div>
+                        <ins
+                          key={adKey}
+                          className="adsbygoogle"
+                          style={{ display: 'block' }}
+                          data-ad-client={import.meta.env.VITE_ADSENSE_CLIENT}
+                          data-ad-slot={import.meta.env.VITE_ADSENSE_SLOT}
+                          data-ad-format="auto"
+                          data-full-width-responsive="true"
+                        ></ins>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <button disabled={watchedAd} onClick={() => callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50">
-                    <PlayCircleIcon className="w-4 h-4"/> I watched the ad
-                  </button>
+                  <div className="flex justify-end">
+                    <button disabled={watchedAd} onClick={() => callTrialTask('trial-tasks/watch-ad', 'Ad watched ✓')} className="px-3 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50">
+                      <PlayCircleIcon className="w-4 h-4"/> I watched the ad
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

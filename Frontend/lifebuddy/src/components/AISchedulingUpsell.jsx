@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePremium } from '../context/PremiumContext';
 import { useAuth } from '../context/AuthContext';
 import { LockClosedIcon, SparklesIcon, ClockIcon, PaperAirplaneIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { loadAdSenseScript, pushAd } from '../utils/ads';
 
 export default function AISchedulingUpsell() {
   const navigate = useNavigate();
@@ -17,8 +18,6 @@ export default function AISchedulingUpsell() {
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   const IS_PROD = import.meta.env.MODE === 'production';
-  const ENABLE_REWARDED_DEV = import.meta.env.VITE_ENABLE_REWARDED_DEV === 'true';
-  const SHOW_REWARDED = IS_PROD || ENABLE_REWARDED_DEV;
 
   const handleUpgrade = () => navigate('/premium');
 
@@ -49,20 +48,33 @@ export default function AISchedulingUpsell() {
     return () => { cancelled = true; };
   }, [showTrialModal]);
 
-  // Load Google Publisher Tag (GPT) for Rewarded Ads
+  // AdSense viewing state (production only)
+  const [isWatching, setIsWatching] = useState(false);
+  const [adReady, setAdReady] = useState(false);
+  const [adKey, setAdKey] = useState(0);
+  const [countdown, setCountdown] = useState(30);
+
   useEffect(() => {
-    if (!showTrialModal || !SHOW_REWARDED) return;
-    if (window.googletag && window.googletag.apiReady) return;
-    window.googletag = window.googletag || { cmd: [] };
-    const scriptId = 'gpt-js';
-    if (!document.getElementById(scriptId)) {
-      const g = document.createElement('script');
-      g.id = scriptId;
-      g.async = true;
-      g.src = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
-      document.head.appendChild(g);
-    }
-  }, [showTrialModal, SHOW_REWARDED]);
+    if (!IS_PROD) return;
+    if (!isWatching) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadAdSenseScript();
+        if (cancelled) return;
+        setAdReady(true);
+        setTimeout(() => { try { pushAd(); } catch {} }, 100);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [IS_PROD, isWatching]);
+
+  useEffect(() => {
+    if (!isWatching) return;
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [isWatching, countdown]);
 
   const markAdWatched = async () => {
     try {
@@ -86,75 +98,21 @@ export default function AISchedulingUpsell() {
     }
   };
 
-  // Start Rewarded Ad session (SSV-based). Real ad playback requires GAM/IMA setup.
-  const startRewarded = async () => {
-    try {
-      setReward((r) => ({ ...r, status: 'starting' }));
-      const res = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/start`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-      });
-      if (!res.ok) { setReward({ sessionId: '', status: 'error' }); return; }
-      const data = await res.json();
-      setReward({ sessionId: data.sessionId, status: 'pending' });
-      // Request a GPT Rewarded Ad and pass sessionId for SSV correlation
-      try {
-        window.googletag = window.googletag || { cmd: [] };
-        window.googletag.cmd.push(() => {
-          const adUnitPath = import.meta.env.VITE_GAM_REWARDED_AD_UNIT; // e.g. '/1234567890/rewarded_web'
-          if (!adUnitPath) {
-            console.warn('VITE_GAM_REWARDED_AD_UNIT not set. Skipping GPT rewarded request.');
-            return;
-          }
-          const slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
-          if (!slot) {
-            console.warn('Failed to define rewarded slot');
-            return;
-          }
-          slot.addService(googletag.pubads());
-          // Pass identifiers for SSV mapping (configure your GAM SSV to consume PPID/targeting)
-          try { googletag.pubads().setPublisherProvidedId(data.sessionId); } catch {}
-          try { slot.setTargeting('session_id', data.sessionId); } catch {}
-
-          // Show the rewarded ad when ready, and listen for reward UI event
-          googletag.pubads().addEventListener('rewardedSlotReady', (event) => {
-            try { event.makeRewardedVisible(); } catch {}
-          });
-          googletag.pubads().addEventListener('rewardedSlotGranted', () => {
-            // User earned the reward; final confirmation still comes via SSV -> status polling below
-          });
-
-          googletag.enableServices();
-          googletag.display(slot);
-        });
-      } catch (e) {
-        console.warn('GPT rewarded error', e);
-      }
-      // Begin polling for SSV completion
-      let attempts = 0;
-      const timer = setInterval(async () => {
-        attempts += 1;
-        try {
-          const stRes = await fetch(`${API_BASE}/api/subscriptions/trial-tasks/rewarded/status/${data.sessionId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (stRes.ok) {
-            const st = await stRes.json();
-            if (st.status === 'rewarded') {
-              clearInterval(timer);
-              setReward((r) => ({ ...r, status: 'rewarded' }));
-              setTaskState((s) => ({ ...s, watchedAd: true }));
-            }
-          }
-        } catch {}
-        if (attempts > 120) { // ~4 minutes
-          clearInterval(timer);
-          setReward((r) => ({ ...r, status: 'timeout' }));
-        }
-      }, 2000);
-    } catch {
-      setReward({ sessionId: '', status: 'error' });
+  const startWatchAd = async () => {
+    if (!IS_PROD) {
+      await markAdWatched();
+      return;
     }
+    setReward({ sessionId: '', status: 'starting' });
+    setIsWatching(true);
+    setAdKey((k) => k + 1);
+    setCountdown(30);
+    // After 30s, mark watched
+    setTimeout(async () => {
+      await markAdWatched();
+      setIsWatching(false);
+      setReward({ sessionId: '', status: 'rewarded' });
+    }, 30000);
   };
 
   const canUnlock = taskState.watchedAd;
@@ -185,9 +143,26 @@ export default function AISchedulingUpsell() {
                   <span className={`text-xs px-2 py-1 rounded ${taskState.watchedAd ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>{taskState.watchedAd ? 'Done' : 'Pending'}</span>
                 </div>
                 <div className="mt-3">
-                  {SHOW_REWARDED ? (
-                    <div className="flex justify-end gap-2">
-                      <button disabled={reward.status==='starting'||reward.status==='pending'||taskState.watchedAd} onClick={startRewarded} className="text-sm px-3 py-1.5 rounded-md bg-slate-900 text-white disabled:opacity-50 dark:bg-slate-700">{reward.status==='rewarded' ? 'Rewarded ✓' : 'Watch rewarded ad'}</button>
+                  {IS_PROD ? (
+                    <div>
+                      {!isWatching ? (
+                        <div className="flex justify-end gap-2">
+                          <button disabled={taskState.watchedAd} onClick={startWatchAd} className="text-sm px-3 py-1.5 rounded-md bg-slate-900 text-white disabled:opacity-50 dark:bg-slate-700">{reward.status==='rewarded' ? 'Rewarded ✓' : 'Watch ad'}</button>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <div className="mb-2 text-xs text-slate-500">Please keep this open {countdown}s…</div>
+                          <ins
+                            key={adKey}
+                            className="adsbygoogle"
+                            style={{ display: 'block' }}
+                            data-ad-client={import.meta.env.VITE_ADSENSE_CLIENT}
+                            data-ad-slot={import.meta.env.VITE_ADSENSE_SLOT}
+                            data-ad-format="auto"
+                            data-full-width-responsive="true"
+                          ></ins>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
