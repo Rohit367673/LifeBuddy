@@ -83,7 +83,19 @@ router.post('/create-order', authenticateUser, async (req, res) => {
     });
   } catch (e) {
     console.error('[PayPal] create-order error:', e);
-    return res.status(500).json({ success: false, message: e.message || 'Failed to create PayPal order' });
+    // Surface helpful PayPal error context (non-sensitive) for troubleshooting
+    const paypalErr = (e && e.statusCode && e.result) ? {
+      statusCode: e.statusCode,
+      debug_id: e.result?.debug_id,
+      details: e.result?.details,
+      message: e.result?.message
+    } : null;
+    const httpCode = paypalErr?.statusCode === 422 ? 422 : 500;
+    return res.status(httpCode).json({
+      success: false,
+      message: paypalErr?.message || e.message || 'Failed to create PayPal order',
+      paypal: paypalErr || undefined
+    });
   }
 });
 
@@ -213,7 +225,19 @@ router.post('/capture', authenticateUser, async (req, res) => {
     return res.json({ success: true, message: 'Payment captured and subscription activated', subscription: user.subscription });
   } catch (e) {
     console.error('[PayPal] capture error:', e);
-    return res.status(500).json({ success: false, message: e.message || 'Failed to capture PayPal order' });
+    // Surface helpful PayPal error context (non-sensitive) for troubleshooting
+    const paypalErr = (e && e.statusCode && e.result) ? {
+      statusCode: e.statusCode,
+      debug_id: e.result?.debug_id,
+      details: e.result?.details,
+      message: e.result?.message
+    } : null;
+    const httpCode = paypalErr?.statusCode === 422 ? 422 : 500;
+    return res.status(httpCode).json({
+      success: false,
+      message: paypalErr?.message || e.message || 'Failed to capture PayPal order',
+      paypal: paypalErr || undefined
+    });
   }
 });
 

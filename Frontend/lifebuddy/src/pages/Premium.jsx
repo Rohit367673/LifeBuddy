@@ -32,7 +32,7 @@ import FAQAccordion from '../components/FAQAccordion';
 import { loadAdSenseScript, pushAd } from '../utils/ads';
 
 const Premium = () => {
-  const { subscription, features, usage, startTrial, subscribe, getPlans, hasFeature } = usePremium();
+  const { subscription, features, usage, startTrial, subscribe, getPlans, hasFeature, fetchSubscriptionStatus } = usePremium();
   const { user, token } = useAuth();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -173,6 +173,20 @@ const Premium = () => {
   };
 
   const handlePaymentSuccess = async (paymentData) => {
+    // If PayPal capture already activated subscription on the backend, skip generic subscribe
+    if (paymentData?.__paypalCaptured) {
+      try {
+        setLoading(true);
+        await fetchSubscriptionStatus();
+        setShowSubscribeModal(false);
+        window.location.href = '/subscribe-success';
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Fallback: use generic subscribe (e.g., card or mock payments)
     setLoading(true);
     const success = await subscribe(selectedPlan, paymentData);
     setLoading(false);

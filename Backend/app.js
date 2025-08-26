@@ -39,13 +39,13 @@ const premiumTaskRoutes = require('./routes/premiumTaskRoutes');
 const aiChatRoutes = require('./routes/aiChatRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const trialRoutes = require('./routes/trialRoutes');
+const paypalRoutes = require('./routes/paypalRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
 const Activity = require('./models/Activity');
 const ReferralCode = require('./models/ReferralCode');
 const ReferralHit = require('./models/ReferralHit');
 const User = require('./models/User');
 const { authenticateUser } = require('./middlewares/authMiddleware');
-
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -114,6 +114,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/trial', trialRoutes);
 app.use('/api/admin-coupons', adminCouponRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/paypal', paypalRoutes);
 
 // Minimal current user endpoint for frontend checks
 app.get('/api/user', authenticateUser, async (req, res) => {

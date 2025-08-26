@@ -164,9 +164,10 @@ const Home = () => {
             <span className="ml-2 text-sm text-gray-500">Your AI-powered life, organized</span>
           </div>
           <div className="flex space-x-6 text-sm text-gray-500">
-            <a href="#" className="hover:text-purple-600">Privacy</a>
-            <a href="#" className="hover:text-purple-600">Terms</a>
-            <a href="#" className="hover:text-purple-600">Support</a>
+            <a href="/about" className="hover:text-purple-600">About</a>
+            <a href="/privacy-policy" className="hover:text-purple-600">Privacy Policy</a>
+            <a href="/terms" className="hover:text-purple-600">Terms &amp; Conditions</a>
+            <a href="/contact" className="hover:text-purple-600">Contact</a>
           </div>
         </div>
       </footer>
