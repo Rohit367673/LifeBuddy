@@ -284,7 +284,7 @@ const Premium = () => {
     {
       id: 'monthly',
       name: 'Monthly',
-      price: 199,
+      price: 1.99,
       period: 'month',
       description: 'Most popular choice',
       features: [
@@ -306,7 +306,7 @@ const Premium = () => {
     {
       id: 'yearly',
       name: 'Yearly',
-      price: 1990,
+      price: 21.99,
       period: 'year',
       description: 'Best value - save 20%',
       features: [

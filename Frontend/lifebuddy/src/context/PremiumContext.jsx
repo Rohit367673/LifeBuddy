@@ -216,7 +216,7 @@ export const PremiumProvider = ({ children }) => {
       {
         id: 'monthly',
         name: 'Monthly',
-        price: 9.99,
+        price: 1.99,
         period: 'month',
         description: 'Most popular choice',
         features: [
@@ -238,7 +238,7 @@ export const PremiumProvider = ({ children }) => {
       {
         id: 'yearly',
         name: 'Yearly',
-        price: 99.99,
+        price: 21.99,
         period: 'year',
         description: 'Best value - save 17%',
         features: [
