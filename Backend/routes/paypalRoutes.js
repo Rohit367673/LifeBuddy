@@ -23,7 +23,7 @@ async function computeAmount(plan, couponCode) {
   if (!['monthly', 'yearly'].includes(plan)) {
     throw new Error('Invalid plan');
   }
-  const base = plan === 'monthly' ? 9.99 : 99.99;
+  const base = plan === 'monthly' ? 1.99 : 21.99;
   let discount = 0;
   let appliedCoupon = null;
   if (couponCode) {
