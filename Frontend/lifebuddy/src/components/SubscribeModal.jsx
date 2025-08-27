@@ -288,7 +288,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               >
                 <span className="font-medium mb-2">PayPal</span>
                 <img 
-                  src={cashfreeImage} 
+                  src={paypalImage} 
                   alt="PayPal payment methods" 
                   className="w-24 h-auto object-contain"
                 />
@@ -304,7 +304,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               >
                 <span className="font-medium mb-2">Cashfree</span>
                 <img 
-                  src={paypalImage} 
+                  src={cashfreeImage} 
                   alt="Cashfree payment methods" 
                   className="w-24 h-auto object-contain"
                 />
