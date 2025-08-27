@@ -9,6 +9,8 @@ import {
 import toast from 'react-hot-toast';
 import { getApiUrl } from '../utils/config';
 import { useAuth } from '../context/AuthContext';
+import paypalImage from '../assets/193-1936998_payment-method-47-icons-payment-option-icons-png.png';
+import cashfreeImage from '../assets/0_BIy_CblCTVoOl5Zg.png';
 
 const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const { token } = useAuth();
@@ -281,17 +283,34 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
             <div className="flex space-x-4">
               <button
                 type="button"
-                className={`px-4 py-2 rounded-md ${paymentGateway === 'paypal' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`flex-1 flex flex-col items-center p-4 rounded-lg border-2 ${paymentGateway === 'paypal' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'}`}
                 onClick={() => setPaymentGateway('paypal')}
               >
-                PayPal
+                <span className="font-medium mb-2">PayPal</span>
+                <img 
+                  src={cashfreeImage} 
+                  alt="PayPal payment methods" 
+                  className="w-24 h-auto object-contain"
+                />
+                <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                  International credit cards
+                </p>
               </button>
+
               <button
                 type="button"
-                className={`px-4 py-2 rounded-md ${paymentGateway === 'cashfree' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`flex-1 flex flex-col items-center p-4 rounded-lg border-2 ${paymentGateway === 'cashfree' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'}`}
                 onClick={() => setPaymentGateway('cashfree')}
               >
-                Cashfree
+                <span className="font-medium mb-2">Cashfree</span>
+                <img 
+                  src={paypalImage} 
+                  alt="Cashfree payment methods" 
+                  className="w-24 h-auto object-contain"
+                />
+                <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                  UPI, Credit/Debit Cards
+                </p>
               </button>
             </div>
           </div>
@@ -411,4 +430,4 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   );
 };
 
-export default SubscribeModal; 
+export default SubscribeModal;
