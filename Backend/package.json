@@ -20,6 +20,7 @@
     "@paypal/checkout-server-sdk": "^1.0.3",
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
+    "cashfree-pg": "^5.0.8",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

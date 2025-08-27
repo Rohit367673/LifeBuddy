@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 
 const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const { token } = useAuth();
-  const paymentMethod = 'paypal'; // Only PayPal is available
+  const [paymentGateway, setPaymentGateway] = useState('paypal'); // 'paypal' or 'cashfree'
   const [isProcessing, setIsProcessing] = useState(false);
   const [coupon, setCoupon] = useState('');
   const [couponInfo, setCouponInfo] = useState(null);
@@ -21,6 +21,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const [paypalReady, setPaypalReady] = useState(false);
   const [initializingPaypal, setInitializingPaypal] = useState(false);
   const [paypalError, setPaypalError] = useState('');
+  const cashfreeRef = useRef(null);
 
   const planDetails = {
     monthly: { name: 'Monthly Plan', price: 1.99, period: 'month' },
@@ -159,6 +160,56 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (paymentGateway === 'cashfree' && Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) > 0) {
+      // Load Cashfree SDK
+      const script = document.createElement('script');
+      script.src = process.env.NODE_ENV === 'production' 
+        ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.production.js' 
+        : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
+      script.async = true;
+      script.onload = initializeCashfree;
+      document.body.appendChild(script);
+
+      return () => {
+        if (script.parentNode) {
+          document.body.removeChild(script);
+        }
+      };
+    }
+  }, [paymentGateway, plan, couponInfo]);
+
+  const initializeCashfree = async () => {
+    try {
+      const response = await fetch('/api/payments/cashfree/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ plan, couponCode: coupon })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create Cashfree order');
+      }
+      
+      const { token: orderToken, orderId } = await response.json();
+
+      // Initialize Cashfree
+      const cashfree = new Cashfree();
+      cashfreeRef.current = cashfree;
+
+      cashfree.redirect(orderToken, {
+        mode: 'redirect',
+        redirectTarget: '_self'
+      });
+    } catch (err) {
+      console.error('Cashfree initialization error:', err);
+      // Handle error
+    }
+  };
+
   const validateCoupon = async () => {
     const code = coupon.trim();
     if (!code) return;
@@ -222,6 +273,29 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
 
         {/* Content */}
         <div className="p-6">
+          {/* Payment Method */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Payment Method
+            </label>
+            <div className="flex space-x-4">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md ${paymentGateway === 'paypal' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                onClick={() => setPaymentGateway('paypal')}
+              >
+                PayPal
+              </button>
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md ${paymentGateway === 'cashfree' ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                onClick={() => setPaymentGateway('cashfree')}
+              >
+                Cashfree
+              </button>
+            </div>
+          </div>
+
           {/* Plan Summary */}
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
@@ -268,29 +342,54 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
           </div>
 
           {/* PayPal */}
-          <div className="py-2">
-            <div className="text-center mb-3">
-              <div className="text-blue-600 font-bold text-2xl">PayPal</div>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">Secure checkout powered by PayPal</p>
+          {paymentGateway === 'paypal' ? (
+            <div className="py-2">
+              <div className="text-center mb-3">
+                <div className="text-blue-600 font-bold text-2xl">PayPal</div>
+                <p className="text-gray-600 dark:text-gray-300 text-sm">Secure checkout powered by PayPal</p>
+              </div>
+              {Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) === 0 ? (
+                <div className="text-center">
+                  <button onClick={handleFreeActivation} disabled={isProcessing} className="btn btn-primary">
+                    {isProcessing ? 'Activating…' : 'Activate with Coupon'}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  {paypalError && (
+                    <div className="text-red-600 text-sm mb-2 text-center">{paypalError}</div>
+                  )}
+                  <div ref={paypalButtonsRef}></div>
+                  {initializingPaypal && (
+                    <div className="text-center text-sm text-gray-500 mt-2">Loading PayPal…</div>
+                  )}
+                </div>
+              )}
             </div>
-            {Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) === 0 ? (
-              <div className="text-center">
-                <button onClick={handleFreeActivation} disabled={isProcessing} className="btn btn-primary">
-                  {isProcessing ? 'Activating…' : 'Activate with Coupon'}
-                </button>
+          ) : (
+            // Cashfree form
+            <div className="py-2">
+              <div className="text-center mb-3">
+                <div className="text-blue-600 font-bold text-2xl">Cashfree</div>
+                <p className="text-gray-600 dark:text-gray-300 text-sm">Secure checkout powered by Cashfree</p>
               </div>
-            ) : (
-              <div>
-                {paypalError && (
-                  <div className="text-red-600 text-sm mb-2 text-center">{paypalError}</div>
-                )}
-                <div ref={paypalButtonsRef}></div>
-                {initializingPaypal && (
-                  <div className="text-center text-sm text-gray-500 mt-2">Loading PayPal…</div>
-                )}
-              </div>
-            )}
-          </div>
+              {Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) === 0 ? (
+                <div className="text-center">
+                  <button 
+                    onClick={handleFreeActivation}
+                    disabled={isProcessing}
+                    className="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 disabled:opacity-50"
+                  >
+                    {isProcessing ? 'Processing...' : 'Activate Free'}
+                  </button>
+                </div>
+              ) : (
+                <div id="cashfree-payment-element">
+                  <p>Redirecting to Cashfree...</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Security Notice */}
           <div className="flex items-center mt-6 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">

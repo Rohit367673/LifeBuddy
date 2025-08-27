@@ -40,6 +40,7 @@ const aiChatRoutes = require('./routes/aiChatRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const trialRoutes = require('./routes/trialRoutes');
 const paypalRoutes = require('./routes/paypalRoutes');
+const cashfreeRoutes = require('./routes/cashfreeRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
 const Activity = require('./models/Activity');
 const ReferralCode = require('./models/ReferralCode');
@@ -114,7 +115,8 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/trial', trialRoutes);
 app.use('/api/admin-coupons', adminCouponRoutes);
 app.use('/api/referrals', referralRoutes);
-app.use('/api/paypal', paypalRoutes);
+app.use('/api/payments/paypal', paypalRoutes);
+app.use('/api/payments/cashfree', cashfreeRoutes);
 
 // Minimal current user endpoint for frontend checks
 app.get('/api/user', authenticateUser, async (req, res) => {

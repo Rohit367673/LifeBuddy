@@ -5,6 +5,7 @@ const { client: paypalClient } = require('../services/paypalClient');
 const User = require('../models/User');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
+const cashfree = require('../services/cashfreeClient'); // Assuming you have a cashfree client setup
 
 const router = express.Router();
 
@@ -238,6 +239,108 @@ router.post('/capture', authenticateUser, async (req, res) => {
       message: paypalErr?.message || e.message || 'Failed to capture PayPal order',
       paypal: paypalErr || undefined
     });
+  }
+});
+
+// POST /api/paypal/verify-payment
+router.post('/verify-payment', authenticateUser, async (req, res) => {
+  try {
+    const { paymentMethod, paymentId, orderId, amount } = req.body;
+    
+    if (paymentMethod === 'paypal') {
+      // Existing PayPal verification
+      if (!orderId) return res.status(400).json({ success: false, message: 'orderId is required' });
+      const request = new paypal.orders.OrdersCaptureRequest(orderId);
+      request.requestBody({});
+      const captureResponse = await paypalClient().execute(request);
+      const status = captureResponse?.result?.status;
+      const purchaseUnit = captureResponse?.result?.purchase_units?.[0];
+      const captures = purchaseUnit?.payments?.captures || [];
+      const capture = captures[0];
+      if (status !== 'COMPLETED' || !capture) {
+        return res.status(400).json({ success: false, message: 'Payment not completed' });
+      }
+      const amountValue = Number(capture.amount.value);
+      const currency = String(capture.amount.currency_code || 'USD');
+      const transactionId = capture.id;
+      const paymentRecord = await Payment.create({
+        user: req.user._id,
+        amount: amountValue,
+        currency,
+        paymentMethod: 'paypal',
+        paymentId: transactionId,
+        status: 'completed',
+        metadata: {
+          paypalOrderId: orderId,
+          payer: captureResponse?.result?.payer || {},
+        }
+      });
+      // Update user subscription
+      const user = await User.findById(req.user._id);
+      const endDate = new Date();
+      if (plan === 'monthly') {
+        endDate.setMonth(endDate.getMonth() + 1);
+      } else {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      }
+      const paymentInfo = {
+        method: 'paypal',
+        transactionId,
+        amount: amountValue,
+        currency,
+        status: 'completed',
+        timestamp: new Date()
+      };
+      user.subscription = {
+        ...(user.subscription || {}),
+        plan,
+        status: 'active',
+        startDate: new Date(),
+        endDate,
+        paymentHistory: [ ...(user.subscription?.paymentHistory || []), paymentInfo ]
+      };
+      await user.save();
+      return res.json({ success: true, message: 'Payment verified and subscription activated', subscription: user.subscription });
+    } else if (paymentMethod === 'cashfree') {
+      // Verify Cashfree payment
+      const paymentDetails = await cashfree.PGOrder.getPayments(orderId);
+      
+      if (paymentDetails.status === 'SUCCESS') {
+        // Update user subscription
+        const user = await User.findById(req.user._id);
+        const endDate = new Date();
+        if (plan === 'monthly') {
+          endDate.setMonth(endDate.getMonth() + 1);
+        } else {
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        }
+        const paymentInfo = {
+          method: 'cashfree',
+          transactionId: paymentId,
+          amount,
+          currency: 'INR',
+          status: 'completed',
+          timestamp: new Date()
+        };
+        user.subscription = {
+          ...(user.subscription || {}),
+          plan,
+          status: 'active',
+          startDate: new Date(),
+          endDate,
+          paymentHistory: [ ...(user.subscription?.paymentHistory || []), paymentInfo ]
+        };
+        await user.save();
+        return res.json({ success: true, message: 'Payment verified and subscription activated', subscription: user.subscription });
+      } else {
+        throw new Error('Cashfree payment not successful');
+      }
+    }
+    
+    return res.status(400).json({ success: false, message: 'Invalid payment method' });
+  } catch (err) {
+    console.error('[Payment Verification] error:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
