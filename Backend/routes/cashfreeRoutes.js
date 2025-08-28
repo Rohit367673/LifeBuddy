@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PGCredentials, PGSession, PGEnvironment, PGOrder, PGWebhook } = require('cashfree-pg');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const { authenticateUser } = require('../middlewares/authMiddleware');
 
 // Configure Cashfree environment
 const env = process.env.NODE_ENV === 'production' 
@@ -16,7 +16,7 @@ const credentials = new PGCredentials({
 });
 
 // Generate order token
-router.post('/create-order', auth, async (req, res) => {
+router.post('/create-order', authenticateUser, async (req, res) => {
   try {
     const { plan, couponCode } = req.body;
     const user = req.user;
