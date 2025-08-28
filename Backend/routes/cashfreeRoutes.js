@@ -1,19 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { PGCredentials, PGSession, PGEnvironment, PGOrder, PGWebhook } = require('cashfree-pg');
+const { Cashfree, CFEnvironment } = require('cashfree-pg');
 const User = require('../models/User');
 const { authenticateUser } = require('../middlewares/authMiddleware');
 
-// Configure Cashfree environment
-const env = process.env.NODE_ENV === 'production' 
-  ? PGEnvironment.Production 
-  : PGEnvironment.Sandbox;
-
-const credentials = new PGCredentials({
-  clientId: process.env.CASHEFREE_APP_ID,
-  clientSecret: process.env.CASHEFREE_SECRET_KEY,
-  environment: env
-});
+// Configure Cashfree
+Cashfree.XClientId = process.env.CASHFREE_APP_ID || '';
+Cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY || '';
+Cashfree.XEnvironment = process.env.NODE_ENV === 'production' 
+  ? CFEnvironment.PRODUCTION 
+  : CFEnvironment.SANDBOX;
 
 // Generate order token
 router.post('/create-order', authenticateUser, async (req, res) => {
@@ -31,17 +27,25 @@ router.post('/create-order', authenticateUser, async (req, res) => {
 
     const amount = base - discount;
 
-    // Create order
-    const order = new PGOrder({
-      orderId: `ORDER_${Date.now()}_${user._id}`,
-      orderAmount: amount,
-      orderCurrency: 'USD'
+    // Create order using new Cashfree API
+    const orderId = `ORDER_${Date.now()}_${user._id}`;
+    const orderRequest = {
+      order_id: orderId,
+      order_amount: amount,
+      order_currency: 'USD',
+      customer_details: {
+        customer_id: user._id.toString(),
+        customer_email: user.email,
+        customer_phone: user.phone || '9999999999'
+      }
+    };
+
+    const response = await Cashfree.PGCreateOrder('2023-08-01', orderRequest);
+    
+    res.json({ 
+      payment_session_id: response.payment_session_id,
+      order_id: response.order_id 
     });
-
-    const session = new PGSession(credentials, order);
-    const token = await session.createOrderToken();
-
-    res.json({ token, orderId: order.orderId });
   } catch (err) {
     console.error('Cashfree order error:', err);
     res.status(500).json({ error: 'Failed to create order' });
@@ -49,17 +53,17 @@ router.post('/create-order', authenticateUser, async (req, res) => {
 });
 
 // Cashfree webhook
-router.post('/webhook', express.json({ type: 'application/json' }), (req, res) => {
+router.post('/webhook', express.json({ type: 'application/json' }), async (req, res) => {
   try {
     const signature = req.headers['x-cf-signature'];
     const payload = req.body;
 
-    // Verify webhook signature
-    const isVerified = PGWebhook.verifySignature({
-      body: payload,
-      signature: signature,
-      secret: process.env.CASHEFREE_WEBHOOK_SECRET
-    });
+    // Verify webhook signature using new API
+    const isVerified = Cashfree.PGVerifyWebhookSignature(
+      JSON.stringify(payload),
+      signature,
+      process.env.CASHFREE_WEBHOOK_SECRET || ''
+    );
 
     if (!isVerified) {
       console.error('Cashfree webhook signature verification failed');
@@ -67,11 +71,13 @@ router.post('/webhook', express.json({ type: 'application/json' }), (req, res) =
     }
 
     // Handle payment event
-    const event = payload.event;
-    const orderId = payload.data.order.order_id;
+    const event = payload.type;
+    const orderId = payload.data?.order?.order_id;
 
-    // Update database based on event
-    // ... implement your logic here ...
+    if (event === 'PAYMENT_SUCCESS_WEBHOOK' && orderId) {
+      // Update user subscription logic here
+      console.log(`Payment successful for order: ${orderId}`);
+    }
 
     res.status(200).end();
   } catch (err) {
