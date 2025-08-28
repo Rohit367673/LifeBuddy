@@ -1134,12 +1134,12 @@ const Profile = () => {
                       <div
                         key={`${weekIndex}-${dayIndex}`}
                                                   className={`
-                        w-8 h-8 rounded-sm border border-gray-200 dark:border-gray-700 
+                        w-12 h-12 rounded-md border border-gray-200 dark:border-gray-700 
                         transition-all duration-200 cursor-pointer relative group
                             ${getMonthlyActivityColor(day)}
                         ${day?.isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
-                            ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
-                          `}
+                        ${!day ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                        `}
                         title={day ? `${day.date}: ${day.completedCount} task${day.completedCount === 1 ? '' : 's'} completed` : 'No activity'}
                       >
                         {day && (

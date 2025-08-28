@@ -399,6 +399,40 @@ achievementSchema.statics.checkAchievements = async function(userId, userStats) 
   
   const newAchievements = [];
   
+  // Get comprehensive user stats if not provided
+  if (!userStats || Object.keys(userStats).length === 0) {
+    const User = require('./User');
+    const user = await User.findById(userId);
+    userStats = {
+      totalTasks: userStats.totalTasks || 0,
+      completedTasks: userStats.completedTasks || 0,
+      totalEvents: user?.stats?.totalEvents || 0,
+      completedEvents: user?.stats?.completedEvents || 0,
+      moodEntries: user?.stats?.moodEntries || 0,
+      taskStreak: user?.stats?.taskStreak || 0,
+      moodStreak: user?.stats?.moodStreak || 0,
+      earlyBirdDays: user?.stats?.earlyBirdDays || 0,
+      nightOwlDays: user?.stats?.nightOwlDays || 0,
+      socialEvents: user?.stats?.socialEvents || 0,
+      homeEvents: user?.stats?.homeEvents || 0,
+      fitnessTasks: user?.stats?.fitnessTasks || 0,
+      learningTasks: user?.stats?.learningTasks || 0,
+      creativeTasks: user?.stats?.creativeTasks || 0,
+      organizedEvents: user?.stats?.organizedEvents || 0,
+      completedGoals: user?.stats?.completedGoals || 0,
+      consistencyStreak: user?.stats?.consistencyStreak || 0,
+      stressManagedDays: user?.stats?.stressManagedDays || 0,
+      perfectWeeks: user?.stats?.perfectWeeks || 0,
+      birthdayEventsCompleted: user?.stats?.birthdayEventsCompleted || 0,
+      budgetsCompleted: user?.stats?.budgetsCompleted || 0,
+      checklistsCompleted: user?.stats?.checklistsCompleted || 0,
+      logins: user?.stats?.logins || 0,
+      eventsCreated: user?.stats?.totalEvents || 0,
+      eventsCompleted: user?.stats?.completedEvents || 0,
+      tasksCompleted: userStats.completedTasks || user?.stats?.completedTasks || 0
+    };
+  }
+  
   for (const achievement of availableAchievements) {
     if (earnedTypes.includes(achievement.type)) continue;
     
@@ -416,6 +450,7 @@ achievementSchema.statics.checkAchievements = async function(userId, userStats) 
       
       await newAchievement.save();
       newAchievements.push(newAchievement);
+      console.log(`🏆 Achievement unlocked: ${achievement.title} for user ${userId}`);
     }
   }
   
