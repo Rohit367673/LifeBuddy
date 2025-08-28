@@ -6,11 +6,17 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 
 // Configure Cashfree
+const isProduction = process.env.NODE_ENV === 'production';
 Cashfree.XClientId = process.env.CASHFREE_APP_ID || '';
 Cashfree.XClientSecret = process.env.CASHFREE_SECRET_KEY || '';
-Cashfree.XEnvironment = process.env.NODE_ENV === 'production' 
-  ? CFEnvironment.PRODUCTION 
-  : CFEnvironment.SANDBOX;
+Cashfree.XEnvironment = isProduction ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
+
+console.log(`[Cashfree] Environment: ${isProduction ? 'PRODUCTION' : 'SANDBOX'}`);
+console.log(`[Cashfree] App ID: ${Cashfree.XClientId ? Cashfree.XClientId.substring(0, 10) + '...' : 'NOT SET'}`);
+
+if (!Cashfree.XClientId || !Cashfree.XClientSecret) {
+  console.warn('[Cashfree] Missing CASHFREE_APP_ID or CASHFREE_SECRET_KEY');
+}
 
 // Generate order token
 router.post('/create-order', authenticateUser, async (req, res) => {

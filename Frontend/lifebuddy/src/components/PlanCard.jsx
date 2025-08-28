@@ -1,8 +1,58 @@
 import { CheckIcon, XMarkIcon, StarIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
 
-const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial }) => {
+const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 'US' }) => {
+  const [pricing, setPricing] = useState(null);
+  const [loading, setLoading] = useState(true);
   const isCurrentPlan = currentPlan === plan.id;
   const isFreePlan = plan.id === 'free';
+
+  // Fetch region-specific pricing
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/pricing/plans?country=${userCountry}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPricing(data.pricing);
+        }
+      } catch (error) {
+        console.error('Error fetching pricing:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!isFreePlan) {
+      fetchPricing();
+    } else {
+      setLoading(false);
+    }
+  }, [userCountry, isFreePlan]);
+
+  const getPlanPricing = () => {
+    if (isFreePlan) return { price: 0, currency: 'USD' };
+    if (!pricing) return { price: plan.price || 0, currency: 'USD' };
+    
+    const planType = plan.id === 'monthly' ? 'monthly' : 'yearly';
+    return {
+      price: pricing[planType]?.price || plan.price || 0,
+      currency: pricing[planType]?.currency || 'USD',
+      savings: pricing[planType]?.savings
+    };
+  };
+
+  const formatPrice = (price, currency) => {
+    const currencySymbols = {
+      'USD': '$',
+      'INR': '₹',
+      'EUR': '€',
+      'GBP': '£',
+      'CAD': 'C$',
+      'AUD': 'A$'
+    };
+    return `${currencySymbols[currency] || currency} ${price}`;
+  };
 
   const getButtonVariant = () => {
     if (isCurrentPlan) return 'secondary';
@@ -63,17 +113,33 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial }) => {
           
           {/* Price */}
           <div className="mb-4">
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">
-              {plan.price} Rs
-              {plan.period !== 'forever' && (
-                <span className="text-lg text-gray-500 dark:text-gray-400">
-                  /{plan.period}
-                </span>
-              )}
-            </div>
+            {loading && !isFreePlan ? (
+              <div className="text-3xl font-bold text-gray-400 animate-pulse">
+                Loading...
+              </div>
+            ) : (
+              <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                {isFreePlan ? (
+                  'Free'
+                ) : (
+                  formatPrice(getPlanPricing().price, getPlanPricing().currency)
+                )}
+                {plan.period !== 'forever' && !isFreePlan && (
+                  <span className="text-lg text-gray-500 dark:text-gray-400">
+                    /{plan.period}
+                  </span>
+                )}
+              </div>
+            )}
             {plan.period === 'forever' && (
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Forever free
+              </div>
+            )}
+            {/* Show savings for yearly plan */}
+            {getPlanPricing().savings && (
+              <div className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
+                Save {formatPrice(getPlanPricing().savings.amount, getPlanPricing().currency)} ({getPlanPricing().savings.percentage}%)
               </div>
             )}
           </div>

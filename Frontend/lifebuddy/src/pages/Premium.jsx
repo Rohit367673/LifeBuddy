@@ -527,6 +527,7 @@ const Premium = () => {
                 currentPlan={subscription?.plan}
                 onSubscribe={() => handleSubscribe(plan.id)}
                 onStartTrial={() => setShowTrialModal(true)}
+                userCountry={userLocation?.country || 'US'}
               />
             ))}
           </div>

@@ -41,14 +41,21 @@ const couponRoutes = require('./routes/couponRoutes');
 const trialRoutes = require('./routes/trialRoutes');
 const paypalRoutes = require('./routes/paypalRoutes');
 const cashfreeRoutes = require('./routes/cashfreeRoutes');
+const pricingRoutes = require('./routes/pricingRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
 const Activity = require('./models/Activity');
 const ReferralCode = require('./models/ReferralCode');
 const ReferralHit = require('./models/ReferralHit');
 const User = require('./models/User');
 const { authenticateUser } = require('./middlewares/authMiddleware');
+const { logEnvironmentStatus } = require('./utils/environmentValidator');
+const { logPaymentStatus } = require('./utils/paymentValidator');
 const app = express();
 const PORT = process.env.PORT || 5001;
+
+// Validate environment on startup
+logEnvironmentStatus();
+logPaymentStatus();
 
 // Security middleware
 app.use(helmet());
@@ -115,6 +122,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/trial', trialRoutes);
 app.use('/api/admin-coupons', adminCouponRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/pricing', pricingRoutes);
 app.use('/api/payments/paypal', paypalRoutes);
 app.use('/api/payments/cashfree', cashfreeRoutes);
 
