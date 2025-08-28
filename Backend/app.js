@@ -97,7 +97,13 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
-app.use(limiter);
+// Skip rate limit for subscription status checks to avoid noisy 429s from frontend polling
+app.use((req, res, next) => {
+  if (req.path === '/api/subscriptions/status') {
+    return next();
+  }
+  return limiter(req, res, next);
+});
 
 // Logging
 app.use(morgan('combined'));

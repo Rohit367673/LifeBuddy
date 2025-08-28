@@ -75,6 +75,8 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
     onSubscribe(plan.id);
   };
 
+  const planPricing = getPlanPricing();
+
   return (
     <div className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl ${
       plan.popular 
@@ -92,11 +94,11 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
         </div>
       )}
 
-      {/* Savings Badge */}
-      {plan.savings && (
+      {/* Savings Badge - dynamic currency-aware for yearly */}
+      {!isFreePlan && plan.id === 'yearly' && planPricing?.savings && (
         <div className="absolute -top-3 -right-3">
           <div className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-            {plan.savings}
+            Save {formatPrice(planPricing.savings.amount, planPricing.currency)} ({planPricing.savings.percentage}%)
           </div>
         </div>
       )}
@@ -122,7 +124,7 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
                 {isFreePlan ? (
                   'Free'
                 ) : (
-                  formatPrice(getPlanPricing().price, getPlanPricing().currency)
+                  formatPrice(planPricing.price, planPricing.currency)
                 )}
                 {plan.period !== 'forever' && !isFreePlan && (
                   <span className="text-lg text-gray-500 dark:text-gray-400">
@@ -137,9 +139,9 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
               </div>
             )}
             {/* Show savings for yearly plan */}
-            {getPlanPricing().savings && (
+            {planPricing.savings && (
               <div className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
-                Save {formatPrice(getPlanPricing().savings.amount, getPlanPricing().currency)} ({getPlanPricing().savings.percentage}%)
+                Save {formatPrice(planPricing.savings.amount, planPricing.currency)} ({planPricing.savings.percentage}%)
               </div>
             )}
           </div>

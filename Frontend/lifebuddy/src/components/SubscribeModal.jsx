@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import paypalImage from '../assets/193-1936998_payment-method-47-icons-payment-option-icons-png.png';
 import cashfreeImage from '../assets/0_BIy_CblCTVoOl5Zg.png';
 
-const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
+const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry = 'US' }) => {
   const { token } = useAuth();
   const [paymentGateway, setPaymentGateway] = useState('paypal'); // 'paypal' or 'cashfree'
   const [isProcessing, setIsProcessing] = useState(false);
@@ -24,6 +24,10 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const [initializingPaypal, setInitializingPaypal] = useState(false);
   const [paypalError, setPaypalError] = useState('');
   const cashfreeRef = useRef(null);
+  const [pricing, setPricing] = useState(null);
+  const [currency, setCurrency] = useState('USD');
+  const [price, setPrice] = useState(0);
+  const userSwitchedGateway = useRef(false);
 
   const planDetails = {
     monthly: { name: 'Monthly Plan', price: 1.99, period: 'month' },
@@ -31,9 +35,50 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   };
   const currentPlan = planDetails[plan];
 
+  // Fetch pricing for the detected country to determine currency and amount
   useEffect(() => {
-    const finalPrice = Math.max(0, (currentPlan?.price || 0) - (couponInfo?.discountAmount || 0));
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!isOpen) return;
+        const resp = await fetch(`${getApiUrl()}/api/pricing/plans?country=${encodeURIComponent(userCountry || 'US')}`);
+        if (!resp.ok) throw new Error('Failed to fetch pricing');
+        const data = await resp.json();
+        if (cancelled) return;
+        setPricing(data?.pricing || null);
+        const planType = plan === 'monthly' ? 'monthly' : 'yearly';
+        const amt = data?.pricing?.[planType]?.price;
+        const cur = data?.pricing?.[planType]?.currency || data?.currency || 'USD';
+        if (typeof amt === 'number') setPrice(amt); else setPrice(planDetails[plan]?.price || 0);
+        setCurrency(cur);
+      } catch (_) {
+        // fallback to defaults
+        setPrice(planDetails[plan]?.price || 0);
+        setCurrency('USD');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, userCountry, plan]);
+
+  const formatPrice = (p, cur) => {
+    const symbols = { USD: '$', INR: '₹', EUR: '€', GBP: '£', CAD: 'C$', AUD: 'A$' };
+    return `${symbols[cur] || cur} ${Number(p).toFixed(2)}`;
+  };
+
+  // Default payment gateway based on currency unless the user manually switched
+  useEffect(() => {
+    if (!isOpen) return;
+    if (userSwitchedGateway.current) return;
+    if (currency === 'INR') setPaymentGateway('cashfree');
+    else setPaymentGateway('paypal');
+  }, [currency, isOpen]);
+
+  useEffect(() => {
+    const base = (typeof price === 'number' ? price : (currentPlan?.price || 0));
+    const finalPrice = Math.max(0, base - (couponInfo?.discountAmount || 0));
     if (!isOpen || finalPrice === 0) return;
+    // Only initialize PayPal when PayPal gateway is selected
+    if (paymentGateway !== 'paypal') return;
     if (!paypalButtonsRef.current) return;
 
     let cancelled = false;
@@ -43,22 +88,37 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
         setInitializingPaypal(true);
         setPaypalError('');
         // Get client ID from backend
-        const cfgResp = await fetch(`${getApiUrl()}/api/paypal/config`);
+        const cfgResp = await fetch(`${getApiUrl()}/api/payments/paypal/config`);
         const cfg = await cfgResp.json();
         const clientId = cfg?.clientId;
         if (!clientId) throw new Error('Missing PayPal client ID');
 
-        // Load SDK if not present
-        if (!window.paypal) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&intent=capture&currency=USD`;
-            script.async = true;
-            script.onload = resolve;
-            script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
-            document.body.appendChild(script);
-          });
+        // Ensure SDK is loaded with correct currency: remove existing SDK and reload
+        const existingSdk = Array.from(document.querySelectorAll('script[src*="paypal.com/sdk/js"]'));
+        if (existingSdk.length) {
+          existingSdk.forEach((s) => s.parentNode && s.parentNode.removeChild(s));
+          // Reset namespace so SDK can load again
+          try { delete window.paypal; } catch (_) { window.paypal = undefined; }
         }
+
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&intent=capture&currency=${encodeURIComponent(currency || 'USD')}&components=buttons`;
+          script.async = true;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
+          document.body.appendChild(script);
+        });
+
+        // Wait until Buttons API is available
+        await new Promise((resolve, reject) => {
+          const start = Date.now();
+          (function check() {
+            if (window.paypal && typeof window.paypal.Buttons === 'function') return resolve();
+            if (Date.now() - start > 5000) return reject(new Error('PayPal SDK did not expose Buttons'));
+            setTimeout(check, 50);
+          })();
+        });
 
         if (cancelled) return;
 
@@ -70,7 +130,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
           createOrder: async () => {
             // Create order on backend with coupon
             try {
-              const resp = await fetch(`${getApiUrl()}/api/paypal/create-order`, {
+              const resp = await fetch(`${getApiUrl()}/api/payments/paypal/create-order`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -79,14 +139,15 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
                 body: JSON.stringify({
                   plan,
                   couponCode: couponInfo?.code || (coupon?.trim() ? coupon.trim().toUpperCase() : undefined),
-                  currency: 'USD'
+                  currency: currency || 'USD',
+                  userCountry
                 })
               });
               const data = await resp.json();
               if (!resp.ok) throw new Error(data?.message || 'Failed to create order');
               if (data.free) {
                 // 100% discount: directly capture without PayPal order
-                const capResp = await fetch(`${getApiUrl()}/api/paypal/capture`, {
+                const capResp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -97,7 +158,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
                 const cap = await capResp.json();
                 if (!capResp.ok) throw new Error(cap?.message || 'Failed to activate subscription');
                 toast.success('Subscription activated with coupon');
-                onSuccess && onSuccess({ __paypalCaptured: true, method: 'coupon', amount: 0, currency: 'USD' });
+                onSuccess && onSuccess({ __paypalCaptured: true, method: 'coupon', amount: 0, currency: currency || 'USD' });
                 // Throw to stop PayPal flow after we handled activation
                 throw new Error('Handled-free-activation');
               }
@@ -114,7 +175,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
           onApprove: async (data) => {
             try {
               const orderId = data.orderID;
-              const resp = await fetch(`${getApiUrl()}/api/paypal/capture`, {
+              const resp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -150,7 +211,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
     })();
 
     return () => { cancelled = true; };
-  }, [isOpen, couponInfo, coupon, token, plan]);
+  }, [isOpen, couponInfo, coupon, token, plan, price, currency, paymentGateway]);
 
   useEffect(() => {
     if (isOpen) {
@@ -163,7 +224,9 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   }, [isOpen]);
 
   useEffect(() => {
-    if (paymentGateway === 'cashfree' && Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) > 0) {
+    const base = typeof price === 'number' ? price : (planDetails[plan].price || 0);
+    const finalPrice = Math.max(0, base - (couponInfo?.discountAmount || 0));
+    if (paymentGateway === 'cashfree' && finalPrice > 0) {
       // Load Cashfree SDK
       const script = document.createElement('script');
       script.src = process.env.NODE_ENV === 'production' 
@@ -179,24 +242,31 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
         }
       };
     }
-  }, [paymentGateway, plan, couponInfo]);
+  }, [paymentGateway, plan, couponInfo, price]);
 
   const initializeCashfree = async () => {
     try {
-      const response = await fetch('/api/payments/cashfree/create-order', {
+      // Guard: Cashfree sandbox typically supports INR only
+      if ((currency || 'INR') !== 'INR') {
+        toast.error('Cashfree supports INR only. Please use PayPal for other currencies.');
+        return;
+      }
+      const response = await fetch(`${getApiUrl()}/api/payments/cashfree/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ plan, couponCode: coupon })
+        body: JSON.stringify({ plan, couponCode: coupon, currency: currency || 'INR', userCountry })
       });
       
       if (!response.ok) {
         throw new Error('Failed to create Cashfree order');
       }
       
-      const { token: orderToken, orderId } = await response.json();
+      const { payment_session_id, order_id } = await response.json();
+      const orderToken = payment_session_id;
+      const orderId = order_id;
 
       // Initialize Cashfree
       const cashfree = new Cashfree();
@@ -221,7 +291,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
       const data = await resp.json();
       if (resp.ok && data.valid) {
         setCouponInfo(data);
-        toast.success(`Coupon applied: -$${data.discountAmount}`);
+        toast.success(`Coupon applied: -${formatPrice(data.discountAmount || 0, currency)}`);
       } else {
         setCouponInfo(null);
         toast.error(data.message || 'Invalid coupon');
@@ -237,7 +307,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
   const handleFreeActivation = async () => {
     try {
       setIsProcessing(true);
-      const resp = await fetch(`${getApiUrl()}/api/paypal/capture`, {
+      const resp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ plan, couponCode: couponInfo?.code || (coupon?.trim() ? coupon.trim().toUpperCase() : undefined) })
@@ -245,7 +315,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.message || 'Failed to activate subscription');
       toast.success('Subscription activated with coupon');
-      onSuccess && onSuccess({ __paypalCaptured: true, method: 'coupon', amount: 0, currency: 'USD' });
+      onSuccess && onSuccess({ __paypalCaptured: true, method: 'coupon', amount: 0, currency: currency || 'USD' });
     } catch (e) {
       toast.error(e?.message || 'Failed to activate');
     } finally {
@@ -255,7 +325,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
 
   if (!isOpen) return null;
 
-  const finalPrice = Math.max(0, planDetails[plan].price - (couponInfo?.discountAmount || 0));
+  const baseDisplayPrice = typeof price === 'number' && price > 0 ? price : planDetails[plan].price;
+  const finalPrice = Math.max(0, baseDisplayPrice - (couponInfo?.discountAmount || 0));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -284,7 +355,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               <button
                 type="button"
                 className={`flex-1 flex flex-col items-center p-4 rounded-lg border-2 ${paymentGateway === 'paypal' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'}`}
-                onClick={() => setPaymentGateway('paypal')}
+                onClick={() => { userSwitchedGateway.current = true; setPaymentGateway('paypal'); }}
               >
                 <span className="font-medium mb-2">PayPal</span>
                 <img 
@@ -300,7 +371,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               <button
                 type="button"
                 className={`flex-1 flex flex-col items-center p-4 rounded-lg border-2 ${paymentGateway === 'cashfree' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'}`}
-                onClick={() => setPaymentGateway('cashfree')}
+                onClick={() => { userSwitchedGateway.current = true; setPaymentGateway('cashfree'); }}
               >
                 <span className="font-medium mb-2">Cashfree</span>
                 <img 
@@ -328,7 +399,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${finalPrice.toFixed(2)}
+                  {formatPrice(finalPrice, currency)}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-300">
                   per {planDetails[plan].period}
@@ -336,7 +407,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
               </div>
             </div>
             {couponInfo && (
-              <div className="mt-2 text-sm text-green-700 dark:text-green-300">Coupon {couponInfo.code} applied (−${couponInfo.discountAmount})</div>
+              <div className="mt-2 text-sm text-green-700 dark:text-green-300">Coupon {couponInfo.code} applied (−{formatPrice(couponInfo.discountAmount || 0, currency)})</div>
             )}
           </div>
 
@@ -367,7 +438,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
                 <div className="text-blue-600 font-bold text-2xl">PayPal</div>
                 <p className="text-gray-600 dark:text-gray-300 text-sm">Secure checkout powered by PayPal</p>
               </div>
-              {Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) === 0 ? (
+              {finalPrice === 0 ? (
                 <div className="text-center">
                   <button onClick={handleFreeActivation} disabled={isProcessing} className="btn btn-primary">
                     {isProcessing ? 'Activating…' : 'Activate with Coupon'}
@@ -392,7 +463,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading }) => {
                 <div className="text-blue-600 font-bold text-2xl">Cashfree</div>
                 <p className="text-gray-600 dark:text-gray-300 text-sm">Secure checkout powered by Cashfree</p>
               </div>
-              {Math.max(0, (planDetails[plan].price || 0) - (couponInfo?.discountAmount || 0)) === 0 ? (
+              {finalPrice === 0 ? (
                 <div className="text-center">
                   <button 
                     onClick={handleFreeActivation}

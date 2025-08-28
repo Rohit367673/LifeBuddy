@@ -8,8 +8,8 @@ router.get('/plans', async (req, res) => {
     const { currency = 'USD', country } = req.query;
     
     // Detect currency from country if provided
-    const detectedCurrency = country ? getCurrencyByCountry(country) : currency;
-    const finalCurrency = currency || detectedCurrency;
+    const detectedCurrency = country ? getCurrencyByCountry(country) : 'USD';
+    const finalCurrency = country ? detectedCurrency : currency;
     
     const monthlyPrice = getPlanPrice('monthly', finalCurrency);
     const yearlyPrice = getPlanPrice('yearly', finalCurrency);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePremium } from '../context/PremiumContext';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -23,7 +23,6 @@ import {
   PlayCircleIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { useRef } from 'react';
 import SubscribeModal from '../components/SubscribeModal';
 import PlanCard from '../components/PlanCard';
 import FeatureComparison from '../components/FeatureComparison';
@@ -39,6 +38,7 @@ const Premium = () => {
   const [selectedPlan, setSelectedPlan] = useState('yearly');
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [userLocation, setUserLocation] = useState({ country: 'US' });
   const pricingRef = useRef(null);
   const featuresRef = useRef(null);
   const [watchedAd, setWatchedAd] = useState(false);
@@ -52,13 +52,14 @@ const Premium = () => {
   const [adKey, setAdKey] = useState(0);
   const [countdown, setCountdown] = useState(30);
 
-  useEffect(() => {
-    const loadPlans = async () => {
-      const plansData = await getPlans();
-      setPlans(plansData);
-    };
-    loadPlans();
+  const loadPlans = useCallback(async () => {
+    const plansData = await getPlans();
+    setPlans(plansData);
   }, [getPlans]);
+
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
 
   useEffect(() => {
     // Scroll to pricing if hash present
@@ -66,6 +67,63 @@ const Premium = () => {
       pricingRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, []);
+
+  // Detect user location
+  useEffect(() => {
+    const detectLocation = async () => {
+      try {
+        // Try to get location from browser geolocation API
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              try {
+                // Use a geolocation service to get country from coordinates
+                const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`);
+                if (response.ok) {
+                  const data = await response.json();
+                  setUserLocation({ country: data.countryCode || 'US' });
+                }
+              } catch (error) {
+                console.log('Geolocation service error:', error);
+              }
+            },
+            (error) => {
+              console.log('Geolocation error:', error);
+              // Fallback to IP-based detection
+              detectLocationByIP();
+            }
+          );
+        } else {
+          detectLocationByIP();
+        }
+      } catch (error) {
+        console.log('Location detection error:', error);
+      }
+    };
+
+    const detectLocationByIP = async () => {
+      try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+          const data = await response.json();
+          setUserLocation({ country: data.country_code || 'US' });
+        }
+      } catch (error) {
+        console.log('IP location detection error:', error);
+        // Keep default 'US'
+      }
+    };
+
+    detectLocation();
+  }, []);
+
+  useEffect(() => {
+    fetchSubscriptionStatus();
+    // Load AdSense script in production
+    if (IS_PROD) {
+      loadAdSenseScript();
+    }
+  }, [fetchSubscriptionStatus, IS_PROD]);
 
   // Load AdSense when watching (prod only)
   useEffect(() => {
@@ -585,6 +643,7 @@ const Premium = () => {
           plan={selectedPlan}
           onSuccess={handlePaymentSuccess}
           loading={loading}
+          userCountry={userLocation?.country || 'US'}
         />
       )}
 
