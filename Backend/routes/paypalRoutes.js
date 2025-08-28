@@ -5,7 +5,7 @@ const { client: paypalClient } = require('../services/paypalClient');
 const User = require('../models/User');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
-const cashfree = require('../services/cashfreeClient'); // Assuming you have a cashfree client setup
+const { cashfree, verifyPayment } = require('../services/cashfreeClient');
 
 const router = express.Router();
 
@@ -303,7 +303,7 @@ router.post('/verify-payment', authenticateUser, async (req, res) => {
       return res.json({ success: true, message: 'Payment verified and subscription activated', subscription: user.subscription });
     } else if (paymentMethod === 'cashfree') {
       // Verify Cashfree payment
-      const paymentDetails = await cashfree.PGOrder.getPayments(orderId);
+      const paymentDetails = await verifyPayment(orderId);
       
       if (paymentDetails.status === 'SUCCESS') {
         // Update user subscription
