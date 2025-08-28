@@ -3,6 +3,7 @@ const router = express.Router();
 const { Cashfree, CFEnvironment } = require('cashfree-pg');
 const User = require('../models/User');
 const { authenticateUser } = require('../middlewares/authMiddleware');
+const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 
 // Configure Cashfree
 Cashfree.XClientId = process.env.CASHFREE_APP_ID || '';
@@ -14,14 +15,20 @@ Cashfree.XEnvironment = process.env.NODE_ENV === 'production'
 // Generate order token
 router.post('/create-order', authenticateUser, async (req, res) => {
   try {
-    const { plan, couponCode } = req.body;
+    const { plan, couponCode, currency = 'INR', userCountry } = req.body;
     const user = req.user;
 
-    // Calculate amount (same as PayPal logic)
+    // Calculate amount with proper currency conversion
     if (!['monthly', 'yearly'].includes(plan)) {
       return res.status(400).json({ error: 'Invalid plan' });
     }
-    const base = plan === 'monthly' ? 1.99 : 21.99;
+    
+    // Detect currency from country if not provided
+    const detectedCurrency = userCountry ? getCurrencyByCountry(userCountry) : currency;
+    const finalCurrency = currency || detectedCurrency;
+    
+    // Get region-specific pricing
+    const base = getPlanPrice(plan, finalCurrency);
     let discount = 0;
     // ... apply coupon logic if needed ...
 
@@ -32,7 +39,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
     const orderRequest = {
       order_id: orderId,
       order_amount: amount,
-      order_currency: 'USD',
+      order_currency: finalCurrency,
       customer_details: {
         customer_id: user._id.toString(),
         customer_email: user.email,

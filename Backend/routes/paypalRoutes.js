@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
 const { cashfree, verifyPayment } = require('../services/cashfreeClient');
+const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 
 const router = express.Router();
 
@@ -20,13 +21,20 @@ router.get('/config', (req, res) => {
 });
 
 // Helper: compute plan price and apply coupon
-async function computeAmount(plan, couponCode) {
+async function computeAmount(plan, couponCode, currency = 'USD', userCountry = null) {
   if (!['monthly', 'yearly'].includes(plan)) {
     throw new Error('Invalid plan');
   }
-  const base = plan === 'monthly' ? 1.99 : 21.99;
+  
+  // Detect currency from country if not provided
+  const detectedCurrency = userCountry ? getCurrencyByCountry(userCountry) : currency;
+  const finalCurrency = currency || detectedCurrency;
+  
+  // Get region-specific pricing
+  const base = getPlanPrice(plan, finalCurrency);
   let discount = 0;
   let appliedCoupon = null;
+  
   if (couponCode) {
     const normalized = String(couponCode).trim().toUpperCase();
     const coupon = await Coupon.findOne({ code: normalized, isActive: true });
@@ -35,15 +43,16 @@ async function computeAmount(plan, couponCode) {
       appliedCoupon = coupon;
     }
   }
+  
   const finalAmount = Math.max(0, base - discount);
-  return { base, discount, finalAmount, appliedCoupon };
+  return { base, discount, finalAmount, appliedCoupon, currency: finalCurrency };
 }
 
 // POST /api/paypal/create-order
 router.post('/create-order', authenticateUser, async (req, res) => {
   try {
-    const { plan, couponCode, currency = 'USD' } = req.body || {};
-    const { base, discount, finalAmount, appliedCoupon } = await computeAmount(plan, couponCode);
+    const { plan, couponCode, currency = 'USD', userCountry } = req.body || {};
+    const { base, discount, finalAmount, appliedCoupon, currency: finalCurrency } = await computeAmount(plan, couponCode, currency, userCountry);
 
     // If fully discounted, no PayPal order needed
     if (finalAmount === 0) {
@@ -53,7 +62,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
         amount: 0,
         baseAmount: base,
         discount,
-        currency
+        currency: finalCurrency
       });
     }
 
@@ -64,7 +73,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
       purchase_units: [
         {
           amount: {
-            currency_code: currency,
+            currency_code: finalCurrency,
             value: finalAmount.toFixed(2)
           },
           custom_id: JSON.stringify({ userId: String(req.user._id), plan, couponCode: appliedCoupon ? appliedCoupon.code : null }),
@@ -80,7 +89,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
       amount: finalAmount,
       baseAmount: base,
       discount,
-      currency,
+      currency: finalCurrency,
     });
   } catch (e) {
     console.error('[PayPal] create-order error:', e);
@@ -318,12 +327,10 @@ router.post('/verify-payment', authenticateUser, async (req, res) => {
           method: 'cashfree',
           transactionId: paymentId,
           amount,
-          currency: 'INR',
-          status: 'completed',
-          timestamp: new Date()
+          currency: finalCurrency,
+          date: new Date()
         };
         user.subscription = {
-          ...(user.subscription || {}),
           plan,
           status: 'active',
           startDate: new Date(),
