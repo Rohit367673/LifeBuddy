@@ -19,6 +19,13 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when possible
 self.addEventListener('fetch', (event) => {
+  // Skip health check requests and API calls in service worker
+  if (event.request.url.includes('/api/health') || 
+      event.request.url.includes('/api/') ||
+      event.request.url.includes('csp.withgoogle.com')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

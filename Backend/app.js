@@ -116,7 +116,9 @@ app.use(cors({
       /^https:\/\/.*\.vercel\.dev$/,
       // Allow Railway backend health checks
       /^https:\/\/.*\.up\.railway\.app$/,
-      /^https:\/\/.*\.railway\.app$/
+      /^https:\/\/.*\.railway\.app$/,
+      // Allow localhost for development
+      /^http:\/\/localhost:\d+$/
     ].filter(Boolean);
     
     // Also allow any localhost origin for development

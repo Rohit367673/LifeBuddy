@@ -1,21 +1,24 @@
 // Smart Backend URL Manager for Render/Railway switching
 class BackendManager {
   constructor() {
+    // In development, prioritize local backend
+    const isDevelopment = import.meta.env.DEV;
+    
     this.backends = {
-      railway: {
-        url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
-        name: 'Railway',
-        priority: 1
+      local: {
+        url: 'http://localhost:5001',
+        name: 'Local',
+        priority: isDevelopment ? 1 : 3
       },
       render: {
         url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
         name: 'Render',
-        priority: 2
+        priority: isDevelopment ? 2 : 1
       },
-      local: {
-        url: 'http://localhost:5001',
-        name: 'Local',
-        priority: 3
+      railway: {
+        url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
+        name: 'Railway',
+        priority: isDevelopment ? 3 : 2
       }
     };
     
@@ -43,6 +46,12 @@ class BackendManager {
         }
       } catch (error) {
         console.warn(`⚠️ Health check failed for ${backend.name}:`, error.message);
+        
+        // In development, skip Railway if it's not accessible
+        if (import.meta.env.DEV && backend.name === 'Railway') {
+          console.log(`🔄 Skipping Railway in development mode`);
+          continue;
+        }
       }
     }
 
