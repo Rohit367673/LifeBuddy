@@ -29,6 +29,7 @@ import FeatureComparison from '../components/FeatureComparison';
 import TestimonialCard from '../components/TestimonialCard';
 import FAQAccordion from '../components/FAQAccordion';
 import { loadAdSenseScript, pushAd } from '../utils/ads';
+import LoadingScreen from '../components/LoadingScreen';
 
 const Premium = () => {
   const { subscription, features, usage, startTrial, subscribe, getPlans, hasFeature, fetchSubscriptionStatus } = usePremium();
@@ -473,6 +474,10 @@ const Premium = () => {
       }
     ]
   };
+
+  if (loading) {
+    return <LoadingScreen text="Preparing premium experience…" />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
