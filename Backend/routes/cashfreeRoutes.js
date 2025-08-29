@@ -33,10 +33,9 @@ router.post('/create-order', authenticateUser, async (req, res) => {
     const detectedCurrency = userCountry ? getCurrencyByCountry(userCountry) : currency;
     const finalCurrency = (currency || detectedCurrency || 'INR').toUpperCase();
 
-    // Cashfree sandbox supports INR only; bail early with helpful message
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (!isProduction && finalCurrency !== 'INR') {
-      return res.status(400).json({ error: 'Cashfree sandbox supports INR only. Use PayPal for other currencies.' });
+    // Cashfree supports INR for domestic processing. Pre-validate and bail early with helpful message
+    if (finalCurrency !== 'INR') {
+      return res.status(400).json({ error: 'Cashfree supports INR only for this merchant. Use PayPal for other currencies.' });
     }
 
     // Ensure credentials present
@@ -100,7 +99,8 @@ router.post('/create-order', authenticateUser, async (req, res) => {
       stack: process.env.NODE_ENV !== 'production' ? err?.stack : undefined
     };
     console.error('Cashfree order error:', details);
-    if (process.env.NODE_ENV !== 'production') {
+    const expose = String(process.env.DEBUG_PAYMENTS || '').toLowerCase() === 'true';
+    if (process.env.NODE_ENV !== 'production' || expose) {
       return res.status(500).json({ error: 'Failed to create order', details });
     }
     return res.status(500).json({ error: 'Failed to create order' });
