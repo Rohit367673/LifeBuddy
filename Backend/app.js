@@ -84,15 +84,15 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'https://life-buddy-git-main-rohit367673s-projects.vercel.app',
-      'https://life-buddy.vercel.app',
       'https://www.lifebuddy.space',
       'https://lifebuddy.space',
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:3000',
       'http://localhost:5000',
-      process.env.FRONTEND_URL
+      process.env.FRONTEND_URL,
+      // Allow Vercel preview deployments
+      /^https:\/\/life-buddy-.*\.vercel\.app$/
     ].filter(Boolean);
     
     // Also allow any localhost origin for development
@@ -100,7 +100,12 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // Check string origins
     if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    }
+    // Check regex patterns for Vercel deployments
+    else if (allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(origin))) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
