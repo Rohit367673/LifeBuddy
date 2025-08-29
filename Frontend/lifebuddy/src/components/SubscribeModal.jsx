@@ -309,6 +309,11 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
 
   const initializeCashfree = async () => {
     try {
+      // Check if user is authenticated
+      if (!token) {
+        throw new Error('Please log in to continue with payment');
+      }
+
       // Cashfree sandbox supports INR only. In non-production, force INR so testing works.
       const isProd = process.env.NODE_ENV === 'production';
       let orderCurrency = (currency || 'INR').toUpperCase();
@@ -331,8 +336,12 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         })
       });
       const data = await response.json().catch(() => ({}));
+      
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please log in again.');
+      }
       if (!response.ok) {
-        throw new Error(data?.error || data?.message || 'Failed to create Cashfree order');
+        throw new Error(data?.error || data?.message || `Server error (${response.status})`);
       }
 
       const { payment_session_id, order_id } = data || {};
