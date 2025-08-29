@@ -242,7 +242,8 @@ router.post('/webhook', async (req, res) => {
       : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
 
     // Verify webhook signature using HMAC-SHA256 (base64)
-    const secret = process.env.CASHFREE_WEBHOOK_SECRET || '';
+    // Cashfree uses the API Secret Key as the webhook signing secret
+    const secret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY || '';
     const allowUnsigned = !secret && process.env.NODE_ENV !== 'production';
 
     if (!allowUnsigned) {
@@ -257,7 +258,7 @@ router.post('/webhook', async (req, res) => {
         return res.status(400).json({ error: 'Invalid signature' });
       }
     } else {
-      console.warn('[Cashfree] No CASHFREE_WEBHOOK_SECRET set; skipping signature verification (dev only)');
+      console.warn('[Cashfree] No webhook secret available; skipping signature verification (dev only)');
     }
 
     // Safely parse JSON after signature verification
