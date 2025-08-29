@@ -264,8 +264,14 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
             const script = document.createElement('script');
             script.src = sdkSrc;
             script.async = true;
-            script.onload = resolve;
-            script.onerror = reject;
+            script.onload = () => {
+              console.log('Cashfree SDK loaded successfully from:', sdkSrc);
+              resolve();
+            };
+            script.onerror = (e) => {
+              console.error('Cashfree SDK failed to load from:', sdkSrc, e);
+              reject(e);
+            };
             document.body.appendChild(script);
           });
         }
@@ -273,6 +279,25 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         await initializeCashfree();
       } catch (e) {
         console.error('Cashfree SDK load/init failed:', e);
+        // Fallback: try alternative CDN or version
+        if (!e.retried && sdkSrc.includes('2.0.0')) {
+          console.log('Retrying with v1.0.0 SDK...');
+          const fallbackSrc = sdkSrc.replace('2.0.0', '1.0.0');
+          try {
+            const script = document.createElement('script');
+            script.src = fallbackSrc;
+            script.async = true;
+            await new Promise((resolve, reject) => {
+              script.onload = resolve;
+              script.onerror = reject;
+              document.body.appendChild(script);
+            });
+            console.log('Cashfree SDK v1.0.0 loaded successfully');
+            await initializeCashfree();
+          } catch (fallbackError) {
+            console.error('Cashfree SDK v1.0.0 also failed:', fallbackError);
+          }
+        }
       }
     };
 
