@@ -8,23 +8,11 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
-const DEFAULT_LIVE_FRONTEND = 'https://www.lifebuddy.space';
-let FRONTEND_URL = process.env.FRONTEND_URL || DEFAULT_LIVE_FRONTEND;
-// In production, never allow localhost return_url
-if (process.env.NODE_ENV === 'production') {
-  try {
-    const u = new URL(FRONTEND_URL);
-    if (u.hostname.includes('localhost') || u.hostname.includes('127.0.0.1')) {
-      FRONTEND_URL = DEFAULT_LIVE_FRONTEND;
-    }
-  } catch (_) {
-    FRONTEND_URL = DEFAULT_LIVE_FRONTEND;
-  }
-}
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Log basic configuration (respect CASHFREE_MODE override)
-const isProdMode = String(process.env.CASHFREE_MODE || '').toUpperCase() === 'PRODUCTION' || process.env.NODE_ENV === 'production';
-console.log(`[Cashfree] Environment: ${isProdMode ? 'PRODUCTION' : 'SANDBOX'}`);
+// Log basic configuration (do not mutate SDK statics; service handles client instantiation)
+const isProduction = process.env.NODE_ENV === 'production';
+console.log(`[Cashfree] Environment: ${isProduction ? 'PRODUCTION' : 'SANDBOX'}`);
 console.log(`[Cashfree] App ID: ${process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.substring(0, 10) + '...' : 'NOT SET'}`);
 if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
   console.warn('[Cashfree] Missing CASHFREE_APP_ID or CASHFREE_SECRET_KEY');
@@ -45,9 +33,10 @@ router.post('/create-order', authenticateUser, async (req, res) => {
     const detectedCurrency = userCountry ? getCurrencyByCountry(userCountry) : currency;
     const finalCurrency = (currency || detectedCurrency || 'INR').toUpperCase();
 
-    // Cashfree supports INR for domestic processing. Pre-validate and bail early with helpful message
-    if (finalCurrency !== 'INR') {
-      return res.status(400).json({ error: 'Cashfree supports INR only for this merchant. Use PayPal for other currencies.' });
+    // Cashfree sandbox supports INR only; bail early with helpful message
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction && finalCurrency !== 'INR') {
+      return res.status(400).json({ error: 'Cashfree sandbox supports INR only. Use PayPal for other currencies.' });
     }
 
     // Ensure credentials present
@@ -76,25 +65,6 @@ router.post('/create-order', authenticateUser, async (req, res) => {
 
     // Create order using new Cashfree API
     const orderId = `ORDER_${Date.now()}_${user._id}`;
-    // Build secure return_url
-    const desiredReturn = process.env.CASHFREE_RETURN_URL
-      || `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`;
-    let returnUrl = desiredReturn;
-    try {
-      const u = new URL(returnUrl);
-      const isLocal = u.hostname.includes('localhost') || u.hostname.includes('127.0.0.1');
-      const isHttp = u.protocol === 'http:';
-      // In production mode, force HTTPS live domain
-      if (isProdMode && (isLocal || isHttp)) {
-        returnUrl = `${DEFAULT_LIVE_FRONTEND}/premium?from=cashfree&order_id=${orderId}`;
-      }
-    } catch (_) {
-      // If malformed, fall back to safe live URL in prod, otherwise to FRONTEND_URL
-      returnUrl = isProdMode
-        ? `${DEFAULT_LIVE_FRONTEND}/premium?from=cashfree&order_id=${orderId}`
-        : `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`;
-    }
-
     const orderRequest = {
       order_id: orderId,
       order_amount: amount,
@@ -106,7 +76,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
         discountApplied: discount
       }),
       order_meta: {
-        return_url: returnUrl
+        return_url: `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`
       },
       customer_details: {
         customer_id: user._id.toString(),
@@ -130,8 +100,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
       stack: process.env.NODE_ENV !== 'production' ? err?.stack : undefined
     };
     console.error('Cashfree order error:', details);
-    const expose = String(process.env.DEBUG_PAYMENTS || '').toLowerCase() === 'true';
-    if (process.env.NODE_ENV !== 'production' || expose) {
+    if (process.env.NODE_ENV !== 'production') {
       return res.status(500).json({ error: 'Failed to create order', details });
     }
     return res.status(500).json({ error: 'Failed to create order' });
@@ -224,6 +193,8 @@ router.post('/confirm', authenticateUser, async (req, res) => {
       status: 'active',
       startDate: new Date(),
       endDate,
+      premiumBadge: true,
+      badgeGrantedAt: new Date(),
       paymentHistory: [
         ...(user.subscription?.paymentHistory || []),
         {
@@ -364,6 +335,8 @@ router.post('/webhook', async (req, res) => {
           status: 'active',
           startDate: new Date(),
           endDate,
+          premiumBadge: true,
+          badgeGrantedAt: new Date(),
           paymentHistory: [
             ...(user.subscription?.paymentHistory || []),
             {

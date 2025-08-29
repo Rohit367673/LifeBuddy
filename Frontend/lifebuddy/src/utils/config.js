@@ -1,8 +1,5 @@
 // Configuration for different environments
 const config = {
-  // API URL - will be set based on environment
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5001',
-  
   // Environment detection
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
@@ -19,26 +16,23 @@ const config = {
   }
 };
 
-// Helper function to get the correct API URL
-export const getApiUrl = () => {
-  // If we're in development and no API URL is set, use localhost
-  if (config.isDevelopment && !import.meta.env.VITE_API_URL) {
-    return 'http://localhost:5001';
-  }
-  
-  // Otherwise use the configured API URL
-  return config.apiUrl;
+// Backend URLs configuration
+export const BACKEND_URLS = {
+  railway: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
+  render: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
+  local: 'http://localhost:5001'
+};
+
+// Helper function to get the correct API URL (now uses smart backend manager)
+export const getApiUrl = async () => {
+  // Import dynamically to avoid circular dependencies
+  const { getApiUrl: getSmartApiUrl } = await import('./backendManager.js');
+  return await getSmartApiUrl();
 };
 
 // Helper function to get fallback API URLs
 export const getFallbackApiUrls = () => {
-  const primary = getApiUrl();
-  const fallbacks = [
-    'https://lifebuddy.onrender.com',
-    'http://localhost:5001'
-  ].filter(url => url !== primary);
-  
-  return [primary, ...fallbacks];
+  return Object.values(BACKEND_URLS);
 };
 
 // Helper function to log configuration for debugging

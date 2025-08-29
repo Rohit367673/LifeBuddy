@@ -10,7 +10,7 @@ const couponUseSchema = new mongoose.Schema({
 }, { _id: false });
 
 const couponSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true, index: true },
+  code: { type: String, required: true, unique: true },
   influencer: { type: String, default: '' },
   discountAmount: { type: Number, required: true, min: 0 },
   isActive: { type: Boolean, default: true },

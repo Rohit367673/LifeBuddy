@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePremium } from '../context/PremiumContext';
-import LoadingScreen from '../components/LoadingScreen';
 import { useTheme } from '../context/ThemeContext';
 import { motion } from 'framer-motion';
+import LoadingScreen from '../components/LoadingScreen';
+import PremiumBadge from '../components/PremiumBadge';
 import { 
   CalendarIcon, 
   CheckCircleIcon, 
@@ -27,6 +28,7 @@ import {
 const Dashboard = () => {
   const { user, getFirebaseToken } = useAuth();
   const { isDarkMode } = useTheme();
+  const { premiumBadge } = usePremium();
   const [motivationalMessage, setMotivationalMessage] = useState(null);
   const [recentAchievements, setRecentAchievements] = useState([]);
   const [stats, setStats] = useState({
@@ -422,10 +424,6 @@ const Dashboard = () => {
       setCompletingTaskId(null);
     }
   };
-
-  if (loading) {
-    return <LoadingScreen text="Loading your dashboard…" />;
-  }
 
   return (
     <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen">

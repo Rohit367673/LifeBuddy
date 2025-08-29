@@ -19,6 +19,8 @@ export const PremiumProvider = ({ children }) => {
   const [features, setFeatures] = useState({});
   const [usage, setUsage] = useState({});
   const [loading, setLoading] = useState(true);
+  const [premiumBadge, setPremiumBadge] = useState(false);
+  const [badgeGrantedAt, setBadgeGrantedAt] = useState(null);
 
   // Fetch subscription status
   const fetchSubscriptionStatus = async () => {
@@ -36,6 +38,8 @@ export const PremiumProvider = ({ children }) => {
         setSubscription(data);
         setFeatures(data.features || {});
         setUsage(data.usage || {});
+        setPremiumBadge(data.premiumBadge || false);
+        setBadgeGrantedAt(data.badgeGrantedAt);
       }
     } catch (error) {
       console.error('Error fetching subscription status:', error);
@@ -305,7 +309,9 @@ export const PremiumProvider = ({ children }) => {
     subscribe,
     getPlans,
     FeatureGate,
-    fetchSubscriptionStatus
+    fetchSubscriptionStatus,
+    premiumBadge,
+    badgeGrantedAt
   };
 
   return (

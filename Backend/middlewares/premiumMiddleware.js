@@ -137,6 +137,46 @@ const checkTrialStatus = async (req, res, next) => {
   }
 };
 
+// Check and handle subscription expiration for monthly/yearly plans
+const checkSubscriptionExpiration = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (user.subscription.status === 'active' && user.subscription.endDate) {
+      const endDate = new Date(user.subscription.endDate);
+      const now = new Date();
+      
+      if (now > endDate) {
+        // Subscription expired, downgrade to free
+        user.subscription.status = 'expired';
+        user.subscription.plan = 'free';
+        user.subscription.expiredAt = new Date();
+        user.features = {
+          unlimitedEvents: false,
+          advancedBudgetTracking: false,
+          fullMoodHistory: false,
+          customChecklists: false,
+          premiumMotivationalMessages: false,
+          profileInsights: false,
+          fullCalendarSync: false,
+          adFree: false,
+          exportablePDFs: false,
+          aiInsights: false,
+          prioritySupport: false,
+          advancedAnalytics: false
+        };
+        await user.save();
+        console.log(`[Subscription] User ${user._id} subscription expired and downgraded to free`);
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Subscription expiration check error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Require premium plan or active trial
 const requirePremium = async (req, res, next) => {
   try {
@@ -159,6 +199,7 @@ module.exports = {
   updateUsage,
 
   checkTrialStatus,
+  checkSubscriptionExpiration,
 
   requirePremium,
   isAdmin

@@ -28,7 +28,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AISchedulingUpsell from './components/AISchedulingUpsell';
 import AdManager from './components/AdManager';
 import PromoVideo from './components/PromoVideo';
+import BackendStatus from './components/BackendStatus';
 import { getApiUrl } from './utils/config';
+import { startHealthMonitoring } from './utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { daysSince } from './utils/dates';
 import LoadingScreen from './components/LoadingScreen';
@@ -39,10 +41,14 @@ function App() {
   const [promoActive, setPromoActive] = useState(false);
 
   useEffect(() => {
+    // Start backend health monitoring
+    startHealthMonitoring();
+    
     // Fetch user data
     const fetchUser = async () => {
       try {
-        const response = await fetch(`${getApiUrl()}/api/user`);
+        const apiUrl = await getApiUrl();
+        const response = await fetch(`${apiUrl}/api/user`);
         const data = await response.json();
         setUser(data);
         // Check if promo should be active
@@ -129,6 +135,7 @@ function App() {
                 onClose={handlePromoClose}
                 isActive={promoActive}
               />
+              <BackendStatus />
             </div>
           </PremiumProvider>
         </ThemeProvider>

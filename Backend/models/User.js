@@ -243,6 +243,13 @@ const userSchema = new mongoose.Schema({
     },
     stripeSubscriptionId: {
       type: String
+    },
+    premiumBadge: {
+      type: Boolean,
+      default: false
+    },
+    badgeGrantedAt: {
+      type: Date
     }
   },
   // Usage tracking for freemium limits

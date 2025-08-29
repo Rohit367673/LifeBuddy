@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { usePremium } from '../context/PremiumContext';
-import LoadingScreen from '../components/LoadingScreen';
 import { 
   UserIcon, 
   ShareIcon, 
@@ -40,8 +38,9 @@ import badge19 from '../assets/svg/badge-19.svg';
 import badge20 from '../assets/svg/badge-20.svg';
 import badge1 from '../assets/svg/badge-1.svg';
 
-
-
+import { usePremium } from '../context/PremiumContext';
+import LoadingScreen from '../components/LoadingScreen';
+import PremiumBadge from '../components/PremiumBadge';
 
 
 // Helper function to process Google avatar URL with multiple fallbacks
@@ -86,6 +85,7 @@ const createProxyUrl = (url) => {
 
 const Profile = () => {
   const { user, getFirebaseToken, firebaseUser } = useAuth();
+  const { premiumBadge } = usePremium();
   const [profileData, setProfileData] = useState(null);
   const [achievements, setAchievements] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -813,7 +813,14 @@ const Profile = () => {
       )}
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+        <div className="flex items-center gap-3 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {user.displayName || user.username || 'User Profile'}
+          </h1>
+          {premiumBadge && (
+            <PremiumBadge size="lg" className="mt-1" />
+          )}
+        </div>
         <div className="flex flex-row flex-wrap gap-2 w-full sm:w-auto overflow-x-auto pb-1">
           <button
             onClick={checkAndAwardAchievements}

@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 
 const path = require('path');
 require('dotenv').config();
@@ -67,6 +68,7 @@ const User = require('./models/User');
 const { authenticateUser } = require('./middlewares/authMiddleware');
 const { logEnvironmentStatus } = require('./utils/environmentValidator');
 const { logPaymentStatus } = require('./utils/paymentValidator');
+const performanceMonitor = require('./scripts/monitorPerformance');
 const app = express();
 // Trust proxy for tunnels (ngrok/localtunnel) so rate-limit sees correct IP
 app.set('trust proxy', 1);
@@ -77,7 +79,24 @@ logEnvironmentStatus();
 logPaymentStatus();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for development
+  crossOriginEmbedderPolicy: false
+}));
+
+// Compression middleware for faster responses
+app.use(compression({
+  level: 6, // Balanced compression level
+  threshold: 1024, // Only compress responses larger than 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
+// CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -91,8 +110,13 @@ app.use(cors({
       'http://localhost:3000',
       'http://localhost:5000',
       process.env.FRONTEND_URL,
-      // Allow Vercel preview deployments
-      /^https:\/\/life-buddy-.*\.vercel\.app$/
+      // Allow Vercel deployments
+      /^https:\/\/life-buddy-.*\.vercel\.app$/,
+      /^https:\/\/.*\.vercel\.app$/,
+      /^https:\/\/.*\.vercel\.dev$/,
+      // Allow Railway backend health checks
+      /^https:\/\/.*\.up\.railway\.app$/,
+      /^https:\/\/.*\.railway\.app$/
     ].filter(Boolean);
     
     // Also allow any localhost origin for development
@@ -115,10 +139,15 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - optimized for better throughput
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 200, // Increased from 100 to 200 for better throughput
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false
 });
 // Skip rate limit for subscription status checks and Cashfree webhook
 app.use((req, res, next) => {
@@ -130,6 +159,9 @@ app.use((req, res, next) => {
   }
   return limiter(req, res, next);
 });
+
+// Performance monitoring middleware
+app.use(performanceMonitor.trackRequest.bind(performanceMonitor));
 
 // Logging
 app.use(morgan('combined', {
@@ -229,6 +261,7 @@ app.get('/r/:code', async (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  performanceMonitor.trackError(err);
   console.error(err.stack);
   res.status(500).json({ 
     message: 'Something went wrong!',
@@ -241,7 +274,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Database connection
+// Database connection with connection pooling
 async function ensureUserIndexes() {
   try {
     const col = mongoose.connection.db.collection('users');
@@ -256,10 +289,25 @@ async function ensureUserIndexes() {
   }
 }
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy')
+// MongoDB connection with optimized settings
+const mongoOptions = {
+  maxPoolSize: 10, // Maximum number of connections in the pool
+  minPoolSize: 2,  // Minimum number of connections in the pool
+  maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+  serverSelectionTimeoutMS: 5000, // Timeout for server selection
+  socketTimeoutMS: 45000, // Timeout for socket operations
+  bufferCommands: false, // Disable mongoose buffering
+  // Removed deprecated options: bufferMaxEntries, useNewUrlParser, useUnifiedTopology
+};
+
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy', mongoOptions)
   .then(async () => {
-    console.log('Connected to MongoDB');
+    console.log('Connected to MongoDB with connection pooling');
     await ensureUserIndexes();
+    
+    // Start performance monitoring
+    performanceMonitor.start();
+    
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
