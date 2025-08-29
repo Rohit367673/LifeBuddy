@@ -244,7 +244,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
     if (cashfreeInitOnceRef.current) return;
     cashfreeInitOnceRef.current = true;
 
-    const isProd = process.env.NODE_ENV === 'production';
+    // Use production SDK for live environment, sandbox for dev
+    const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     const sdkSrc = isProd
       ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.production.js'
       : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
