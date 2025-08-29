@@ -239,19 +239,36 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
   useEffect(() => {
     const base = typeof price === 'number' ? price : (planDetails[plan].price || 0);
     const finalPrice = Math.max(0, base - (couponInfo?.discountAmount || 0));
-    if (paymentGateway !== 'cashfree' || finalPrice <= 0) return;
 
-    if (cashfreeInitOnceRef.current) return;
+    if (paymentGateway !== 'cashfree' || finalPrice <= 0 || cashfreeInitOnceRef.current) return;
     cashfreeInitOnceRef.current = true;
 
-    // Use production SDK for live environment, sandbox for dev
-    const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    const sdkSrc = isProd
-      ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.production.js'
-      : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
+    // Determine SDK source based on environment
+    const isProduction = window.location.hostname === 'www.lifebuddy.space' || 
+                        window.location.hostname === 'lifebuddy.space';
+    
+    // Use the correct Cashfree SDK v3 URL (same for both environments)
+    const sdkUrl = 'https://sdk.cashfree.com/js/v3/cashfree.js';
 
     const g = window;
     g.__LB_cashfreeLoadingPromise = g.__LB_cashfreeLoadingPromise || {};
+
+    const loadSDK = async (url) => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = () => {
+          console.log('Cashfree SDK loaded successfully from:', url);
+          resolve();
+        };
+        script.onerror = (e) => {
+          console.error('Cashfree SDK failed to load from:', url, e);
+          reject(e);
+        };
+        document.body.appendChild(script);
+      });
+    };
 
     const ensureInit = async () => {
       try {
@@ -259,45 +276,14 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
           await initializeCashfree();
           return;
         }
-        if (!g.__LB_cashfreeLoadingPromise[sdkSrc]) {
-          g.__LB_cashfreeLoadingPromise[sdkSrc] = new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = sdkSrc;
-            script.async = true;
-            script.onload = () => {
-              console.log('Cashfree SDK loaded successfully from:', sdkSrc);
-              resolve();
-            };
-            script.onerror = (e) => {
-              console.error('Cashfree SDK failed to load from:', sdkSrc, e);
-              reject(e);
-            };
-            document.body.appendChild(script);
-          });
+
+        if (!g.__LB_cashfreeLoadingPromise[sdkUrl]) {
+          g.__LB_cashfreeLoadingPromise[sdkUrl] = loadSDK(sdkUrl);
         }
-        await g.__LB_cashfreeLoadingPromise[sdkSrc];
+        await g.__LB_cashfreeLoadingPromise[sdkUrl];
         await initializeCashfree();
       } catch (e) {
-        console.error('Cashfree SDK load/init failed:', e);
-        // Fallback: try alternative CDN or version
-        if (!e.retried && sdkSrc.includes('2.0.0')) {
-          console.log('Retrying with v1.0.0 SDK...');
-          const fallbackSrc = sdkSrc.replace('2.0.0', '1.0.0');
-          try {
-            const script = document.createElement('script');
-            script.src = fallbackSrc;
-            script.async = true;
-            await new Promise((resolve, reject) => {
-              script.onload = resolve;
-              script.onerror = reject;
-              document.body.appendChild(script);
-            });
-            console.log('Cashfree SDK v1.0.0 loaded successfully');
-            await initializeCashfree();
-          } catch (fallbackError) {
-            console.error('Cashfree SDK v1.0.0 also failed:', fallbackError);
-          }
-        }
+        console.error('Cashfree SDK initialization failed:', e);
       }
     };
 
@@ -353,13 +339,18 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
       const orderToken = payment_session_id;
       const orderId = order_id;
 
-      // Initialize Cashfree
-      const cashfree = new Cashfree();
+      // Initialize Cashfree v3 SDK
+      const isProduction = window.location.hostname === 'www.lifebuddy.space' || 
+                          window.location.hostname === 'lifebuddy.space';
+      
+      const cashfree = Cashfree({
+        mode: isProduction ? "production" : "sandbox"
+      });
       cashfreeRef.current = cashfree;
 
-      cashfree.redirect(orderToken, {
-        mode: 'redirect',
-        redirectTarget: '_self'
+      cashfree.checkout({
+        paymentSessionId: orderToken,
+        redirectTarget: "_self"
       });
     } catch (err) {
       console.error('Cashfree initialization error:', err);
