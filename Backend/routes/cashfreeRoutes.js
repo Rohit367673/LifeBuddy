@@ -8,7 +8,7 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.lifebuddy.space';
 
 // Log basic configuration (do not mutate SDK statics; service handles client instantiation)
 const isProduction = process.env.NODE_ENV === 'production';
