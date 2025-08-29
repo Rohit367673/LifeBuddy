@@ -8,7 +8,19 @@ const { authenticateUser } = require('../middlewares/authMiddleware');
 const { getPlanPrice, getCurrencyByCountry } = require('../utils/currencyConverter');
 const Coupon = require('../models/Coupon');
 const Payment = require('../models/Payment');
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.lifebuddy.space';
+const DEFAULT_LIVE_FRONTEND = 'https://www.lifebuddy.space';
+let FRONTEND_URL = process.env.FRONTEND_URL || DEFAULT_LIVE_FRONTEND;
+// In production, never allow localhost return_url
+if (process.env.NODE_ENV === 'production') {
+  try {
+    const u = new URL(FRONTEND_URL);
+    if (u.hostname.includes('localhost') || u.hostname.includes('127.0.0.1')) {
+      FRONTEND_URL = DEFAULT_LIVE_FRONTEND;
+    }
+  } catch (_) {
+    FRONTEND_URL = DEFAULT_LIVE_FRONTEND;
+  }
+}
 
 // Log basic configuration (do not mutate SDK statics; service handles client instantiation)
 const isProduction = process.env.NODE_ENV === 'production';
