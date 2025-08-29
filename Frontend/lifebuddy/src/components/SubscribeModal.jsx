@@ -24,6 +24,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
   const [initializingPaypal, setInitializingPaypal] = useState(false);
   const [paypalError, setPaypalError] = useState('');
   const cashfreeRef = useRef(null);
+  const cashfreeInitOnceRef = useRef(false);
   const [pricing, setPricing] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [price, setPrice] = useState(0);
@@ -57,7 +58,15 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         setCurrency('USD');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Cleanup: only clear the buttons container; keep SDK script to avoid duplicate listeners
+      try {
+        if (paypalButtonsRef.current) {
+          paypalButtonsRef.current.innerHTML = '';
+        }
+      } catch (_) {}
+    };
   }, [isOpen, userCountry, plan]);
 
   const formatPrice = (p, cur) => {
@@ -87,42 +96,43 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
       try {
         setInitializingPaypal(true);
         setPaypalError('');
+        // Guard: do not use PayPal for INR (use Cashfree)
+        if ((currency || 'USD') === 'INR') {
+          setPaypalError('PayPal is unavailable for INR. Please switch to Cashfree.');
+          return;
+        }
         // Get client ID from backend
         const cfgResp = await fetch(`${getApiUrl()}/api/payments/paypal/config`);
         const cfg = await cfgResp.json();
         const clientId = cfg?.clientId;
         if (!clientId) throw new Error('Missing PayPal client ID');
 
-        // Ensure SDK is loaded with correct currency: remove existing SDK and reload
-        const existingSdk = Array.from(document.querySelectorAll('script[src*="paypal.com/sdk/js"]'));
-        if (existingSdk.length) {
-          existingSdk.forEach((s) => s.parentNode && s.parentNode.removeChild(s));
-          // Reset namespace so SDK can load again
-          try { delete window.paypal; } catch (_) { window.paypal = undefined; }
-        }
+        // Build SDK src 
+        const sdkSrc = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&intent=capture&components=buttons`;
 
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&intent=capture&currency=${encodeURIComponent(currency || 'USD')}&components=buttons`;
-          script.async = true;
-          script.onload = resolve;
-          script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
-          document.body.appendChild(script);
-        });
+        // Global singleton to avoid duplicate loads
+        const g = window;
+        g.__LB_paypalLoadingPromise = g.__LB_paypalLoadingPromise || {};
+
+        // Load SDK if not already loaded
+        if (!g.__LB_paypalLoadingPromise[sdkSrc]) {
+          g.__LB_paypalLoadingPromise[sdkSrc] = loadPayPalSDK(sdkSrc);
+        }
+        await g.__LB_paypalLoadingPromise[sdkSrc];
 
         // Wait until Buttons API is available
         await new Promise((resolve, reject) => {
           const start = Date.now();
           (function check() {
             if (window.paypal && typeof window.paypal.Buttons === 'function') return resolve();
-            if (Date.now() - start > 5000) return reject(new Error('PayPal SDK did not expose Buttons'));
+            if (Date.now() - start > 7000) return reject(new Error('PayPal SDK did not expose Buttons'));
             setTimeout(check, 50);
           })();
         });
 
         if (cancelled) return;
 
-        // Clear previous buttons if any
+        // Clear previous buttons
         paypalButtonsRef.current.innerHTML = '';
 
         window.paypal.Buttons({
@@ -220,51 +230,100 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
       setCouponInfo(null);
       setPaypalError('');
       setPaypalReady(false);
+      // allow Cashfree to re-initialize on each modal open
+      cashfreeInitOnceRef.current = false;
     }
   }, [isOpen]);
 
+  // Initialize Cashfree exactly once per modal open
   useEffect(() => {
     const base = typeof price === 'number' ? price : (planDetails[plan].price || 0);
     const finalPrice = Math.max(0, base - (couponInfo?.discountAmount || 0));
-    if (paymentGateway === 'cashfree' && finalPrice > 0) {
-      // Load Cashfree SDK
-      const script = document.createElement('script');
-      script.src = process.env.NODE_ENV === 'production' 
-        ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.production.js' 
-        : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
-      script.async = true;
-      script.onload = initializeCashfree;
-      document.body.appendChild(script);
+    if (paymentGateway !== 'cashfree' || finalPrice <= 0) return;
 
-      return () => {
-        if (script.parentNode) {
-          document.body.removeChild(script);
+    if (cashfreeInitOnceRef.current) return;
+    cashfreeInitOnceRef.current = true;
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const sdkSrc = isProd
+      ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.production.js'
+      : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
+
+    const g = window;
+    g.__LB_cashfreeLoadingPromise = g.__LB_cashfreeLoadingPromise || {};
+
+    const ensureInit = async () => {
+      try {
+        if (g.Cashfree) {
+          await initializeCashfree();
+          return;
         }
-      };
+        if (!g.__LB_cashfreeLoadingPromise[sdkSrc]) {
+          g.__LB_cashfreeLoadingPromise[sdkSrc] = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = sdkSrc;
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.appendChild(script);
+          });
+        }
+        await g.__LB_cashfreeLoadingPromise[sdkSrc];
+        await initializeCashfree();
+      } catch (e) {
+        console.error('Cashfree SDK load/init failed:', e);
+      }
+    };
+
+    ensureInit();
+  }, [paymentGateway, plan, couponInfo, price, currency]);
+
+  // Reset one-time guard if user switches away from Cashfree
+  useEffect(() => {
+    if (paymentGateway !== 'cashfree') {
+      cashfreeInitOnceRef.current = false;
     }
-  }, [paymentGateway, plan, couponInfo, price]);
+  }, [paymentGateway]);
+
+  const loadPayPalSDK = (src) => {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  };
 
   const initializeCashfree = async () => {
     try {
-      // Guard: Cashfree sandbox typically supports INR only
-      if ((currency || 'INR') !== 'INR') {
-        toast.error('Cashfree supports INR only. Please use PayPal for other currencies.');
-        return;
+      // Cashfree sandbox supports INR only. In non-production, force INR so testing works.
+      const isProd = process.env.NODE_ENV === 'production';
+      let orderCurrency = (currency || 'INR').toUpperCase();
+      if (!isProd && orderCurrency !== 'INR') {
+        orderCurrency = 'INR';
+        try { toast('Using INR for Cashfree sandbox', { icon: 'ℹ️' }); } catch (_) {}
       }
+
       const response = await fetch(`${getApiUrl()}/api/payments/cashfree/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ plan, couponCode: coupon, currency: currency || 'INR', userCountry })
+        body: JSON.stringify({ 
+          plan, 
+          couponCode: coupon?.trim() || undefined, 
+          currency: orderCurrency, 
+          userCountry 
+        })
       });
-      
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to create Cashfree order');
+        throw new Error(data?.error || data?.message || 'Failed to create Cashfree order');
       }
-      
-      const { payment_session_id, order_id } = await response.json();
+
+      const { payment_session_id, order_id } = data || {};
       const orderToken = payment_session_id;
       const orderId = order_id;
 
@@ -278,9 +337,17 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
       });
     } catch (err) {
       console.error('Cashfree initialization error:', err);
-      // Handle error
+      try { toast.error(err?.message || 'Failed to create Cashfree order'); } catch (_) {}
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (cashfreeRef.current) {
+        cashfreeRef.current.destroy();
+      }
+    };
+  }, []);
 
   const validateCoupon = async () => {
     const code = coupon.trim();

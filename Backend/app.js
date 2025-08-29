@@ -4,8 +4,19 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config();
+
+// In development, avoid process exit on uncaught errors to prevent restart loops
+if (process.env.NODE_ENV !== 'production') {
+  process.on('uncaughtException', (err) => {
+    console.error('[Dev] Uncaught Exception:', err);
+  });
+  process.on('unhandledRejection', (reason, p) => {
+    console.error('[Dev] Unhandled Rejection:', reason);
+  });
+}
 
 // Environment verification
 console.log('[ENV] NODE_ENV:', process.env.NODE_ENV);
@@ -51,6 +62,8 @@ const { authenticateUser } = require('./middlewares/authMiddleware');
 const { logEnvironmentStatus } = require('./utils/environmentValidator');
 const { logPaymentStatus } = require('./utils/paymentValidator');
 const app = express();
+// Trust proxy for tunnels (ngrok/localtunnel) so rate-limit sees correct IP
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5001;
 
 // Validate environment on startup
@@ -73,7 +86,6 @@ app.use(cors({
       'http://localhost:5174',
       'http://localhost:3000',
       'http://localhost:5000',
-      
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -97,18 +109,29 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
-// Skip rate limit for subscription status checks to avoid noisy 429s from frontend polling
+// Skip rate limit for subscription status checks and Cashfree webhook
 app.use((req, res, next) => {
-  if (req.path === '/api/subscriptions/status') {
+  if (
+    req.path === '/api/subscriptions/status' ||
+    req.path === '/api/payments/cashfree/webhook'
+  ) {
     return next();
   }
   return limiter(req, res, next);
 });
 
 // Logging
-app.use(morgan('combined'));
+app.use(morgan('combined', {
+  skip: (req, res) => {
+    if (req.path === '/api/subscriptions/status') return true; // quiet frequent polling
+    if (req.path === '/api/health') return true; // optional: health checks
+    return false;
+  }
+}));
 
 // Body parsing middleware
+// IMPORTANT: Use raw body for Cashfree webhook so signature verification matches exactly
+app.use('/api/payments/cashfree/webhook', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -232,7 +255,14 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err);
-    process.exit(1);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn('[Dev] Continuing to run server without DB connection for debugging. Some routes may fail.');
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} (DB connection failed)`);
+      });
+    }
   });
 
 module.exports = app;

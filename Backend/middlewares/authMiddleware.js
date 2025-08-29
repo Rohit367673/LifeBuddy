@@ -1,12 +1,16 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const DEBUG_AUTH = process.env.DEBUG_AUTH === 'true';
 
 // Middleware to verify JWT token and get user (supports both Firebase and traditional auth)
 const authenticateUser = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log('AUTH HEADER:', authHeader);
-    console.log('JWT SECRET (debug):', process.env.JWT_SECRET);
+    if (DEBUG_AUTH) {
+      const sec = process.env.JWT_SECRET || '';
+      console.log('AUTH HEADER present:', !!authHeader);
+      console.log('JWT SECRET set:', !!sec, sec ? (sec.slice(0, 4) + '***') : '');
+    }
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.log('No token provided or malformed header');
@@ -16,13 +20,21 @@ const authenticateUser = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    console.log('EXTRACTED TOKEN:', token);
+    if (DEBUG_AUTH) {
+      console.log('EXTRACTED TOKEN length:', token ? token.length : 0);
+    }
     
     let decoded;
     try {
       // Verify JWT token
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('DECODED PAYLOAD:', decoded);
+      if (DEBUG_AUTH) {
+        console.log('DECODED PAYLOAD claims:', {
+          firebaseUid: decoded.firebaseUid,
+          userId: decoded.userId,
+          exp: decoded.exp,
+        });
+      }
     } catch (error) {
       console.log('JWT VERIFY ERROR:', error);
       return res.status(401).json({ 
@@ -38,18 +50,18 @@ const authenticateUser = async (req, res, next) => {
         firebaseUid: decoded.firebaseUid,
         isActive: true 
       }).select('-__v');
-      console.log('USER LOOKUP BY firebaseUid:', user);
+      if (DEBUG_AUTH) console.log('USER LOOKUP BY firebaseUid -> found:', !!user);
     } else if (decoded.userId) {
       // Traditional auth
       user = await User.findOne({ 
         _id: decoded.userId,
         isActive: true 
       }).select('-__v');
-      console.log('USER LOOKUP BY userId:', user);
+      if (DEBUG_AUTH) console.log('USER LOOKUP BY userId -> found:', !!user);
     }
 
     if (!user) {
-      console.log('User not found for decoded payload:', decoded);
+      if (DEBUG_AUTH) console.log('User not found for decoded payload');
       return res.status(401).json({ 
         message: 'Invalid token. User not found.' 
       });

@@ -43,6 +43,7 @@ const Premium = () => {
   const featuresRef = useRef(null);
   const [watchedAd, setWatchedAd] = useState(false);
   const [reward, setReward] = useState({ sessionId: '', status: 'idle' });
+  const cashfreeHandledRef = useRef(false);
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   const IS_PROD = import.meta.env.MODE === 'production';
@@ -123,7 +124,51 @@ const Premium = () => {
     if (IS_PROD) {
       loadAdSenseScript();
     }
-  }, [fetchSubscriptionStatus, IS_PROD]);
+  }, [IS_PROD]); // Remove fetchSubscriptionStatus from dependencies to prevent infinite loop
+
+  // Handle Cashfree return: confirm order and activate subscription
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get('from');
+    const orderId = params.get('order_id');
+
+    if (!token || cashfreeHandledRef.current) return;
+    if (from === 'cashfree' && orderId) {
+      cashfreeHandledRef.current = true;
+      (async () => {
+        try {
+          setLoading(true);
+          const res = await fetch(`${API_BASE}/api/payments/cashfree/confirm`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ orderId })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && (data?.success || data?.subscription)) {
+            toast.success('Payment confirmed! Premium activated.');
+            await fetchSubscriptionStatus();
+            // Clean URL params and redirect to success page
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('from');
+              url.searchParams.delete('order_id');
+              window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+            } catch {}
+            window.location.href = '/subscribe-success';
+          } else {
+            toast.error(data?.message || 'Payment confirmation failed.');
+          }
+        } catch (e) {
+          toast.error('Payment confirmation failed.');
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [token, API_BASE, fetchSubscriptionStatus]);
 
   // Load AdSense when watching (prod only)
   useEffect(() => {

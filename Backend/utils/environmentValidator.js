@@ -2,7 +2,6 @@
 const validateEnvironment = () => {
   const requiredEnvVars = [
     'NODE_ENV',
-    'MONGO_URI',
     'JWT_SECRET',
     'FIREBASE_PROJECT_ID',
     'FIREBASE_PRIVATE_KEY',
@@ -25,6 +24,11 @@ const validateEnvironment = () => {
       missingVars.push(varName);
     }
   });
+
+  // MongoDB URI: accept either MONGODB_URI or MONGO_URI (app.js uses MONGODB_URI)
+  if (!process.env.MONGODB_URI && !process.env.MONGO_URI) {
+    missingVars.push('MONGODB_URI (or MONGO_URI)');
+  }
 
   // Check payment environment variables
   paymentEnvVars.forEach(varName => {
