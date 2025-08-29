@@ -87,6 +87,12 @@ router.post('/trial', authenticateUser, async (req, res) => {
 router.post('/subscribe', authenticateUser, async (req, res) => {
   try {
     const { plan, paymentData, couponCode } = req.body;
+    // Hard block in production: activation must happen via payment gateway specific confirm/webhook
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        message: 'Direct subscribe is disabled in production. Use payment gateway confirmation.'
+      });
+    }
     
     if (!['monthly', 'yearly'].includes(plan)) {
       return res.status(400).json({
@@ -117,6 +123,10 @@ router.post('/subscribe', authenticateUser, async (req, res) => {
       }
     }
 
+    // Store payment information (dev only). Require explicit completed status to activate
+    if (String(paymentData?.status).toLowerCase() !== 'completed') {
+      return res.status(400).json({ message: 'Payment not completed' });
+    }
     // Store payment information
     const paymentInfo = {
       method: paymentData?.method || 'mock',

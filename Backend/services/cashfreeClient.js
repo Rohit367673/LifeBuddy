@@ -8,6 +8,7 @@ const secretKey = process.env.CASHFREE_SECRET_KEY || '';
 // Allow explicit mode override via env (CASHFREE_MODE=PRODUCTION|SANDBOX) — prefer CASHFREE_MODE if set
 const envMode = String(process.env.CASHFREE_MODE || '').toUpperCase();
 const resolvedMode = envMode ? (envMode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX') : (isProd ? 'PRODUCTION' : 'SANDBOX');
+const apiVersion = process.env.CASHFREE_API_VERSION || '2022-09-01';
 
 console.log(`[Cashfree] Resolved mode: ${resolvedMode}`);
 console.log(`[Cashfree] App ID: ${appId ? appId.substring(0, 10) + '...' : 'NOT SET'}`);
@@ -32,7 +33,7 @@ const createOrder = async (orderData) => {
     const res = await axios.post(`${base}/pg/orders`, orderData, {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': '2022-09-01',
+        'x-api-version': apiVersion,
         'x-client-id': appId,
         'x-client-secret': secretKey
       },
@@ -52,7 +53,7 @@ const verifyPayment = async (orderId) => {
     const res = await axios.get(`${base}/pg/orders/${encodeURIComponent(orderId)}/payments`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': '2022-09-01',
+        'x-api-version': apiVersion,
         'x-client-id': appId,
         'x-client-secret': secretKey
       },
@@ -72,7 +73,7 @@ const getOrderStatus = async (orderId) => {
     const res = await axios.get(`${base}/pg/orders/${encodeURIComponent(orderId)}`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': '2022-09-01',
+        'x-api-version': apiVersion,
         'x-client-id': appId,
         'x-client-secret': secretKey
       },
