@@ -14,14 +14,14 @@ console.log(`[Cashfree] Secret Key: ${secretKey ? 'SET (length: ' + secretKey.le
 
 // Create Cashfree client instance (recreate each time to ensure correct mode)
 function getClient() {
-  // Prefer SDK's CFEnvironment constants to avoid base-URL mismatch
-  const env = resolvedMode === 'PRODUCTION' ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
+  // Use documented uppercase string modes for Node SDK v5
+  const modeString = resolvedMode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
 
-  console.log(`[Cashfree Client] Creating client with env: ${resolvedMode}`);
-  console.log(`[Cashfree Client] Expected API URL: ${env === CFEnvironment.PRODUCTION ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com'}`);
+  console.log(`[Cashfree Client] Creating client with mode: ${modeString}`);
+  console.log(`[Cashfree Client] Expected API URL: ${modeString === 'PRODUCTION' ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com'}`);
 
   const client = new Cashfree({
-    mode: env,
+    mode: modeString,
     appId: appId,
     secretKey: secretKey
   });
