@@ -1,4 +1,5 @@
-const { Cashfree, CFEnvironment } = require('cashfree-pg');
+const { Cashfree } = require('cashfree-pg');
+const axios = require('axios');
 
 // Initialize Cashfree with proper authentication
 const isProd = process.env.NODE_ENV === 'production';
@@ -12,22 +13,11 @@ console.log(`[Cashfree] Resolved mode: ${resolvedMode}`);
 console.log(`[Cashfree] App ID: ${appId ? appId.substring(0, 10) + '...' : 'NOT SET'}`);
 console.log(`[Cashfree] Secret Key: ${secretKey ? 'SET (length: ' + secretKey.length + ')' : 'NOT SET'}`);
 
-// Create Cashfree client instance (recreate each time to ensure correct mode)
-function getClient() {
-  // Use documented uppercase string modes for Node SDK v5
-  const modeString = resolvedMode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX';
-
-  console.log(`[Cashfree Client] Creating client with mode: ${modeString}`);
-  console.log(`[Cashfree Client] Expected API URL: ${modeString === 'PRODUCTION' ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com'}`);
-
-  const client = new Cashfree({
-    mode: modeString,
-    appId: appId,
-    secretKey: secretKey
-  });
-
-  console.log(`[Cashfree Client] Client created successfully`);
-  return client;
+// Determine base URL explicitly to avoid SDK mode inconsistencies
+function getBaseUrl() {
+  const base = resolvedMode === 'PRODUCTION' ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com';
+  console.log(`[Cashfree REST] Using base URL: ${base}`);
+  return base;
 }
 
 // Create order function
@@ -38,10 +28,17 @@ const createOrder = async (orderData) => {
       err.code = 'CF_NO_CREDENTIALS';
       throw err;
     }
-    // SDK v5 commonly supports a single-argument call; avoid passing extra args that may break across versions
-    const order = await getClient().PGCreateOrder(orderData);
-    // SDK may return { data: {...} } – normalize to payload
-    return order?.data || order;
+    const base = getBaseUrl();
+    const res = await axios.post(`${base}/pg/orders`, orderData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-version': '2022-09-01',
+        'x-client-id': appId,
+        'x-client-secret': secretKey
+      },
+      timeout: 10000
+    });
+    return res.data;
   } catch (error) {
     console.error('Cashfree create order (client) error:', error);
     throw error;
@@ -51,22 +48,18 @@ const createOrder = async (orderData) => {
 // Verify payment function
 const verifyPayment = async (orderId) => {
   try {
-    // SDK v5: PGOrderFetchPayments(order_id, x_request_id?, x_idempotency_key?, options?)
-    const payment = await getClient().PGOrderFetchPayments(orderId);
-    return payment?.data || payment;
+    const base = getBaseUrl();
+    const res = await axios.get(`${base}/pg/orders/${encodeURIComponent(orderId)}/payments`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-version': '2022-09-01',
+        'x-client-id': appId,
+        'x-client-secret': secretKey
+      },
+      timeout: 10000
+    });
+    return res.data;
   } catch (error) {
-    // Fallback for SDK variants expecting x-api-version first
-    const msg = String(error?.message || '').toLowerCase();
-    const apiMsg = String(error?.response?.data?.message || '').toLowerCase();
-    if (msg.includes('argument') || apiMsg.includes('x-api-version')) {
-      try {
-        console.warn('[Cashfree] verifyPayment: retrying with x-api-version fallback');
-        const payment = await getClient().PGOrderFetchPayments('2022-09-01', orderId);
-        return payment?.data || payment;
-      } catch (e2) {
-        console.error('Cashfree verify payment (client) fallback error:', e2);
-      }
-    }
     console.error('Cashfree verify payment (client) error:', error);
     throw error;
   }
@@ -75,22 +68,18 @@ const verifyPayment = async (orderId) => {
 // Get order status
 const getOrderStatus = async (orderId) => {
   try {
-    // SDK v5: PGFetchOrder(order_id, x_request_id?, x_idempotency_key?, options?)
-    const order = await getClient().PGFetchOrder(orderId);
-    return order?.data || order;
+    const base = getBaseUrl();
+    const res = await axios.get(`${base}/pg/orders/${encodeURIComponent(orderId)}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-version': '2022-09-01',
+        'x-client-id': appId,
+        'x-client-secret': secretKey
+      },
+      timeout: 10000
+    });
+    return res.data;
   } catch (error) {
-    // Fallback for SDK variants expecting x-api-version first
-    const msg = String(error?.message || '').toLowerCase();
-    const apiMsg = String(error?.response?.data?.message || '').toLowerCase();
-    if (msg.includes('argument') || apiMsg.includes('x-api-version')) {
-      try {
-        console.warn('[Cashfree] getOrderStatus: retrying with x-api-version fallback');
-        const order = await getClient().PGFetchOrder('2022-09-01', orderId);
-        return order?.data || order;
-      } catch (e2) {
-        console.error('Cashfree get order status (client) fallback error:', e2);
-      }
-    }
     console.error('Cashfree get order status (client) error:', error);
     throw error;
   }
