@@ -1,5 +1,7 @@
 import { CheckIcon, XMarkIcon, StarIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import LoadingScreen from './LoadingScreen';
 
 const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 'US' }) => {
   const [pricing, setPricing] = useState(null);
@@ -76,6 +78,10 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
   };
 
   const planPricing = getPlanPricing();
+
+  if (loading) {
+    return <LoadingScreen text="Loading plan details…" />;
+  }
 
   return (
     <div className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl ${

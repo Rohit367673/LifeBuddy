@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePremium } from '../context/PremiumContext';
+import LoadingScreen from '../components/LoadingScreen';
 import { 
   UserIcon, 
   ShareIcon, 
@@ -677,11 +679,7 @@ const Profile = () => {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingScreen text="Loading your profile…" />;
   }
 
   // Defensive: declare 'today' only once before any calendar logic

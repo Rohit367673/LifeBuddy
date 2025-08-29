@@ -31,6 +31,7 @@ import PromoVideo from './components/PromoVideo';
 import { getApiUrl } from './utils/config';
 import React, { useState, useEffect } from 'react';
 import { daysSince } from './utils/dates';
+import LoadingScreen from './components/LoadingScreen';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -60,7 +61,7 @@ function App() {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingScreen text="Preparing your LifeBuddy experience…" />;
   }
 
   const handleUpgrade = () => {

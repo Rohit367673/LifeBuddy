@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { usePremium } from '../context/PremiumContext';
@@ -19,6 +19,7 @@ import EventModal from '../components/EventModal';
 import EventCard from '../components/EventCard';
 import EventDetail from '../components/EventDetail';
 import toast from 'react-hot-toast';
+import LoadingScreen from '../components/LoadingScreen';
 
 const Events = () => {
   const { user, getFirebaseToken } = useAuth();
@@ -246,11 +247,7 @@ const Events = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <LoadingScreen text="Loading your events…" />;
   }
 
   const filteredEvents = getFilteredEvents();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePremium } from '../context/PremiumContext';
 import api from '../utils/api';
+import LoadingScreen from './LoadingScreen';
 
 const TrialDashboard = () => {
   const { currentUser } = useAuth();
@@ -45,7 +46,7 @@ const TrialDashboard = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingScreen text="Loading trial dashboard…" />;
   }
 
   if (error) {

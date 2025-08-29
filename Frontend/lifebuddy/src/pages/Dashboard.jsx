@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { usePremium } from '../context/PremiumContext';
+import LoadingScreen from '../components/LoadingScreen';
 import { useTheme } from '../context/ThemeContext';
 import { motion } from 'framer-motion';
 import { 
@@ -420,6 +422,10 @@ const Dashboard = () => {
       setCompletingTaskId(null);
     }
   };
+
+  if (loading) {
+    return <LoadingScreen text="Loading your dashboard…" />;
+  }
 
   return (
     <div className="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen">

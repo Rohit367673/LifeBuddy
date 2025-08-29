@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { loadAdSenseScript, pushAd } from '../utils/ads';
 import { useAuth } from '../context/AuthContext';
+import { usePremium } from '../context/PremiumContext';
+import LoadingScreen from '../components/LoadingScreen';
 import { 
   ShoppingBagIcon,
   GiftIcon,
@@ -252,11 +254,7 @@ const Store = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingScreen text="Loading store…" />;
   }
 
   return (
