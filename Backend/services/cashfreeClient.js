@@ -5,9 +5,9 @@ const axios = require('axios');
 const isProd = process.env.NODE_ENV === 'production';
 const appId = process.env.CASHFREE_APP_ID || '';
 const secretKey = process.env.CASHFREE_SECRET_KEY || '';
-// Allow explicit mode override via env (CASHFREE_MODE=PRODUCTION|SANDBOX)
+// Allow explicit mode override via env (CASHFREE_MODE=PRODUCTION|SANDBOX) — prefer CASHFREE_MODE if set
 const envMode = String(process.env.CASHFREE_MODE || '').toUpperCase();
-const resolvedMode = envMode === 'PRODUCTION' ? 'PRODUCTION' : (isProd ? 'PRODUCTION' : 'SANDBOX');
+const resolvedMode = envMode ? (envMode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX') : (isProd ? 'PRODUCTION' : 'SANDBOX');
 
 console.log(`[Cashfree] Resolved mode: ${resolvedMode}`);
 console.log(`[Cashfree] App ID: ${appId ? appId.substring(0, 10) + '...' : 'NOT SET'}`);

@@ -22,9 +22,9 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
-// Log basic configuration (do not mutate SDK statics; service handles client instantiation)
-const isProduction = process.env.NODE_ENV === 'production';
-console.log(`[Cashfree] Environment: ${isProduction ? 'PRODUCTION' : 'SANDBOX'}`);
+// Log basic configuration (respect CASHFREE_MODE override)
+const isProdMode = String(process.env.CASHFREE_MODE || '').toUpperCase() === 'PRODUCTION' || process.env.NODE_ENV === 'production';
+console.log(`[Cashfree] Environment: ${isProdMode ? 'PRODUCTION' : 'SANDBOX'}`);
 console.log(`[Cashfree] App ID: ${process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.substring(0, 10) + '...' : 'NOT SET'}`);
 if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
   console.warn('[Cashfree] Missing CASHFREE_APP_ID or CASHFREE_SECRET_KEY');
