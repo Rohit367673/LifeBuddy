@@ -21,10 +21,14 @@ if (process.env.NODE_ENV !== 'production') {
 // Environment verification
 console.log('[ENV] NODE_ENV:', process.env.NODE_ENV);
 console.log('[ENV] OPENROUTER_API_KEY present:', !!process.env.OPENROUTER_API_KEY);
-console.log('[ENV] OPENROUTER_API_KEY prefix:', process.env.OPENROUTER_API_KEY ? process.env.OPENROUTER_API_KEY.substring(0,8) + '...' : 'Not set');
+console.log('[ENV] OPENROUTER_API_KEY prefix:', process.env.OPENROUTER_API_KEY ? process.env.OPENROUTER_API_KEY.substring(0, 9) + '...' : 'Not set');
 console.log('[ENV] OPENROUTER_REFERRER:', process.env.OPENROUTER_REFERRER || 'Not set');
 console.log('[ENV] OPENROUTER_TITLE:', process.env.OPENROUTER_TITLE || 'Not set');
 console.log('[ENV] OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Not set');
+console.log('[DEBUG] CASHFREE_APP_ID present:', !!process.env.CASHFREE_APP_ID);
+console.log('[DEBUG] CASHFREE_SECRET_KEY present:', !!process.env.CASHFREE_SECRET_KEY);
+console.log('[DEBUG] CASHFREE_MODE:', process.env.CASHFREE_MODE || 'Not set');
+console.log('[DEBUG] All env keys containing CASHFREE:', Object.keys(process.env).filter(k => k.includes('CASHFREE')));
 
 // Set default environment variables if not provided (do NOT set fake OpenRouter keys)
 if (!process.env.OPENROUTER_API_KEY) {
