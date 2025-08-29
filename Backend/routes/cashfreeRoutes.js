@@ -76,6 +76,25 @@ router.post('/create-order', authenticateUser, async (req, res) => {
 
     // Create order using new Cashfree API
     const orderId = `ORDER_${Date.now()}_${user._id}`;
+    // Build secure return_url
+    const desiredReturn = process.env.CASHFREE_RETURN_URL
+      || `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`;
+    let returnUrl = desiredReturn;
+    try {
+      const u = new URL(returnUrl);
+      const isLocal = u.hostname.includes('localhost') || u.hostname.includes('127.0.0.1');
+      const isHttp = u.protocol === 'http:';
+      // In production mode, force HTTPS live domain
+      if (isProdMode && (isLocal || isHttp)) {
+        returnUrl = `${DEFAULT_LIVE_FRONTEND}/premium?from=cashfree&order_id=${orderId}`;
+      }
+    } catch (_) {
+      // If malformed, fall back to safe live URL in prod, otherwise to FRONTEND_URL
+      returnUrl = isProdMode
+        ? `${DEFAULT_LIVE_FRONTEND}/premium?from=cashfree&order_id=${orderId}`
+        : `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`;
+    }
+
     const orderRequest = {
       order_id: orderId,
       order_amount: amount,
@@ -87,7 +106,7 @@ router.post('/create-order', authenticateUser, async (req, res) => {
         discountApplied: discount
       }),
       order_meta: {
-        return_url: `${FRONTEND_URL}/premium?from=cashfree&order_id=${orderId}`
+        return_url: returnUrl
       },
       customer_details: {
         customer_id: user._id.toString(),
