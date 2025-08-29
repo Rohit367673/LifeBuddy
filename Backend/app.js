@@ -29,6 +29,8 @@ console.log('[DEBUG] CASHFREE_APP_ID present:', !!process.env.CASHFREE_APP_ID);
 console.log('[DEBUG] CASHFREE_SECRET_KEY present:', !!process.env.CASHFREE_SECRET_KEY);
 console.log('[DEBUG] CASHFREE_MODE:', process.env.CASHFREE_MODE || 'Not set');
 console.log('[DEBUG] All env keys containing CASHFREE:', Object.keys(process.env).filter(k => k.includes('CASHFREE')));
+console.log('[DEBUG] Raw CASHFREE_APP_ID value:', JSON.stringify(process.env.CASHFREE_APP_ID));
+console.log('[DEBUG] Raw CASHFREE_SECRET_KEY value:', process.env.CASHFREE_SECRET_KEY ? `"${process.env.CASHFREE_SECRET_KEY.substring(0, 15)}..."` : 'undefined');
 
 // Set default environment variables if not provided (do NOT set fake OpenRouter keys)
 if (!process.env.OPENROUTER_API_KEY) {
