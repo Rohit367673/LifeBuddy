@@ -1,4 +1,4 @@
-const { Cashfree } = require('cashfree-pg');
+const { Cashfree, CFEnvironment } = require('cashfree-pg');
 
 // Initialize Cashfree with proper authentication
 const isProd = process.env.NODE_ENV === 'production';
@@ -12,17 +12,22 @@ console.log(`[Cashfree] Resolved mode: ${resolvedMode}`);
 console.log(`[Cashfree] App ID: ${appId ? appId.substring(0, 10) + '...' : 'NOT SET'}`);
 console.log(`[Cashfree] Secret Key: ${secretKey ? 'SET (length: ' + secretKey.length + ')' : 'NOT SET'}`);
 
-// Create a singleton Cashfree client instance (no global static mutation)
-let clientInstance = null;
+// Create Cashfree client instance (recreate each time to ensure correct mode)
 function getClient() {
-  if (!clientInstance) {
-    clientInstance = new Cashfree({
-      mode: resolvedMode,
-      appId: appId,
-      secretKey: secretKey
-    });
-  }
-  return clientInstance;
+  const environment = resolvedMode === 'PRODUCTION' ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
+  
+  console.log(`[Cashfree Client] Creating client with mode: ${resolvedMode}`);
+  console.log(`[Cashfree Client] Using environment: ${environment}`);
+  console.log(`[Cashfree Client] Expected API URL: ${resolvedMode === 'PRODUCTION' ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com'}`);
+  
+  const client = new Cashfree({
+    environment: environment,
+    appId: appId,
+    secretKey: secretKey
+  });
+  
+  console.log(`[Cashfree Client] Client created successfully`);
+  return client;
 }
 
 // Create order function
