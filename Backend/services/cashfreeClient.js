@@ -38,10 +38,8 @@ const createOrder = async (orderData) => {
       err.code = 'CF_NO_CREDENTIALS';
       throw err;
     }
-    // SDK v5 expects: PGCreateOrder(CreateOrderRequest, x_request_id?, x_idempotency_key?, options?)
-    // Use order_id as idempotency key if available
-    const idempotencyKey = orderData && orderData.order_id ? String(orderData.order_id) : undefined;
-    const order = await getClient().PGCreateOrder(orderData, undefined, idempotencyKey);
+    // SDK v5 commonly supports a single-argument call; avoid passing extra args that may break across versions
+    const order = await getClient().PGCreateOrder(orderData);
     // SDK may return { data: {...} } – normalize to payload
     return order?.data || order;
   } catch (error) {
