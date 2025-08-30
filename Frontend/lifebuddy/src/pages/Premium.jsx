@@ -266,7 +266,7 @@ const Premium = () => {
       author: "Sarah Chen",
       badge: "Event Planner Pro 🏆",
       streak: "23 days",
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face"
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face"
     },
     {
       quote: "After switching to Premium, I planned my full move-in day without stress. The checklist templates are a game-changer!",
