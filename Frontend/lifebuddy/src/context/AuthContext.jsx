@@ -262,7 +262,7 @@ export const AuthProvider = ({ children }) => {
   const verifyOTP = async (otpCode) => {
     try {
       setLoading(true);
-      const fu = auth.currentUser;
+      const fu = auth?.currentUser;
       if (!fu) throw new Error('No authenticated user. Please login again.');
 
       const response = await fetch(`${getApiUrl()}/api/auth/verify-otp`, {
@@ -299,7 +299,7 @@ export const AuthProvider = ({ children }) => {
   const finalizeEmailRegistration = async (displayName, avatar = '') => {
     try {
       setLoading(true);
-      const fu = auth.currentUser;
+      const fu = auth?.currentUser;
       if (!fu) throw new Error('No authenticated user. Please login again.');
       await fu.reload();
       if (!fu.emailVerified) {
