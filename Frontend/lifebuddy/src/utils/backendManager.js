@@ -1,7 +1,7 @@
 // Smart Backend URL Manager for Render/Railway switching
 const BACKEND_URLS = {
   local: 'http://localhost:5001',
-  railway: 'https://lifebuddy-backend-production.up.railway.app',
+  railway: '',
   render: 'https://lifebuddy.onrender.com'
 };
 

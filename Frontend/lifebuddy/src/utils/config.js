@@ -18,7 +18,7 @@ const config = {
 
 // Backend URLs configuration
 export const BACKEND_URLS = {
-  railway: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
+  railway: import.meta.env.VITE_RAILWAY_URL || '',
   render: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
   local: 'http://localhost:5001'
 };
