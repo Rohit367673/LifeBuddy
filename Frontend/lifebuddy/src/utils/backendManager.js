@@ -10,15 +10,15 @@ class BackendManager {
         name: 'Local',
         priority: isDevelopment ? 1 : 3  // Local first in development
       },
-      railway: {
-        url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
-        name: 'Railway',
-        priority: isDevelopment ? 2 : 1  // Railway primary in production
-      },
       render: {
         url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
         name: 'Render',
-        priority: isDevelopment ? 3 : 2  // Render fallback
+        priority: isDevelopment ? 2 : 1  // Render primary in production
+      },
+      railway: {
+        url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
+        name: 'Railway',
+        priority: isDevelopment ? 3 : 2  // Railway fallback due to deployment issues
       }
     };
     
