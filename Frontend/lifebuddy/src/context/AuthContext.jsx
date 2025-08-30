@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig';
 import { getApiUrl, logConfig } from '../utils/config';
+import { getApiUrl as getBackendUrl } from '../utils/backendManager';
 import { 
   setAuthToken, 
   getAuthToken, 
@@ -522,11 +523,8 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔥 Processing successful Google login for:', firebaseUser.email);
       
-      // Temporarily hardcode backend URL for production
-      const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
-
-      // In development, we can still use the environment variable
-      // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      // Use dynamic backend URL selection
+      const backendUrl = await getBackendUrl();
       
       apiClient.defaults.baseURL = backendUrl;
       console.log('🔥 Backend URL set for login:', backendUrl);
@@ -686,11 +684,8 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 Verifying token:', token ? 'Token exists' : 'No token');
       
-      // Temporarily hardcode backend URL for production
-      const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
-
-      // In development, we can still use the environment variable
-      // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      // Use dynamic backend URL selection
+      const backendUrl = await getBackendUrl();
       
       apiClient.defaults.baseURL = backendUrl;
       
@@ -786,11 +781,8 @@ export const AuthProvider = ({ children }) => {
 
       // Ensure backend is switched and base URL is set
       try {
-        // Temporarily hardcode backend URL for production
-        const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
-
-        // In development, we can still use the environment variable
-        // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+        // Use dynamic backend URL selection
+        const backendUrl = await getBackendUrl();
         
         apiClient.defaults.baseURL = backendUrl;
         console.log(`🌐 Backend base URL set to: ${backendUrl}`);
