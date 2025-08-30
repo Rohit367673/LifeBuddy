@@ -20,33 +20,58 @@ if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
 
 // Generate order token
 router.post('/create-order', authenticateUser, async (req, res) => {
+  console.log('[Cashfree] Create-order request:', req.body);
+  
   try {
     const { plan, couponCode, currency = 'INR', userCountry } = req.body;
     const user = req.user;
 
     // Calculate amount with proper currency conversion
     if (!['monthly', 'yearly'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid plan' });
+      console.error('[Cashfree] Invalid plan:', plan);
+      return res.status(400).json({ 
+        error: 'Invalid plan',
+        ...(process.env.NODE_ENV !== 'production' ? { details: `Plan must be monthly or yearly, got: ${plan}` } : {})
+      });
     }
     
     // Detect currency from country if not provided
     const detectedCurrency = userCountry ? getCurrencyByCountry(userCountry) : currency;
     const finalCurrency = (currency || detectedCurrency || 'INR').toUpperCase();
+    console.log('[Cashfree] Final currency:', finalCurrency);
 
-    // Cashfree sandbox supports INR only; bail early with helpful message
+    // Cashfree supports multiple currencies in production, but sandbox is INR only
     const isProduction = process.env.NODE_ENV === 'production';
     if (!isProduction && finalCurrency !== 'INR') {
-      return res.status(400).json({ error: 'Cashfree sandbox supports INR only. Use PayPal for other currencies.' });
+      console.error('[Cashfree] Sandbox currency error:', finalCurrency);
+      return res.status(400).json({ 
+        error: 'Cashfree sandbox supports INR only. Use PayPal for other currencies.',
+        ...(process.env.NODE_ENV !== 'production' ? { details: `Currency: ${finalCurrency}` } : {})
+      });
+    }
+
+    // In production, ensure Cashfree supports the currency
+    if (isProduction && !['INR', 'USD'].includes(finalCurrency)) {
+      console.error('[Cashfree] Unsupported currency in production:', finalCurrency);
+      return res.status(400).json({ 
+        error: 'Currency not supported by Cashfree. Use PayPal for other currencies.',
+        ...(process.env.NODE_ENV !== 'production' ? { details: `Currency: ${finalCurrency}` } : {})
+      });
     }
 
     // Ensure credentials present
     if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
       console.error('[Cashfree] Missing credentials: set CASHFREE_APP_ID and CASHFREE_SECRET_KEY');
-      return res.status(500).json({ error: 'Cashfree not configured on server' });
+      return res.status(500).json({ 
+        error: 'Cashfree not configured on server',
+        ...(process.env.NODE_ENV !== 'production' ? { details: 'Check environment variables' } : {})
+      });
     }
     
     // Get region-specific pricing and apply coupon if present
     const base = getPlanPrice(plan, finalCurrency);
+    console.log('[Cashfree] Base price:', base);
+    
     let discount = 0;
     let appliedCoupon = null;
     if (couponCode) {
@@ -59,8 +84,14 @@ router.post('/create-order', authenticateUser, async (req, res) => {
     }
 
     const amount = Number(Math.max(0, base - discount).toFixed(2));
+    console.log('[Cashfree] Final amount:', amount);
+    
     if (!(amount > 0)) {
-      return res.status(400).json({ error: 'Invalid amount for Cashfree order' });
+      console.error('[Cashfree] Invalid amount:', amount);
+      return res.status(400).json({ 
+        error: 'Invalid amount for Cashfree order',
+        ...(process.env.NODE_ENV !== 'production' ? { details: `Amount: ${amount}` } : {})
+      });
     }
 
     // Create order using new Cashfree API

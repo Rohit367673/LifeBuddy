@@ -84,10 +84,24 @@ function getCurrencyByCountry(countryCode) {
     'PT': 'EUR',
     'IE': 'EUR',
     'FI': 'EUR',
-    'GR': 'EUR'
+    'GR': 'EUR',
+    'SG': 'USD', // Singapore uses USD for international services
+    'MY': 'USD', // Malaysia
+    'TH': 'USD', // Thailand
+    'PH': 'USD', // Philippines
+    'ID': 'USD', // Indonesia
+    'VN': 'USD', // Vietnam
+    'BD': 'USD', // Bangladesh
+    'PK': 'USD', // Pakistan
+    'LK': 'USD', // Sri Lanka
+    'NP': 'INR', // Nepal (close to India, use INR)
+    'BT': 'INR', // Bhutan (uses INR)
+    'MV': 'USD'  // Maldives
   };
   
-  return countryToCurrency[countryCode?.toUpperCase()] || 'USD';
+  const currency = countryToCurrency[countryCode?.toUpperCase()];
+  console.log(`[CurrencyConverter] Country: ${countryCode} -> Currency: ${currency || 'USD'}`);
+  return currency || 'USD';
 }
 
 /**

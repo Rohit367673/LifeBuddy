@@ -66,11 +66,14 @@ app.use(compression({
   }
 }));
 
-// CORS configuration
+// CORS configuration - Enhanced for Railway deployment
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('CORS: allowing request with no origin');
+      return callback(null, true);
+    }
     
     const allowedOrigins = [
       'https://www.lifebuddy.space',
@@ -92,6 +95,7 @@ app.use(cors({
     ].filter(Boolean);
     
     console.log('CORS check for origin:', origin);
+    console.log('CORS allowed origins:', allowedOrigins);
     
     // Also allow any localhost origin for development
     if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
@@ -101,24 +105,60 @@ app.use(cors({
     
     // Check string origins
     if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log('CORS allowed: exact match');
+      console.log('CORS allowed: exact match for origin:', origin);
       callback(null, true);
     }
     // Check regex patterns for Vercel deployments
     else if (allowedOrigins.some(pattern => pattern instanceof RegExp && pattern.test(origin))) {
-      console.log('CORS allowed: regex match');
+      console.log('CORS allowed: regex match for origin:', origin);
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
+      console.log('Available allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: [
+    'Authorization', 
+    'Content-Type', 
+    'X-Requested-With', 
+    'Accept', 
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
   exposedHeaders: ['Authorization'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
+
+// Additional CORS headers for Railway compatibility
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log('[CORS Middleware] Request from origin:', origin, 'Method:', req.method, 'Path:', req.path);
+  
+  if (origin === 'https://www.lifebuddy.space' || origin === 'https://lifebuddy.space') {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+    res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+    res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  }
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    console.log('[CORS] Handling preflight for:', req.path, 'from origin:', origin);
+    res.header('Access-Control-Allow-Origin', origin || 'https://www.lifebuddy.space');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+    res.header('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Rate limiting - optimized for development
 const limiter = rateLimit({
@@ -297,7 +337,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
     }
   });
 
-  // Root endpoint for Railway deployment verification
+  // Root endpoint for Railway health check
   app.get('/', (req, res) => {
     res.json({ 
       status: 'OK', 
@@ -355,10 +395,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
   // Start performance monitoring
   performanceMonitor.start();
 
-  // Start server
-  const PORT = process.env.PORT || 5001;
-  app.listen(PORT, () => {
+  // Start server with Railway-compatible port
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Railway PORT: ${process.env.PORT || 'not set'}`);
   });
 })
 .catch(err => {
@@ -367,9 +409,10 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
     process.exit(1);
   } else {
     console.warn('[Dev] Continuing to run server without DB connection for debugging. Some routes may fail.');
-    const PORT = process.env.PORT || 5001;
-    app.listen(PORT, () => {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT} (DB connection failed)`);
+      console.log(`Railway PORT: ${process.env.PORT || 'not set'}`);
     });
   }
 });
