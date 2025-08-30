@@ -1,4 +1,10 @@
 // Smart Backend URL Manager for Render/Railway switching
+const BACKEND_URLS = {
+  local: 'http://localhost:5001',
+  railway: 'https://lifebuddy-backend-production.up.railway.app',
+  render: 'https://lifebuddy.onrender.com'
+};
+
 class BackendManager {
   constructor() {
     // In development, prioritize local backend
@@ -6,19 +12,19 @@ class BackendManager {
     
     this.backends = {
       local: {
-        url: 'http://localhost:5001',
+        url: BACKEND_URLS.local,
         name: 'Local',
         priority: isDevelopment ? 1 : 3  // Local first in development
       },
-      render: {
-        url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
-        name: 'Render',
-        priority: isDevelopment ? 2 : 1  // Render primary - working correctly
-      },
       railway: {
-        url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
+        url: import.meta.env.VITE_RAILWAY_URL || BACKEND_URLS.railway,
         name: 'Railway',
-        priority: isDevelopment ? 3 : 2  // Railway fallback - URL routing issues
+        priority: isDevelopment ? 2 : 1  // Railway primary as requested
+      },
+      render: {
+        url: import.meta.env.VITE_RENDER_URL || BACKEND_URLS.render,
+        name: 'Render',
+        priority: isDevelopment ? 3 : 2  // Render fallback
       }
     };
     

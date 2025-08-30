@@ -417,100 +417,55 @@ export const AuthProvider = ({ children }) => {
   // Google login
   const loginWithGoogle = async () => {
     try {
-      console.log(' Google login initiated');
+      console.log('🔥 Google login initiated');
       setLoading(true);
       
       // Check if Firebase is properly initialized
-      console.log(' Firebase Auth Check:', {
+      console.log('🔥 Firebase Auth Check:', {
         auth: !!auth,
         authCurrentUser: auth?.currentUser,
         projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
       });
       
-      // Fast fail if Firebase isn't initialized (common cause of Google login issues)
+      // Fast fail if Firebase isn't initialized
       if (!auth) {
         const hint =
-          'Google login not configured. Please set VITE_FIREBASE_* values in Frontend/lifebuddy/.env (or .env.local), enable Google provider in Firebase Auth, and restart the dev server.';
-        console.error(' Google login blocked: Firebase auth is null. ' + hint);
-        toast.error('Google login is not configured. Please update your Firebase .env settings.');
-        setLoading(false);
-        return;
+          !import.meta.env.VITE_FIREBASE_API_KEY ? 'Missing VITE_FIREBASE_API_KEY' :
+          !import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'Missing VITE_FIREBASE_PROJECT_ID' :
+          !import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? 'Missing VITE_FIREBASE_AUTH_DOMAIN' :
+          'Firebase not initialized';
+        throw new Error(`Firebase Auth not available. ${hint}`);
       }
-
-      // Log configuration for debugging
-      console.log(' Firebase Auth Configuration:');
-      console.log('- Auth object:', !!auth);
-      console.log('- Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
-      console.log('- Auth Domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
-      console.log('- API Key present:', !!import.meta.env.VITE_FIREBASE_API_KEY);
-      logConfig();
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
       
-      // Set custom parameters for better UX
+      // Configure provider for better cross-browser compatibility
       provider.setCustomParameters({
         prompt: 'select_account',
-        hd: '' // Allow any domain
+        access_type: 'offline'
       });
       
-      console.log(' Starting Google login...');
-      console.log('- Current auth state:', auth.currentUser);
-      const apiUrl = await getApiUrl();
-      console.log('- API URL:', apiUrl);
+      // Detect browser type for optimal auth method
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
-
-      // Use redirect method as primary approach (more reliable than popup)
-      console.log(' Using redirect method for Google login');
+      console.log('🔥 Browser detection:', { isSafari, isFirefox, isMobile });
       
-      try {
-        await signInWithRedirect(auth, provider);
-        console.log(' Redirect initiated successfully');
-        // User will be redirected to Google, then back to our app
-        return;
-      } catch (redirectError) {
-        console.log(' Redirect failed, trying popup method:', redirectError.code);
-        console.log('- Error message:', redirectError.message);
-        
-        // Fallback to popup if redirect fails
+      // For Safari and mobile, prefer redirect method
+      if (isSafari || isFirefox || isMobile) {
+        console.log('🔥 Using redirect method for Safari/Firefox/Mobile');
         try {
-          console.log(' Attempting popup login as fallback...');
-          const result = await signInWithPopup(auth, provider);
-          console.log(' Popup login successful:', result.user.email);
-          console.log('- User UID:', result.user.uid);
-          console.log('- Display Name:', result.user.displayName);
-          const firebaseUser = result.user;
-          await handleSuccessfulGoogleLogin(firebaseUser);
-          setLoading(false);
+          await signInWithRedirect(auth, provider);
+          console.log('🔥 Redirect initiated successfully');
           return;
-        } catch (popupError) {
-          console.log(' Both redirect and popup failed:', popupError.code);
-          throw popupError;
+        } catch (redirectError) {
+          console.log('🔥 Redirect failed:', redirectError.code);
         }
       }
-
-    } catch (error) {
-      console.error(' Google login error:', error);
-      console.error('- Error code:', error.code);
-      console.error('- Error message:', error.message);
-      toast.error(error.message || 'Failed to login with Google');
-      setLoading(false);
-      throw error;
-    }
-  };
-
-  // Handle successful Google login (extracted for reuse)
-  const handleSuccessfulGoogleLogin = async (firebaseUser) => {
-    console.log(' Firebase user:', firebaseUser);
-    const token = await firebaseUser.getIdToken();
-    console.log(' Firebase ID token:', token);
-    
-    // Ensure backend URL is set before making API call
-    try {
-      const backendUrl = await switchBackend();
-      apiClient.defaults.baseURL = backendUrl;
       console.log(' Backend URL set for login:', backendUrl);
     } catch (error) {
       console.error('Failed to set backend URL:', error);

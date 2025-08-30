@@ -6,6 +6,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "auto-restart": "node auto-restart.js",
+    "build": "echo 'No build step required'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:cashfree:direct": "node scripts/test-cashfree-direct.js",
     "test:cashfree:backend": "node scripts/test-cashfree-backend.js",
