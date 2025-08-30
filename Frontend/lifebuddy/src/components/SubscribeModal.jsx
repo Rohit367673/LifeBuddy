@@ -328,14 +328,12 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
       const baseUrl = await getApiUrl();
       const response = await fetch(`${baseUrl}/api/payments/cashfree/create-order`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
           plan, 
+          currency: orderCurrency.toUpperCase(),
+          amount: parseFloat(price),
           couponCode: coupon?.trim() || undefined, 
-          currency: orderCurrency, 
           userCountry 
         })
       });
