@@ -19,12 +19,12 @@ class BackendManager {
       railway: {
         url: import.meta.env.VITE_RAILWAY_URL || BACKEND_URLS.railway,
         name: 'Railway',
-        priority: 1  // Railway primary
+        priority: 99  // Railway down - deployment issues
       },
       render: {
         url: import.meta.env.VITE_RENDER_URL || BACKEND_URLS.render,
         name: 'Render',
-        priority: 99  // Disable Render for now due to 500 errors
+        priority: 1  // Use Render as primary until Railway is fixed
       }
     };
     
