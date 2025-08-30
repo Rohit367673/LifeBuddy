@@ -317,25 +317,21 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         throw new Error('Please log in to continue with payment');
       }
 
-      // Cashfree sandbox supports INR only. In non-production, force INR so testing works.
-      const isProd = process.env.NODE_ENV === 'production';
-      let orderCurrency = (currency || 'INR').toUpperCase();
-      if (!isProd && orderCurrency !== 'INR') {
-        orderCurrency = 'INR';
-        try { toast('Using INR for Cashfree sandbox', { icon: 'ℹ️' }); } catch (_) {}
-      }
-
-      const baseUrl = await getApiUrl();
-      const response = await fetch(`${baseUrl}/api/payments/cashfree/create-order`, {
+      // Temporary: use Railway backend directly for Cashfree payments
+      const paymentUrl = `https://lifebuddy-backend-production.up.railway.app/api/payments/cashfree/create-order`;
+      
+      const response = await fetch(paymentUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ 
-          plan, 
-          currency: orderCurrency.toUpperCase(),
-          amount: parseFloat(price),
-          couponCode: coupon?.trim() || undefined, 
-          userCountry 
-        })
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan: plan,
+          currency: currency,
+          amount: price,
+          userCountry: userCountry
+        }),
       });
       const data = await response.json().catch(() => ({}));
       
