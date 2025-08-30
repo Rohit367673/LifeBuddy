@@ -6,8 +6,12 @@ import App from './App.jsx'
 import './utils/trustedTypes'
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  import.meta.env.DEV ? (
     <App />
-  </StrictMode>,
+  ) : (
+    <StrictMode>
+      <App />
+    </StrictMode>
+  ),
 )
 document.documentElement.classList.add('react-mounted');

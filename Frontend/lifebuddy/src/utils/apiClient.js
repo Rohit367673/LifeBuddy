@@ -1,5 +1,6 @@
 import axios from 'axios';
 import backendManager from './backendManager.js';
+import { getAuthToken, setAuthToken, clearAuthCookies } from './cookies.js';
 
 // Create axios instance with automatic backend fallback
 const apiClient = axios.create({
@@ -9,12 +10,22 @@ const apiClient = axios.create({
   }
 });
 
+// Single in-flight refresh request lock to prevent race conditions
+let refreshTokenRequest = null;
+
 // Request interceptor to set the correct backend URL
 apiClient.interceptors.request.use(async (config) => {
   try {
     const baseURL = await backendManager.getApiUrl();
     config.baseURL = baseURL;
     console.log(`🌐 API Request to: ${baseURL}${config.url}`);
+
+    // Inject Authorization header from secure cookie if present
+    const token = getAuthToken();
+    if (token && !config.headers?.Authorization) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   } catch (error) {
     console.error('Failed to get backend URL:', error);
@@ -33,6 +44,57 @@ apiClient.interceptors.response.use(
     // If this is a retry request, don't retry again
     if (originalRequest._retry) {
       return Promise.reject(error);
+    }
+
+    // Handle 401 Unauthorized globally with token refresh
+    if (error.response?.status === 401 && !originalRequest._retry401 && !originalRequest._isRefreshCall) {
+      const currentToken = getAuthToken();
+      // Only attempt refresh if we have a token to refresh
+      if (!currentToken) {
+        return Promise.reject(error);
+      }
+      
+      originalRequest._retry401 = true;
+      try {
+        if (!refreshTokenRequest) {
+          const baseURL = await backendManager.getApiUrl();
+          refreshTokenRequest = apiClient.post('/api/auth/refresh', {}, {
+            baseURL,
+            headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {},
+            _isRefreshCall: true
+          }).then((res) => {
+            const newToken = res?.data?.token;
+            if (!newToken) throw new Error('No token returned from refresh endpoint');
+            setAuthToken(newToken);
+            // Notify app that token was refreshed
+            try {
+              window.dispatchEvent(new CustomEvent('auth:tokenRefreshed', { detail: { token: newToken } }));
+            } catch (_) {}
+            return newToken;
+          }).catch((refreshErr) => {
+            // Clear cookies and propagate error
+            clearAuthCookies();
+            // Notify app that refresh failed
+            try {
+              window.dispatchEvent(new Event('auth:refreshFailed'));
+            } catch (_) {}
+            throw refreshErr;
+          }).finally(() => {
+            refreshTokenRequest = null;
+          });
+        }
+
+        const newToken = await refreshTokenRequest;
+        // Retry original request with new token
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        if (!originalRequest.baseURL) {
+          originalRequest.baseURL = await backendManager.getApiUrl();
+        }
+        return apiClient(originalRequest);
+      } catch (e) {
+        return Promise.reject(e);
+      }
     }
 
     // Check if it's a network error or server error

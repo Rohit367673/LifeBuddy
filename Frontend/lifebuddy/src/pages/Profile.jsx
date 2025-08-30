@@ -16,6 +16,7 @@ import {
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import apiClient from '../utils/apiClient';
 import badge2 from '../assets/svg/badge-2.svg';
 import badge3 from '../assets/svg/badge-3.svg';
 import badge4 from '../assets/svg/badge-4.svg';
@@ -631,12 +632,9 @@ const Profile = () => {
         setSearchLoading(false);
         return;
       }
-      const token = await getFirebaseToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/search?q=${encodeURIComponent(q)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data)) {
+      const res = await apiClient.get(`/api/users/search?q=${encodeURIComponent(q)}`);
+      const data = res.data;
+      if (Array.isArray(data)) {
         // Find exact match (case-insensitive)
         const found = data.find(u => u.username && u.username.toLowerCase() === q.toLowerCase());
         if (found) {

@@ -8,6 +8,34 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
+// Helpers for robust token extraction
+const parseCookies = (cookieHeader) => {
+  try {
+    return cookieHeader.split(';').reduce((acc, part) => {
+      const idx = part.indexOf('=');
+      if (idx === -1) return acc;
+      const key = part.slice(0, idx).trim();
+      const val = part.slice(idx + 1).trim();
+      if (!key) return acc;
+      acc[key] = decodeURIComponent(val || '');
+      return acc;
+    }, {});
+  } catch (_) {
+    return {};
+  }
+};
+
+const extractToken = (req) => {
+  const authHeader = req.headers.authorization || '';
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (m) return m[1].trim();
+  if (req.headers.cookie) {
+    const cookies = parseCookies(req.headers.cookie);
+    if (cookies.auth_token) return cookies.auth_token;
+  }
+  return null;
+};
+
 // Traditional email/password registration
 router.post('/register-traditional', authRateLimiter, async (req, res) => {
   try {
@@ -394,15 +422,10 @@ router.post('/login', authRateLimiter, async (req, res) => {
 // Verify token
 router.get('/verify', async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        message: 'No token provided.'
-      });
+    const token = extractToken(req);
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided.' });
     }
-
-    const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Handle both Firebase and traditional auth tokens
@@ -455,21 +478,25 @@ router.get('/verify', async (req, res) => {
 // Refresh token
 router.post('/refresh', authRateLimiter, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        message: 'No token provided.'
-      });
+    const token = extractToken(req);
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided.' });
     }
-
-    const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    const user = await User.findOne({ 
-      firebaseUid: decoded.firebaseUid,
-      isActive: true 
-    });
+    // Support both Firebase-based and traditional tokens
+    let user;
+    if (decoded.firebaseUid) {
+      user = await User.findOne({
+        firebaseUid: decoded.firebaseUid,
+        isActive: true
+      });
+    } else if (decoded.userId) {
+      user = await User.findOne({
+        _id: decoded.userId,
+        isActive: true
+      });
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -477,12 +504,11 @@ router.post('/refresh', authRateLimiter, async (req, res) => {
       });
     }
 
-    // Generate new token
+    // Generate new token with available identifiers
+    const payload = { userId: user._id };
+    if (user.firebaseUid) payload.firebaseUid = user.firebaseUid;
     const newToken = jwt.sign(
-      { 
-        firebaseUid: user.firebaseUid,
-        userId: user._id 
-      },
+      payload,
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRE || '30d' }
     );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeSlashIcon, CameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import apiClient from '../utils/apiClient';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -19,7 +20,7 @@ const Signup = () => {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const { register, finalizeEmailRegistration, resendVerificationEmail, verifyOTP, token, user, loading: authLoading, awaitingEmailVerification } = useAuth();
+  const { register, finalizeEmailRegistration, resendVerificationEmail, verifyOTP, token, user, loading: authLoading, awaitingEmailVerification, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
@@ -96,8 +97,8 @@ const Signup = () => {
       setUsernameError('');
       try {
         const q = cleanUsername(username);
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
+        const res = await apiClient.get(`/api/users/search?q=${encodeURIComponent(q)}`);
+        const data = res.data;
         if (!Array.isArray(data)) {
           setUsernameAvailable(null);
           setUsernameError('Error checking username');
@@ -244,14 +245,21 @@ const Signup = () => {
     }
   };
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleSignup = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🔥 Google signup button clicked!');
+    
     setLoading(true);
+    setErrors({});
     
     try {
+      console.log('🚀 Calling loginWithGoogle from signup...');
       await loginWithGoogle();
+      console.log('✅ loginWithGoogle completed successfully from signup');
       // Navigation will be handled by useEffect below
     } catch (error) {
-      console.error('Google signup error:', error);
+      console.error('❌ Google signup error:', error);
       setErrors({ general: error.message });
       setLoading(false);
     }
@@ -612,8 +620,32 @@ const Signup = () => {
           <div>
             <button
               type="button"
-              onClick={handleGoogleSignup}
-              disabled={loading}
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔥 SIGNUP BUTTON CLICK - Google signup triggered!', { loading, authLoading });
+                
+                // Clear any existing tokens first
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = 'user_data=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                console.log('🧹 Cleared existing tokens');
+                
+                if (loading || authLoading) {
+                  console.log('⚠️ Signup button disabled, ignoring click');
+                  return;
+                }
+                try {
+                  console.log('🚀 Starting Google signup...');
+                  await loginWithGoogle();
+                  console.log('✅ Google signup completed');
+                } catch (error) {
+                  console.error('❌ Google signup error:', error);
+                  setErrors({ general: error.message });
+                }
+              }}
+              disabled={loading || authLoading}
               className="btn-secondary w-full py-3 text-base"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">

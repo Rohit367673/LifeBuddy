@@ -57,7 +57,14 @@ try {
     auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);
-    messaging = getMessaging(app);
+    
+    // Initialize messaging only if supported
+    try {
+      messaging = getMessaging(app);
+    } catch (messagingError) {
+      console.warn('⚠️ Firebase Messaging not supported in this environment');
+      messaging = null;
+    }
     
     // Initialize Analytics (only in production)
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {

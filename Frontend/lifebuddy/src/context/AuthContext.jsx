@@ -26,8 +26,23 @@ import {
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import UsernameModal from '../components/UsernameModal';
+import { switchBackend } from '../utils/backendManager';
+import apiClient from '../utils/apiClient';
 
 const AuthContext = createContext();
+
+// Global singleton to prevent multiple auth initializations
+let authInitialized = false;
+let authInitializing = false;
+let globalAuthState = {
+  user: null,
+  token: null,
+  loading: true,
+  firebaseUser: null
+};
+
+// Global instance counter for debugging
+let instanceCount = 0;
 
 // Explicit export to fix Fast Refresh issues
 export function useAuth() {
@@ -40,15 +55,20 @@ export function useAuth() {
 
 // Explicit export to fix Fast Refresh issues
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(null);
+  instanceCount++;
+  const currentInstance = instanceCount;
+  console.log(`🔄 AuthProvider mounting - instance #${currentInstance}, initialized:`, authInitialized, 'initializing:', authInitializing);
+  
+  const [user, setUser] = useState(globalAuthState.user);
+  const [firebaseUser, setFirebaseUser] = useState(globalAuthState.firebaseUser);
+  const [loading, setLoading] = useState(globalAuthState.loading);
+  const [token, setToken] = useState(globalAuthState.token);
   const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const tokenExpiryTimeoutRef = useRef(null);
   const initializingRef = useRef(false);
+  const hasInitializedRef = useRef(false); // Track if this instance has completed initialization
   const navigate = useNavigate();
   const [authLoading, setAuthLoading] = useState(false); // Define setAuthLoading here
 
@@ -397,19 +417,33 @@ export const AuthProvider = ({ children }) => {
   // Google login
   const loginWithGoogle = async () => {
     try {
+      console.log(' Google login initiated');
       setLoading(true);
+      
+      // Check if Firebase is properly initialized
+      console.log(' Firebase Auth Check:', {
+        auth: !!auth,
+        authCurrentUser: auth?.currentUser,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+      });
       
       // Fast fail if Firebase isn't initialized (common cause of Google login issues)
       if (!auth) {
         const hint =
           'Google login not configured. Please set VITE_FIREBASE_* values in Frontend/lifebuddy/.env (or .env.local), enable Google provider in Firebase Auth, and restart the dev server.';
-        console.error('Google login blocked: Firebase auth is null. ' + hint);
+        console.error(' Google login blocked: Firebase auth is null. ' + hint);
         toast.error('Google login is not configured. Please update your Firebase .env settings.');
         setLoading(false);
         return;
       }
 
       // Log configuration for debugging
+      console.log(' Firebase Auth Configuration:');
+      console.log('- Auth object:', !!auth);
+      console.log('- Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
+      console.log('- Auth Domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+      console.log('- API Key present:', !!import.meta.env.VITE_FIREBASE_API_KEY);
       logConfig();
       
       const provider = new GoogleAuthProvider();
@@ -418,46 +452,49 @@ export const AuthProvider = ({ children }) => {
       
       // Set custom parameters for better UX
       provider.setCustomParameters({
-        prompt: 'select_account'
+        prompt: 'select_account',
+        hd: '' // Allow any domain
       });
       
-      console.log('Starting Google login...');
-      console.log('Current auth state:', auth.currentUser);
-      console.log('API URL:', getApiUrl());
-      console.log('Auth domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+      console.log(' Starting Google login...');
+      console.log('- Current auth state:', auth.currentUser);
+      const apiUrl = await getApiUrl();
+      console.log('- API URL:', apiUrl);
       
 
-      // Try popup first, fallback to redirect if popup fails
-      console.log('Attempting popup login first...');
+      // Use redirect method as primary approach (more reliable than popup)
+      console.log(' Using redirect method for Google login');
       
       try {
-        const result = await signInWithPopup(auth, provider);
-        console.log('Popup login successful:', result.user.email);
-        const firebaseUser = result.user;
-        await handleSuccessfulGoogleLogin(firebaseUser);
-        setLoading(false);
-        return;
-      } catch (popupError) {
-        console.log('Popup failed, trying redirect method:', popupError.code);
-        
-        // If popup fails, use redirect method
-        console.log('Using redirect method for Google login');
-        setAuthLoading(true);
-        
-        // Clear any existing redirect result first
-        try {
-          await getRedirectResult(auth);
-        } catch (error) {
-          console.log('Clearing existing redirect result:', error);
-        }
-        
-        // Use redirect method as fallback
         await signInWithRedirect(auth, provider);
+        console.log(' Redirect initiated successfully');
+        // User will be redirected to Google, then back to our app
         return;
+      } catch (redirectError) {
+        console.log(' Redirect failed, trying popup method:', redirectError.code);
+        console.log('- Error message:', redirectError.message);
+        
+        // Fallback to popup if redirect fails
+        try {
+          console.log(' Attempting popup login as fallback...');
+          const result = await signInWithPopup(auth, provider);
+          console.log(' Popup login successful:', result.user.email);
+          console.log('- User UID:', result.user.uid);
+          console.log('- Display Name:', result.user.displayName);
+          const firebaseUser = result.user;
+          await handleSuccessfulGoogleLogin(firebaseUser);
+          setLoading(false);
+          return;
+        } catch (popupError) {
+          console.log(' Both redirect and popup failed:', popupError.code);
+          throw popupError;
+        }
       }
 
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error(' Google login error:', error);
+      console.error('- Error code:', error.code);
+      console.error('- Error message:', error.message);
       toast.error(error.message || 'Failed to login with Google');
       setLoading(false);
       throw error;
@@ -466,93 +503,62 @@ export const AuthProvider = ({ children }) => {
 
   // Handle successful Google login (extracted for reuse)
   const handleSuccessfulGoogleLogin = async (firebaseUser) => {
+    console.log(' Firebase user:', firebaseUser);
+    const token = await firebaseUser.getIdToken();
+    console.log(' Firebase ID token:', token);
+    
+    // Ensure backend URL is set before making API call
     try {
-      console.log('Handling successful Google login for:', firebaseUser.email);
-      console.log('Firebase UID:', firebaseUser.uid);
-      console.log('Firebase display name:', firebaseUser.displayName);
-      console.log('Firebase photo URL:', firebaseUser.photoURL);
+      const backendUrl = await switchBackend();
+      apiClient.defaults.baseURL = backendUrl;
+      console.log(' Backend URL set for login:', backendUrl);
+    } catch (error) {
+      console.error('Failed to set backend URL:', error);
+      throw new Error('Could not connect to backend');
+    }
+    
+    try {
+      let response;
+      let data;
       
-      // Get Firebase token for debugging
-      let idToken = '';
+      // Try login first
       try {
-        idToken = await firebaseUser.getIdToken(true);
-        console.log('Firebase ID token obtained successfully, length:', idToken.length);
-        console.log('First 10 chars of token:', idToken.substring(0, 10) + '...');
-      } catch (tokenError) {
-        console.error('Error getting Firebase ID token:', tokenError);
-      }
-      
-      const apiUrl = getApiUrl();
-      console.log('Using API URL:', apiUrl);
-      
-      // Try to login to backend, if user doesn't exist, register them
-      console.log('Attempting backend login with Firebase UID:', firebaseUser.uid);
-      console.log('User email:', firebaseUser.email);
-      let response = await fetch(`${apiUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        response = await apiClient.post('/api/auth/login', {
           firebaseUid: firebaseUser.uid,
-          avatar: firebaseUser.photoURL || '', // Always send avatar, default to empty string
-          email: firebaseUser.email || '', // Send email as backup
-        }),
-      });
-      console.log('Backend login attempt complete');
-
-      console.log('Login response status:', response.status);
-
-      if (response.status === 404) {
-        // User not found, register them
-        console.log('User not found, registering...');
-        response = await fetch(`${apiUrl}/api/auth/register`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          avatar: firebaseUser.photoURL || '',
+          email: firebaseUser.email || '',
+        });
+        console.log(' Backend login response:', response.data);
+        data = response.data;
+      } catch (loginError) {
+        // If login fails with 404, try registration
+        if (loginError.response?.status === 404) {
+          console.log(' User not found, attempting registration...');
+          response = await apiClient.post('/api/auth/register', {
             firebaseUid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || '',
             firstName: firebaseUser.displayName?.split(' ')[0] || '',
             lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
-            avatar: firebaseUser.photoURL,
-          }),
-        });
-        
-        console.log('Register response status:', response.status);
-        
-        if (response.status === 409) {
-          // User already exists, try login again
-          console.log('User already exists, trying login again...');
-          response = await fetch(`${apiUrl}/api/auth/login`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              firebaseUid: firebaseUser.uid,
-              avatar: firebaseUser.photoURL,
-            }),
+            avatar: firebaseUser.photoURL || '',
           });
+          console.log(' Backend registration response:', response.data);
+          data = response.data;
+        } else {
+          throw loginError;
         }
       }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Backend request failed:', response.status, errorData);
-        throw new Error(`Backend request failed: ${response.status} - ${errorData.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      console.log('Backend response:', data);
+      // Store token and user data in cookies
+      setAuthToken(data.token);
+      setUserData(data.user);
       
+      // Update React state
       setToken(data.token);
       setFirebaseUser(firebaseUser);
-      setUser(data.user); // Set user immediately for fast UI feedback
-      console.log('✅ User state updated:', data.user);
-      console.log('✅ Token set:', data.token);
+      setUser(data.user);
+      console.log('📝 User state updated:', data.user);
+      console.log('🔑 Token stored in cookies:', data.token ? 'Yes' : 'No');
       
       // If user has no username, show modal
       if (!data.user.username) {
@@ -560,9 +566,9 @@ export const AuthProvider = ({ children }) => {
         setShowUsernameModal(true);
       } else {
         // Fetch the latest user profile (which will have the username if set)
-        console.log('🔍 Fetching user profile after successful login...');
+        console.log(' Fetching user profile after successful login...');
         await fetchUserProfile(data.token);
-        console.log('✅ User profile fetched successfully');
+        console.log(' User profile fetched successfully');
       }
       
       toast.success('Welcome back!');
@@ -578,31 +584,49 @@ export const AuthProvider = ({ children }) => {
 
   // Handler for setting username from modal
   const handleSetGoogleUsername = async (username) => {
-    if (!pendingGoogleUser) return;
+    console.log('🎯 handleSetGoogleUsername called with:', username);
+    console.log('🎯 pendingGoogleUser:', pendingGoogleUser);
+    console.log('🎯 current user:', user);
+    console.log('🎯 current token:', token);
+    
     try {
       setLoading(true);
-      const res = await fetch(`${getApiUrl()}/api/users/set-username`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${pendingGoogleUser.token}`
-        },
-        body: JSON.stringify({ username })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.message || 'Failed to set username');
-        return;
+      console.log('🔄 Setting username:', username);
+      
+      // Use current token if no pending user (for already logged in users)
+      const userToken = pendingGoogleUser?.token || token;
+      console.log('🔄 Using token:', userToken ? 'Present' : 'Missing');
+      
+      if (!userToken) {
+        throw new Error('No authentication token available');
       }
-      setUser(data.user);
-      setShowUsernameModal(false);
-      setPendingGoogleUser(null);
-      toast.success('Username set successfully!');
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 150);
+      
+      const res = await apiClient.post('/api/users/set-username', { username });
+      console.log('✅ Username set response:', res.data);
+      
+      // Update user state and cookies
+      setUser(res.data.user);
+      setUserData(res.data.user);
+      
+      // Clear modal state if it was from pending Google user
+      if (pendingGoogleUser) {
+        setShowUsernameModal(false);
+        setPendingGoogleUser(null);
+        
+        toast.success('Username set successfully!');
+        console.log('🎯 Navigating to dashboard in 150ms...');
+        setTimeout(() => {
+          console.log('🎯 Executing navigation to /dashboard');
+          navigate('/dashboard');
+        }, 150);
+      } else {
+        // For already logged in users, just show success
+        toast.success('Username updated successfully!');
+      }
     } catch (err) {
-      toast.error('Failed to set username');
+      console.error('❌ Set username error:', err);
+      console.error('❌ Error details:', err.response?.data);
+      toast.error(err.response?.data?.message || 'Failed to set username');
     } finally {
       setLoading(false);
     }
@@ -619,10 +643,20 @@ export const AuthProvider = ({ children }) => {
         await signOut(auth);
       }
       
-      // Clear local state
+      // Clear cookies to avoid stale auth state across reloads
+      clearAuthCookies();
+
+      // Clear local state and global state
       setUser(null);
       setFirebaseUser(null);
       setToken(null);
+      
+      // Reset global auth state
+      globalAuthState.user = null;
+      globalAuthState.token = null;
+      globalAuthState.firebaseUser = null;
+      globalAuthState.loading = false;
+      authInitialized = false; // Allow re-initialization after logout
       
       toast.success('Logged out successfully');
       navigate('/');
@@ -639,27 +673,22 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 Verifying token:', token ? 'Token exists' : 'No token');
       
-      const response = await fetch(`${getApiUrl()}/api/auth/verify`, {
-        method: 'GET',
+      // Ensure backend URL is set before verification
+      const backendUrl = await switchBackend();
+      apiClient.defaults.baseURL = backendUrl;
+      
+      const response = await apiClient.get('/api/auth/verify', {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
-      console.log('🔍 Token verification response status:', response.status);
-
-      if (!response.ok) {
-        console.log('❌ Token verification failed');
-        return false;
-      }
-
-      const data = await response.json();
-      console.log('✅ Token verification successful, user:', data.user);
-      setUser(data.user);
+      console.log('📊 Token verification response status:', response.status);
+      console.log('✅ Token verification successful, user:', response.data.user);
+      setUser(response.data.user);
       return true;
     } catch (error) {
-      console.error('Token verification error:', error);
+      console.error('❌ Token verification error:', error);
       return false;
     }
   };
@@ -667,18 +696,12 @@ export const AuthProvider = ({ children }) => {
   // After login or signup, fetch the latest user profile
   const fetchUserProfile = async (token) => {
     try {
-      console.log('🔍 Fetching user profile with token:', token ? 'Token exists' : 'No token');
-      const res = await fetch(`${getApiUrl()}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log('🔍 User profile response status:', res.status);
-      if (res.ok) {
-        const data = await res.json();
-        console.log('✅ User profile data received:', data);
-        setUser(data);
-      } else {
-        console.log('❌ User profile fetch failed:', res.status);
-      }
+      console.log(' Fetching user profile with token:', token ? 'Token exists' : 'No token');
+      // Import apiClient dynamically to avoid circular dependency
+      const { default: apiClient } = await import('../utils/apiClient');
+      const res = await apiClient.get('/api/users/profile');
+      console.log(' User profile data received:', res.data);
+      setUser(res.data);
     } catch (err) {
       console.error('Failed to fetch user profile after login:', err);
     }
@@ -706,19 +729,62 @@ export const AuthProvider = ({ children }) => {
   // Check for stored token on app load
   useEffect(() => {
     const initializeAuth = async () => {
-      // Prevent multiple initialization attempts
+      // Global singleton check - only initialize once across all AuthProvider instances
+      if (authInitialized) {
+        console.log(`🔒 Instance #${currentInstance}: Auth already initialized globally, syncing state`);
+        setUser(globalAuthState.user);
+        setToken(globalAuthState.token);
+        setFirebaseUser(globalAuthState.firebaseUser);
+        setLoading(globalAuthState.loading);
+        return;
+      }
+      
+      // Check if another instance is already initializing
+      if (authInitializing) {
+        console.log(`⏳ Instance #${currentInstance}: Auth initialization in progress by another instance, waiting...`);
+        // Wait for initialization to complete, then sync state
+        const checkInterval = setInterval(() => {
+          if (authInitialized) {
+            clearInterval(checkInterval);
+            console.log(`✅ Instance #${currentInstance}: Syncing to completed auth state`);
+            setUser(globalAuthState.user);
+            setToken(globalAuthState.token);
+            setFirebaseUser(globalAuthState.firebaseUser);
+            setLoading(globalAuthState.loading);
+          }
+        }, 100);
+        return;
+      }
+      
+      // Prevent multiple initialization attempts (check first)
       if (initializingRef.current) {
-        console.log('🔄 Auth initialization already in progress, skipping');
+        console.log(`🔒 Instance #${currentInstance}: Auth initialization already in progress locally, skipping`);
         return;
       }
       
       initializingRef.current = true;
+      authInitializing = true;
+      setAuthLoading(true);
+      console.log(`🚀 Instance #${currentInstance}: Starting auth initialization (singleton)`);
+
+      // Ensure backend is switched and base URL is set
+      try {
+        const backendUrl = await switchBackend();
+        apiClient.defaults.baseURL = backendUrl;
+        console.log(`🌐 Backend base URL set to: ${backendUrl}`);
+      } catch (error) {
+        console.error('❌ Failed to switch backend:', error);
+        toast.error('Failed to connect to backend. Please try again later.');
+        setAuthLoading(false);
+        initializingRef.current = false; // Reset flag on error
+        return;
+      }
       let userSet = false;
       
       try {
         // Check if cookies are enabled
         if (!areCookiesEnabled()) {
-          console.error('❌ Cookies are disabled. Authentication requires cookies.');
+          console.error(' Cookies are disabled. Authentication requires cookies.');
           toast.error('Please enable cookies to use authentication features.');
           setLoading(false);
           return;
@@ -726,34 +792,39 @@ export const AuthProvider = ({ children }) => {
 
         // Check for stored token in cookies
         const storedToken = getAuthToken();
-        console.log('🔄 Auth initialization - Token found:', storedToken ? 'Yes' : 'No');
+        console.log(' Auth initialization - Token found:', storedToken ? 'Yes' : 'No');
         
         if (storedToken) {
           // Check if token is expired before making API call
           const decoded = decodeJwt(storedToken);
           const isExpired = decoded && decoded.exp && decoded.exp * 1000 <= Date.now();
           
-          console.log('🔍 Token expiry check:', isExpired ? 'Expired' : 'Valid');
+          console.log(' Token expiry check:', isExpired ? 'Expired' : 'Valid');
           
           if (!isExpired) {
-            const isValid = await verifyToken(storedToken);
-            console.log('✅ Token verification result:', isValid);
-            if (isValid) {
-              setToken(storedToken);
-              // Also restore user data from cookies
-              const savedUser = getUserData();
-              if (savedUser) {
-                setUser(savedUser);
-                console.log('🍪 User data restored from cookie');
-              }
+            // Skip token verification for now - just restore from cookies
+            setToken(storedToken);
+            const savedUser = getUserData();
+            if (savedUser) {
+              setUser(savedUser);
+              console.log(' User data restored from cookie');
               userSet = true;
+              setLoading(false); // Set loading false when user is restored
             } else {
-              clearAuthCookies();
-              setUser(null);
-              setToken(null);
+              // If no saved user data, try to verify token
+              const isValid = await verifyToken(storedToken);
+              console.log(' Token verification result:', isValid);
+              if (isValid) {
+                userSet = true;
+                setLoading(false);
+              } else {
+                clearAuthCookies();
+                setUser(null);
+                setToken(null);
+              }
             }
           } else {
-            console.log('❌ Token expired, clearing');
+            console.log(' Token expired, clearing');
             clearAuthCookies();
             setUser(null);
             setToken(null);
@@ -839,7 +910,16 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
       } finally {
         initializingRef.current = false; // Reset flag
-        setLoading(false); // Only after all checks and setUser calls
+        authInitializing = false; // Reset global initializing flag
+        authInitialized = true; // Mark as initialized
+        setAuthLoading(false); // Always reset auth loading
+        // Only set loading to false if we haven't set a user
+        if (!userSet) {
+          setLoading(false);
+          globalAuthState.loading = false;
+        }
+        hasInitializedRef.current = true; // Mark this instance as initialized
+        console.log(`✅ Instance #${currentInstance}: Auth initialization complete`);
       }
     };
 
@@ -850,13 +930,43 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setFirebaseUser(firebaseUser);
+      globalAuthState.firebaseUser = firebaseUser;
     });
 
     return unsubscribe;
   }, []);
 
+  // Listen for global auth token refresh/failure events from apiClient
+  useEffect(() => {
+    const handleTokenRefreshed = (e) => {
+      const newToken = e?.detail?.token;
+      if (newToken) {
+        setToken(newToken);
+        // Reschedule auto-logout based on new token expiry
+        scheduleAutoLogout(newToken);
+      }
+    };
+
+    const handleRefreshFailed = () => {
+      // Clear local state and cookies; user must log in again
+      clearAuthCookies();
+      setUser(null);
+      setToken(null);
+      try { toast.error('Your session expired. Please log in again.'); } catch (_) {}
+    };
+
+    window.addEventListener('auth:tokenRefreshed', handleTokenRefreshed);
+    window.addEventListener('auth:refreshFailed', handleRefreshFailed);
+
+    return () => {
+      window.removeEventListener('auth:tokenRefreshed', handleTokenRefreshed);
+      window.removeEventListener('auth:refreshFailed', handleRefreshFailed);
+    };
+  }, []);
+
   // Store token in secure cookies when it changes
   useEffect(() => {
+    globalAuthState.token = token;
     if (token) {
       const currentStoredToken = getAuthToken();
       if (currentStoredToken !== token) {
@@ -864,11 +974,12 @@ export const AuthProvider = ({ children }) => {
         console.log('🍪 Token saved to secure cookie');
       }
       scheduleAutoLogout(token);
-    } else {
+    } else if (hasInitializedRef.current) {
+      // Only remove cookies if this instance has completed initialization
       const currentStoredToken = getAuthToken();
       if (currentStoredToken) {
         removeAuthToken();
-        console.log('🍪 Token removed from cookie');
+        console.log('🗑️ Token removed from cookie');
       }
       clearAutoLogoutTimer();
     }
@@ -876,13 +987,25 @@ export const AuthProvider = ({ children }) => {
 
   // Store user data in cookies when it changes
   useEffect(() => {
+    globalAuthState.user = user;
     if (user) {
       setUserData(user);
       console.log('🍪 User data saved to cookie');
-    } else {
+    } else if (hasInitializedRef.current) {
+      // Only remove user data if this instance has completed initialization
       removeUserData();
     }
   }, [user]);
+
+  // Sync loading state to global state
+  useEffect(() => {
+    globalAuthState.loading = loading;
+  }, [loading]);
+
+  // Sync firebaseUser to global state
+  useEffect(() => {
+    globalAuthState.firebaseUser = firebaseUser;
+  }, [firebaseUser]);
 
   // Add this useEffect to check for missing username after user is set
   useEffect(() => {
@@ -899,6 +1022,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     token,
     awaitingEmailVerification,
+    showUsernameModal,
+    pendingGoogleUser,
     getFirebaseToken,
     register,
     finalizeEmailRegistration,
@@ -910,16 +1035,12 @@ export const AuthProvider = ({ children }) => {
     verifyToken,
     resendVerificationEmail,
     verifyOTP,
+    handleSetGoogleUsername,
   };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
-      <UsernameModal
-        isOpen={showUsernameModal}
-        onClose={() => {}}
-        onSetUsername={handleSetGoogleUsername}
-      />
     </AuthContext.Provider>
   );
 }; 

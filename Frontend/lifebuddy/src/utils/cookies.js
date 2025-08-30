@@ -98,7 +98,7 @@ export const setAuthToken = (token) => {
   
   setCookie('auth_token', token, {
     expires: expirationTime,
-    secure: true, // Force secure in production
+    // Do not force Secure here; COOKIE_CONFIG handles it based on protocol
     sameSite: 'strict',
     // httpOnly: true, // Would be ideal but needs server-side implementation
   });
@@ -127,7 +127,7 @@ export const setUserData = (userData) => {
   
   setCookie('user_data', JSON.stringify(userData), {
     expires: expirationTime,
-    secure: true,
+    // Do not force Secure here; COOKIE_CONFIG handles it based on protocol
     sameSite: 'strict'
   });
 };

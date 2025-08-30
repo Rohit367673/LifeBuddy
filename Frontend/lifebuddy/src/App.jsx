@@ -29,46 +29,26 @@ import AISchedulingUpsell from './components/AISchedulingUpsell';
 import AdManager from './components/AdManager';
 import PromoVideo from './components/PromoVideo';
 import BackendStatus from './components/BackendStatus';
-import { getApiUrl } from './utils/config';
 import { startHealthMonitoring } from './utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { daysSince } from './utils/dates';
-import LoadingScreen from './components/LoadingScreen';
+import { useAuth } from './context/AuthContext';
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Inner App component that uses auth context
+function AppContent() {
   const [promoActive, setPromoActive] = useState(false);
+  const { user } = useAuth();
 
+  // Check if promo should be active when user changes
   useEffect(() => {
-    // Start backend health monitoring
-    startHealthMonitoring();
-    
-    // Fetch user data
-    const fetchUser = async () => {
-      try {
-        const apiUrl = await getApiUrl();
-        const response = await fetch(`${apiUrl}/api/user`);
-        const data = await response.json();
-        setUser(data);
-        // Check if promo should be active
-        if (data && !data.isPremium) {
-          const signupDate = new Date(data.signupDate);
-          const days = daysSince(signupDate);
-          setPromoActive(days <= 7);
-        }
-      } catch (err) {
-        console.error('Failed to fetch user:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  if (loading) {
-    return <LoadingScreen text="Preparing your LifeBuddy experience…" />;
-  }
+    if (user && !user.isPremium) {
+      const signupDate = new Date(user.signupDate);
+      const days = daysSince(signupDate);
+      setPromoActive(days <= 7);
+    } else {
+      setPromoActive(false);
+    }
+  }, [user]);
 
   const handleUpgrade = () => {
     // Placeholder for upgrade function
@@ -79,64 +59,73 @@ function App() {
     setPromoActive(false);
   };
 
-  // Only show ads if promo is not active
-  const showAds = !promoActive;
+  return (
+    <div className="App">
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/premium" element={<Premium />} />
+        <Route path="/subscribe-success" element={<SubscribeSuccess />} />
+        <Route path="/profile/:identifier" element={<PublicProfile />} />
+        {/* Direct voice route (also added inside MainLayout below) */}
+        <Route path="/ai-voice" element={<VoiceChat />} />
+        <Route path="/voice-chat" element={<VoiceChat />} />
+        <Route path="/voice-chat" element={<VoiceChat />} />
+
+        {/* Main layout with nested routes */}
+        <Route element={<MainLayout />}>
+          <Route path="/productivity" element={
+            <ProtectedRoute
+              inlineFallback={<AISchedulingUpsell />}
+            >
+              <Productivity />
+            </ProtectedRoute>
+          } />
+          <Route path="/ai-chat" element={<AIChat />} />
+          <Route path="/ai-voice" element={<VoiceChat />} />
+          <Route path="/store" element={<Store />} />
+          <Route path="/my-schedule" element={<MySchedule />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/new" element={<EventForm />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/events/:id/edit" element={<EventForm />} />
+          <Route path="/daily-tools" element={<DailyTools />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin/coupons" element={<AdminCouponPanel />} />
+        </Route>
+        {/* Fallback */}
+        <Route path="*" element={<div style={{ padding: 16 }}>Page not found</div>} />
+      </Routes>
+      <AdManager user={user} promoActive={promoActive} />
+      <PromoVideo 
+        user={user} 
+        onUpgrade={handleUpgrade}
+        onClose={handlePromoClose}
+        isActive={promoActive}
+      />
+      <BackendStatus />
+    </div>
+  );
+}
+
+// Main App component that provides context
+function App() {
+  useEffect(() => {
+    // Start backend health monitoring
+    startHealthMonitoring();
+  }, []);
 
   return (
     <Router>
       <AuthProvider>
         <ThemeProvider>
           <PremiumProvider>
-            <div className="App">
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/premium" element={<Premium />} />
-                <Route path="/subscribe-success" element={<SubscribeSuccess />} />
-                <Route path="/profile/:identifier" element={<PublicProfile />} />
-                {/* Direct voice route (also added inside MainLayout below) */}
-                <Route path="/ai-voice" element={<VoiceChat />} />
-                <Route path="/voice-chat" element={<VoiceChat />} />
-                <Route path="/voice-chat" element={<VoiceChat />} />
-
-                {/* Main layout with nested routes */}
-                <Route element={<MainLayout />}>
-                  <Route path="/productivity" element={
-                    <ProtectedRoute
-                      inlineFallback={<AISchedulingUpsell />}
-                    >
-                      <Productivity />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/ai-chat" element={<AIChat />} />
-                  <Route path="/ai-voice" element={<VoiceChat />} />
-                  <Route path="/store" element={<Store />} />
-                  <Route path="/my-schedule" element={<MySchedule />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/events" element={<Events />} />
-                  <Route path="/events/new" element={<EventForm />} />
-                  <Route path="/events/:id" element={<EventDetail />} />
-                  <Route path="/events/:id/edit" element={<EventForm />} />
-                  <Route path="/daily-tools" element={<DailyTools />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/admin/coupons" element={<AdminCouponPanel />} />
-                </Route>
-                {/* Fallback */}
-                <Route path="*" element={<div style={{ padding: 16 }}>Page not found</div>} />
-              </Routes>
-              <AdManager user={user} promoActive={promoActive} />
-              <PromoVideo 
-                user={user} 
-                onUpgrade={handleUpgrade}
-                onClose={handlePromoClose}
-                isActive={promoActive}
-              />
-              <BackendStatus />
-            </div>
+            <AppContent />
           </PremiumProvider>
         </ThemeProvider>
       </AuthProvider>

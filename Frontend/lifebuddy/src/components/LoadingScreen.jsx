@@ -24,11 +24,11 @@ const LoadingScreen = ({ text = 'Loading your experience…' }) => {
       </div>
 
       {/* Text */}
-      <div className="absolute mt-28 md:mt-36 text-center px-6">
+      <div className="absolute mt-40 md:mt-48 text-center px-6">
         <div className="text-lg md:text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-indigo-200 via-white to-fuchsia-200 animate-shimmer bg-[length:200%_100%]">
           {text}
         </div>
-        <div className="mt-2 text-xs md:text-sm text-indigo-200/70">Optimizing and getting things ready…</div>
+        <div className="mt-3 text-xs md:text-sm text-indigo-200/70">Optimizing and getting things ready…</div>
       </div>
 
       {/* Keyframes */}
@@ -45,5 +45,6 @@ const LoadingScreen = ({ text = 'Loading your experience…' }) => {
 };
 
 export default LoadingScreen;
+
 
 

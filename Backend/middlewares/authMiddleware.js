@@ -2,24 +2,54 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const DEBUG_AUTH = process.env.DEBUG_AUTH === 'true';
 
+// Minimal cookie parser to avoid extra dependency
+const parseCookies = (cookieHeader) => {
+  try {
+    return cookieHeader.split(';').reduce((acc, part) => {
+      const idx = part.indexOf('=');
+      if (idx === -1) return acc;
+      const key = part.slice(0, idx).trim();
+      const val = part.slice(idx + 1).trim();
+      if (!key) return acc;
+      acc[key] = decodeURIComponent(val || '');
+      return acc;
+    }, {});
+  } catch (_) {
+    return {};
+  }
+};
+
 // Middleware to verify JWT token and get user (supports both Firebase and traditional auth)
 const authenticateUser = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || '';
     if (DEBUG_AUTH) {
       const sec = process.env.JWT_SECRET || '';
       console.log('AUTH HEADER present:', !!authHeader);
       console.log('JWT SECRET set:', !!sec, sec ? (sec.slice(0, 4) + '***') : '');
     }
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('No token provided or malformed header');
+    // Extract token from Authorization header (case-insensitive Bearer)
+    let token;
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match) token = match[1].trim();
+
+    // Fallback to cookie 'auth_token' when header missing/malformed
+    if (!token && req.headers.cookie) {
+      const cookies = parseCookies(req.headers.cookie);
+      if (cookies.auth_token) {
+        token = cookies.auth_token;
+        if (DEBUG_AUTH) console.log('TOKEN SOURCE: cookie auth_token');
+      }
+    }
+
+    if (!token) {
+      console.log('No token provided or malformed header/cookie missing');
       return res.status(401).json({ 
         message: 'Access denied. No token provided.' 
       });
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     if (DEBUG_AUTH) {
       console.log('EXTRACTED TOKEN length:', token ? token.length : 0);
     }
@@ -93,13 +123,20 @@ const authenticateUser = async (req, res, next) => {
 // Optional authentication - doesn't fail if no token
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || '';
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token;
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match) token = match[1].trim();
+    
+    if (!token && req.headers.cookie) {
+      const cookies = parseCookies(req.headers.cookie);
+      if (cookies.auth_token) token = cookies.auth_token;
+    }
+    
+    if (!token) {
       return next();
     }
-
-    const token = authHeader.substring(7);
     
     let decoded;
     try {

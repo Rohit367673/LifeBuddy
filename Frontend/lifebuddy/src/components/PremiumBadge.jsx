@@ -28,3 +28,4 @@ const PremiumBadge = ({ size = 'md', showTooltip = true, className = '' }) => {
 };
 
 export default PremiumBadge;
+

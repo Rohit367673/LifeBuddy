@@ -34,24 +34,7 @@ router.get('/', authenticateUser, async (req, res) => {
   }
 });
 
-// Get achievement by ID
-router.get('/:id', authenticateUser, async (req, res) => {
-  try {
-    const achievement = await Achievement.findOne({
-      _id: req.params.id,
-      user: req.user._id
-    });
-    
-    if (!achievement) {
-      return res.status(404).json({ message: 'Achievement not found' });
-    }
-    
-    res.json(achievement);
-  } catch (error) {
-    console.error('Error fetching achievement:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
+// NOTE: moved dynamic '/:id' route below all specific routes to avoid conflicts
 
 // Get available achievements (not yet earned)
 router.get('/available/list', authenticateUser, async (req, res) => {
@@ -200,16 +183,17 @@ router.post('/check', authenticateUser, async (req, res) => {
 // Get recent achievements
 router.get('/recent/list', authenticateUser, async (req, res) => {
   try {
-    const { limit = 5 } = req.query;
+    const limit = parseInt(req.query.limit) || 3;
     
-    const recentAchievements = await Achievement.find({
+    const achievements = await Achievement.find({ 
       user: req.user._id,
-      'progress.current': { $gte: '$progress.target' } // Only earned achievements
+      isEarned: true 
     })
     .sort({ earnedAt: -1 })
-    .limit(parseInt(limit));
-    
-    res.json(recentAchievements);
+    .limit(limit)
+    .select('title description points earnedAt badgeType category');
+
+    res.json(achievements);
   } catch (error) {
     console.error('Error fetching recent achievements:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -505,4 +489,23 @@ router.get('/public/:identifier', async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Get achievement by ID (placed after specific routes to avoid conflicts)
+router.get('/:id', authenticateUser, async (req, res) => {
+  try {
+    const achievement = await Achievement.findOne({
+      _id: req.params.id,
+      user: req.user._id
+    });
+    
+    if (!achievement) {
+      return res.status(404).json({ message: 'Achievement not found' });
+    }
+    
+    res.json(achievement);
+  } catch (error) {
+    console.error('Error fetching achievement:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+module.exports = router;

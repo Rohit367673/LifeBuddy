@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import apiClient from '../utils/apiClient';
 
 const UsernameModal = ({ isOpen, onClose, onSetUsername }) => {
   const [username, setUsername] = useState('');
@@ -35,11 +36,8 @@ const UsernameModal = ({ isOpen, onClose, onSetUsername }) => {
       setError('');
       try {
         const q = cleanUsername(username);
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/users/search?q=${encodeURIComponent(q)}`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
-        const data = await res.json();
+        const res = await apiClient.get(`/api/users/search?q=${encodeURIComponent(q)}`);
+        const data = res.data;
         if (!Array.isArray(data)) {
           setUsernameAvailable(null);
           setError('Error checking username');
@@ -94,6 +92,8 @@ const UsernameModal = ({ isOpen, onClose, onSetUsername }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('🔄 Username form submitted:', { username, usernameAvailable, checkingUsername });
+    
     if (!/^@[a-zA-Z0-9_]{3,30}$/.test(username)) {
       setError('User ID must start with @ and use only letters, numbers, underscores (3-30 chars)');
       return;
@@ -102,10 +102,13 @@ const UsernameModal = ({ isOpen, onClose, onSetUsername }) => {
       setError('User ID must include both letters and numbers');
       return;
     }
-    if (!usernameAvailable) {
-      setError('User ID is not available');
+    if (usernameAvailable !== true) {
+      setError('User ID is not available or still checking');
       return;
     }
+    
+    console.log('✅ Calling onSetUsername with:', cleanUsername(username));
+    console.log('✅ onSetUsername function:', onSetUsername);
     onSetUsername(cleanUsername(username));
   };
 

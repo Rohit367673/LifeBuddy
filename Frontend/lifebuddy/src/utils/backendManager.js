@@ -8,17 +8,17 @@ class BackendManager {
       local: {
         url: 'http://localhost:5001',
         name: 'Local',
-        priority: isDevelopment ? 1 : 3
-      },
-      render: {
-        url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
-        name: 'Render',
-        priority: isDevelopment ? 2 : 1
+        priority: isDevelopment ? 1 : 3  // Local first in development
       },
       railway: {
         url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
         name: 'Railway',
-        priority: isDevelopment ? 3 : 2
+        priority: isDevelopment ? 2 : 1  // Railway primary in production
+      },
+      render: {
+        url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
+        name: 'Render',
+        priority: isDevelopment ? 3 : 2  // Render fallback
       }
     };
     
@@ -46,12 +46,7 @@ class BackendManager {
         }
       } catch (error) {
         console.warn(`⚠️ Health check failed for ${backend.name}:`, error.message);
-        
-        // In development, skip Railway if it's not accessible
-        if (import.meta.env.DEV && backend.name === 'Railway') {
-          console.log(`🔄 Skipping Railway in development mode`);
-          continue;
-        }
+        // Do not skip remote backends in development; allow fallback to Railway/Render
       }
     }
 
@@ -65,7 +60,7 @@ class BackendManager {
   async healthCheck(url) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
       
       const response = await fetch(`${url}/api/health`, {
         method: 'GET',
@@ -77,12 +72,10 @@ class BackendManager {
       
       clearTimeout(timeoutId);
       
-      if (response.ok) {
-        const data = await response.json();
-        return data.status === 'OK';
-      }
-      return false;
+      // Accept any successful response, not just specific JSON format
+      return response.ok;
     } catch (error) {
+      console.log(`Health check failed for ${url}:`, error.message);
       return false;
     }
   }
@@ -174,5 +167,11 @@ export const getBackendStatus = () => backendManager.getBackendStatus();
 export const switchToBackend = (name) => backendManager.switchToBackend(name);
 export const startHealthMonitoring = () => backendManager.startHealthMonitoring();
 export const stopHealthMonitoring = () => backendManager.stopHealthMonitoring();
+
+// Add the missing switchBackend function that AuthContext expects
+export const switchBackend = async () => {
+  const backend = await backendManager.getBestBackend();
+  return backend.url;
+};
 
 export default backendManager;

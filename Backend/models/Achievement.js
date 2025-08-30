@@ -78,14 +78,8 @@ const achievementSchema = new mongoose.Schema({
     default: false
   },
   progress: {
-    current: {
-      type: Number,
-      default: 0
-    },
-    target: {
-      type: Number,
-      required: true
-    }
+    current: { type: Number, default: 0 },
+    target: { type: Number, required: true }
   },
   category: {
     type: String,

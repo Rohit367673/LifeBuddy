@@ -5,6 +5,8 @@ import { useTheme } from '../context/ThemeContext';
 import { motion } from 'framer-motion';
 import LoadingScreen from '../components/LoadingScreen';
 import PremiumBadge from '../components/PremiumBadge';
+import UsernameModal from '../components/UsernameModal';
+import apiClient from '../utils/apiClient';
 import { 
   CalendarIcon, 
   CheckCircleIcon, 
@@ -26,9 +28,10 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
-  const { user, getFirebaseToken } = useAuth();
+  const { user, getFirebaseToken, handleSetGoogleUsername } = useAuth();
   const { isDarkMode } = useTheme();
   const { premiumBadge } = usePremium();
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [motivationalMessage, setMotivationalMessage] = useState(null);
   const [recentAchievements, setRecentAchievements] = useState([]);
   const [stats, setStats] = useState({
@@ -66,8 +69,18 @@ const Dashboard = () => {
     console.log('🎯 Dashboard component mounted');
     console.log('👤 User:', user);
     console.log('🔗 API URL:', import.meta.env.VITE_API_URL);
+    
+    // Check if user needs to set username after Google login
+    if (user && !user.username) {
+      console.log('🎯 User needs to set username, showing modal');
+      setShowUsernameModal(true);
+    } else if (user && user.username) {
+      console.log('🎯 User already has username:', user.username);
+      setShowUsernameModal(false);
+    }
+    
     loadDashboardData();
-  }, []);
+  }, [user]);
 
   const loadDashboardData = async () => {
     try {
@@ -170,28 +183,23 @@ const Dashboard = () => {
 
   const loadMotivationalMessage = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/motivational/daily`, {
-        headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Handle both object and string responses
-        if (typeof data === 'object' && data.message) {
-          // If message is an object, get its content
-          if (typeof data.message === 'object' && data.message.content) {
-            setMotivationalMessage(data.message.content);
-          } else if (typeof data.message === 'string') {
-            setMotivationalMessage(data.message);
-          } else {
-            setMotivationalMessage('Stay motivated and keep pushing forward!');
-          }
-        } else if (typeof data === 'string') {
-          setMotivationalMessage(data);
+      const response = await apiClient.get('/api/motivational/daily');
+      const data = response.data;
+      
+      // Handle both object and string responses
+      if (typeof data === 'object' && data.message) {
+        // If message is an object, get its content
+        if (typeof data.message === 'object' && data.message.content) {
+          setMotivationalMessage(data.message.content);
+        } else if (typeof data.message === 'string') {
+          setMotivationalMessage(data.message);
         } else {
           setMotivationalMessage('Stay motivated and keep pushing forward!');
         }
+      } else if (typeof data === 'string') {
+        setMotivationalMessage(data);
+      } else {
+        setMotivationalMessage('Stay motivated and keep pushing forward!');
       }
     } catch (error) {
       console.error('Error loading motivational message:', error);
@@ -201,15 +209,8 @@ const Dashboard = () => {
 
   const loadRecentAchievements = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/achievements/recent/list?limit=3`, {
-        headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setRecentAchievements(data);
-      }
+      const response = await apiClient.get('/api/achievements/recent/list?limit=3');
+      setRecentAchievements(response.data);
     } catch (error) {
       console.error('Error loading recent achievements:', error);
     }
@@ -281,17 +282,11 @@ const Dashboard = () => {
 
   const loadAchievementProgress = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/achievements/progress`, {
-        headers: {
-          'Authorization': `Bearer ${await getFirebaseToken()}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAchievementProgress(data);
-      }
+      const response = await apiClient.get('/api/achievements/progress');
+      setAchievementProgress(response.data || []);
     } catch (error) {
       console.error('Error loading achievement progress:', error);
+      setAchievementProgress([]);
     }
   };
 
@@ -870,13 +865,21 @@ const Dashboard = () => {
                       transition={{ type: 'spring', stiffness: 300 }}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-900">{achievement.title}</span>
-                        <span className="text-sm text-gray-600">{achievement.progress}%</span>
+                        <span className="font-medium text-gray-900">{achievement.title || 'Achievement'}</span>
+                        <span className="text-sm text-gray-600">
+                          {typeof achievement.progress === 'object' && achievement.progress?.current !== undefined
+                            ? Math.round((achievement.progress.current / achievement.progress.target) * 100)
+                            : achievement.progress || 0}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-gradient-to-r from-purple-400 to-blue-600 h-2 rounded-full" 
-                          style={{ width: `${achievement.progress}%` }}
+                          style={{ 
+                            width: `${typeof achievement.progress === 'object' && achievement.progress?.current !== undefined
+                              ? Math.round((achievement.progress.current / achievement.progress.target) * 100)
+                              : achievement.progress || 0}%` 
+                          }}
                         ></div>
                       </div>
                       <p className="text-sm text-gray-600 mt-2">{achievement.description}</p>
@@ -923,6 +926,20 @@ const Dashboard = () => {
           </div>
         )}
       </motion.section>
+      
+      {/* Username Modal - only show in Dashboard after Google login */}
+      <UsernameModal
+        isOpen={showUsernameModal}
+        onClose={() => setShowUsernameModal(false)}
+        onSetUsername={async (username) => {
+          try {
+            await handleSetGoogleUsername(username);
+            setShowUsernameModal(false);
+          } catch (error) {
+            console.error('Failed to set username:', error);
+          }
+        }}
+      />
     </div>
   );
 };
