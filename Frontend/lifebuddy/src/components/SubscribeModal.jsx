@@ -317,8 +317,9 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         throw new Error('Please log in to continue with payment');
       }
 
-      // Temporary: use Railway backend directly for Cashfree payments
-      const paymentUrl = `https://lifebuddy-backend-production.up.railway.app/api/payments/cashfree/create-order`;
+      // Use dynamic backend URL for Cashfree payments
+      const baseUrl = await getApiUrl();
+      const paymentUrl = `${baseUrl}/api/payments/cashfree/create-order`;
       
       const response = await fetch(paymentUrl, {
         method: 'POST',

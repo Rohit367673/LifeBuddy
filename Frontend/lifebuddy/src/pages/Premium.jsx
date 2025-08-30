@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePremium } from '../context/PremiumContext';
 import { useAuth } from '../context/AuthContext';
+import { detectUserCountry } from '../utils/countryDetection';
 import { 
   CheckIcon, 
   StarIcon,
@@ -44,6 +45,7 @@ const Premium = () => {
   const [watchedAd, setWatchedAd] = useState(false);
   const [reward, setReward] = useState({ sessionId: '', status: 'idle' });
   const cashfreeHandledRef = useRef(false);
+  const [userCountry, setUserCountry] = useState('US');
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   const IS_PROD = import.meta.env.MODE === 'production';
@@ -57,6 +59,17 @@ const Premium = () => {
     const plansData = await getPlans();
     setPlans(plansData);
   }, [getPlans]);
+
+  // Detect user country on component mount
+  useEffect(() => {
+    detectUserCountry().then(country => {
+      setUserCountry(country);
+      console.log('[Premium] Detected user country:', country);
+    }).catch(error => {
+      console.warn('[Premium] Country detection failed:', error);
+      setUserCountry('US'); // fallback
+    });
+  }, []);
 
   useEffect(() => {
     loadPlans();
@@ -585,7 +598,7 @@ const Premium = () => {
                 currentPlan={subscription?.plan}
                 onSubscribe={() => handleSubscribe(plan.id)}
                 onStartTrial={() => setShowTrialModal(true)}
-                userCountry={user?.country || 'US'}
+                userCountry={userCountry}
               />
             ))}
           </div>
@@ -643,7 +656,7 @@ const Premium = () => {
           plan={selectedPlan}
           onSuccess={handlePaymentSuccess}
           loading={loading}
-          userCountry={user?.country || 'US'}
+          userCountry={userCountry}
         />
       )}
 

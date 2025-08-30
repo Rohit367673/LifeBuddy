@@ -1,6 +1,6 @@
 import { CheckIcon, XMarkIcon, StarIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { getCurrencySymbol } from '../utils/countryDetection';
 import LoadingScreen from './LoadingScreen';
 
 const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 'US' }) => {
@@ -45,15 +45,7 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
   };
 
   const formatPrice = (price, currency) => {
-    const currencySymbols = {
-      'USD': '$',
-      'INR': '₹',
-      'EUR': '€',
-      'GBP': '£',
-      'CAD': 'C$',
-      'AUD': 'A$'
-    };
-    return `${currencySymbols[currency] || currency} ${price}`;
+    return `${getCurrencySymbol(currency)} ${price}`;
   };
 
   const getButtonVariant = () => {
