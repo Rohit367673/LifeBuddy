@@ -42,7 +42,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
     (async () => {
       try {
         if (!isOpen) return;
-        const resp = await fetch(`${getApiUrl()}/api/pricing/plans?country=${encodeURIComponent(userCountry || 'US')}`);
+        const baseUrl = await getApiUrl();
+        const resp = await fetch(`${baseUrl}/api/pricing/plans?country=${encodeURIComponent(userCountry || 'US')}`);
         if (!resp.ok) throw new Error('Failed to fetch pricing');
         const data = await resp.json();
         if (cancelled) return;
@@ -85,8 +86,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
   useEffect(() => {
     const base = (typeof price === 'number' ? price : (currentPlan?.price || 0));
     const finalPrice = Math.max(0, base - (couponInfo?.discountAmount || 0));
-    if (!isOpen || finalPrice === 0) return;
-    // Only initialize PayPal when PayPal gateway is selected
+
     if (paymentGateway !== 'paypal') return;
     if (!paypalButtonsRef.current) return;
 
@@ -102,7 +102,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
           return;
         }
         // Get client ID from backend
-        const cfgResp = await fetch(`${getApiUrl()}/api/payments/paypal/config`);
+        const baseUrl = await getApiUrl();
+        const cfgResp = await fetch(`${baseUrl}/api/payments/paypal/config`);
         const cfg = await cfgResp.json();
         const clientId = cfg?.clientId;
         if (!clientId) throw new Error('Missing PayPal client ID');
@@ -140,7 +141,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
           createOrder: async () => {
             // Create order on backend with coupon
             try {
-              const resp = await fetch(`${getApiUrl()}/api/payments/paypal/create-order`, {
+              const baseUrl = await getApiUrl();
+              const resp = await fetch(`${baseUrl}/api/payments/paypal/create-order`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -157,7 +159,7 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
               if (!resp.ok) throw new Error(data?.message || 'Failed to create order');
               if (data.free) {
                 // 100% discount: directly capture without PayPal order
-                const capResp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
+                const capResp = await fetch(`${baseUrl}/api/payments/paypal/capture`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -185,7 +187,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
           onApprove: async (data) => {
             try {
               const orderId = data.orderID;
-              const resp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
+              const baseUrl = await getApiUrl();
+              const resp = await fetch(`${baseUrl}/api/payments/paypal/capture`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -322,7 +325,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
         try { toast('Using INR for Cashfree sandbox', { icon: 'ℹ️' }); } catch (_) {}
       }
 
-      const response = await fetch(`${getApiUrl()}/api/payments/cashfree/create-order`, {
+      const baseUrl = await getApiUrl();
+      const response = await fetch(`${baseUrl}/api/payments/cashfree/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,9 +384,10 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
     if (!code) return;
     setValidatingCoupon(true);
     try {
-      const resp = await fetch(`${getApiUrl()}/api/coupons/validate?code=${encodeURIComponent(code)}`);
-      const data = await resp.json();
-      if (resp.ok && data.valid) {
+      const baseUrl = await getApiUrl();
+      const couponResp = await fetch(`${baseUrl}/api/coupons/validate?code=${encodeURIComponent(code)}`);
+      const data = await couponResp.json();
+      if (couponResp.ok && data.valid) {
         setCouponInfo(data);
         toast.success(`Coupon applied: -${formatPrice(data.discountAmount || 0, currency)}`);
       } else {
@@ -400,7 +405,8 @@ const SubscribeModal = ({ isOpen, onClose, plan, onSuccess, loading, userCountry
   const handleFreeActivation = async () => {
     try {
       setIsProcessing(true);
-      const resp = await fetch(`${getApiUrl()}/api/payments/paypal/capture`, {
+      const baseUrl = await getApiUrl();
+      const resp = await fetch(`${baseUrl}/api/payments/paypal/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ plan, couponCode: couponInfo?.code || (coupon?.trim() ? coupon.trim().toUpperCase() : undefined) })
