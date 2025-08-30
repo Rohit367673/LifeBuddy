@@ -522,8 +522,12 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔥 Processing successful Google login for:', firebaseUser.email);
       
-      // Ensure backend URL is set
-      const backendUrl = await switchBackend();
+      // Temporarily hardcode backend URL for production
+      const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
+
+      // In development, we can still use the environment variable
+      // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      
       apiClient.defaults.baseURL = backendUrl;
       console.log('🔥 Backend URL set for login:', backendUrl);
       
@@ -682,8 +686,12 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔍 Verifying token:', token ? 'Token exists' : 'No token');
       
-      // Ensure backend URL is set before verification
-      const backendUrl = await switchBackend();
+      // Temporarily hardcode backend URL for production
+      const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
+
+      // In development, we can still use the environment variable
+      // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+      
       apiClient.defaults.baseURL = backendUrl;
       
       const response = await apiClient.get('/api/auth/verify', {
@@ -778,7 +786,12 @@ export const AuthProvider = ({ children }) => {
 
       // Ensure backend is switched and base URL is set
       try {
-        const backendUrl = await switchBackend();
+        // Temporarily hardcode backend URL for production
+        const backendUrl = 'https://lifebuddy-backend-production.up.railway.app';
+
+        // In development, we can still use the environment variable
+        // const backendUrl = process.env.REACT_APP_BACKEND_URL;
+        
         apiClient.defaults.baseURL = backendUrl;
         console.log(`🌐 Backend base URL set to: ${backendUrl}`);
       } catch (error) {
@@ -1025,6 +1038,24 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
+  const initializeAchievements = async (userId) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/achievements/initialize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+        }),
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to initialize achievements:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     firebaseUser,
@@ -1045,6 +1076,7 @@ export const AuthProvider = ({ children }) => {
     resendVerificationEmail,
     verifyOTP,
     handleSetGoogleUsername,
+    initializeAchievements,
   };
 
   return (
