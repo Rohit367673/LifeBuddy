@@ -464,15 +464,69 @@ export const AuthProvider = ({ children }) => {
           return;
         } catch (redirectError) {
           console.log('🔥 Redirect failed:', redirectError.code);
+          if (isSafari) {
+            throw new Error('Google login requires popup permissions. Please enable popups for this site in Safari settings.');
+          }
         }
       }
-      console.log(' Backend URL set for login:', backendUrl);
+      
+      // For Chrome and other browsers, try popup first
+      console.log('🔥 Attempting Google login with popup...');
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
+        await handleSuccessfulGoogleLogin(firebaseUser);
+        setLoading(false);
+        return;
+      } catch (popupError) {
+        console.log('🔥 Popup failed:', popupError.code);
+        
+        // If popup was blocked, try redirect as fallback
+        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+          console.log('🔥 Popup blocked, trying redirect fallback...');
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectError) {
+            console.log('🔥 Both popup and redirect failed');
+            throw redirectError;
+          }
+        }
+        
+        throw popupError;
+      }
+
     } catch (error) {
-      console.error('Failed to set backend URL:', error);
-      throw new Error('Could not connect to backend');
+      console.error('🔥 Google login error:', error);
+      console.error('- Error code:', error.code);
+      console.error('- Error message:', error.message);
+      
+      // Provide browser-specific error messages
+      let errorMessage = error.message || 'Failed to login with Google';
+      if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup blocked. Please allow popups for this site and try again.';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Login cancelled. Please try again.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      toast.error(errorMessage);
+      setLoading(false);
+      throw error;
     }
-    
+  };
+
+  // Handle successful Google login after Firebase auth
+  const handleSuccessfulGoogleLogin = async (firebaseUser) => {
     try {
+      console.log('🔥 Processing successful Google login for:', firebaseUser.email);
+      
+      // Ensure backend URL is set
+      const backendUrl = await switchBackend();
+      apiClient.defaults.baseURL = backendUrl;
+      console.log('🔥 Backend URL set for login:', backendUrl);
+      
       let response;
       let data;
       
@@ -483,12 +537,12 @@ export const AuthProvider = ({ children }) => {
           avatar: firebaseUser.photoURL || '',
           email: firebaseUser.email || '',
         });
-        console.log(' Backend login response:', response.data);
+        console.log('🔥 Backend login response:', response.data);
         data = response.data;
       } catch (loginError) {
         // If login fails with 404, try registration
         if (loginError.response?.status === 404) {
-          console.log(' User not found, attempting registration...');
+          console.log('🔥 User not found, attempting registration...');
           response = await apiClient.post('/api/auth/register', {
             firebaseUid: firebaseUser.uid,
             email: firebaseUser.email || '',
@@ -497,7 +551,7 @@ export const AuthProvider = ({ children }) => {
             lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
             avatar: firebaseUser.photoURL || '',
           });
-          console.log(' Backend registration response:', response.data);
+          console.log('🔥 Backend registration response:', response.data);
           data = response.data;
         } else {
           throw loginError;
@@ -521,9 +575,9 @@ export const AuthProvider = ({ children }) => {
         setShowUsernameModal(true);
       } else {
         // Fetch the latest user profile (which will have the username if set)
-        console.log(' Fetching user profile after successful login...');
+        console.log('🔥 Fetching user profile after successful login...');
         await fetchUserProfile(data.token);
-        console.log(' User profile fetched successfully');
+        console.log('🔥 User profile fetched successfully');
       }
       
       toast.success('Welcome back!');
