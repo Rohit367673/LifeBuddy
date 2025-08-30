@@ -13,12 +13,12 @@ class BackendManager {
       render: {
         url: import.meta.env.VITE_RENDER_URL || 'https://lifebuddy.onrender.com',
         name: 'Render',
-        priority: isDevelopment ? 2 : 1  // Render primary in production
+        priority: isDevelopment ? 2 : 1  // Render primary - working correctly
       },
       railway: {
         url: import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app',
         name: 'Railway',
-        priority: isDevelopment ? 3 : 2  // Railway fallback due to deployment issues
+        priority: isDevelopment ? 3 : 2  // Railway fallback - URL routing issues
       }
     };
     
