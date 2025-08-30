@@ -14,17 +14,17 @@ class BackendManager {
       local: {
         url: BACKEND_URLS.local,
         name: 'Local',
-        priority: isDevelopment ? 1 : 3  // Local first in development
+        priority: isDevelopment ? 1 : 99  // Local only in development
       },
       railway: {
         url: import.meta.env.VITE_RAILWAY_URL || BACKEND_URLS.railway,
         name: 'Railway',
-        priority: isDevelopment ? 2 : 1  // Railway primary as requested
+        priority: 1  // Railway primary
       },
       render: {
         url: import.meta.env.VITE_RENDER_URL || BACKEND_URLS.render,
         name: 'Render',
-        priority: isDevelopment ? 3 : 2  // Render fallback
+        priority: 99  // Disable Render for now due to 500 errors
       }
     };
     

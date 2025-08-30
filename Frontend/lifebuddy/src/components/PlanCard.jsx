@@ -13,19 +13,26 @@ const PlanCard = ({ plan, currentPlan, onSubscribe, onStartTrial, userCountry = 
   useEffect(() => {
     const fetchPricing = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/pricing/plans?country=${userCountry}`);
+        // Use dynamic API URL detection
+        const { getApiUrl } = await import('../utils/config.js');
+        const baseUrl = await getApiUrl();
+        const response = await fetch(`${baseUrl}/api/pricing/plans?country=${userCountry}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('[PlanCard] Pricing data received:', data);
           setPricing(data.pricing);
+        } else {
+          console.error('[PlanCard] Pricing fetch failed:', response.status);
         }
       } catch (error) {
-        console.error('Error fetching pricing:', error);
+        console.error('[PlanCard] Error fetching pricing:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!isFreePlan) {
+    if (!isFreePlan && userCountry) {
+      console.log('[PlanCard] Fetching pricing for country:', userCountry);
       fetchPricing();
     } else {
       setLoading(false);
