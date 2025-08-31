@@ -17,20 +17,42 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Fetch event - network first strategy to prevent white screen
+// Fetch event - Safari-compatible network first strategy
 self.addEventListener('fetch', (event) => {
-  // Skip health check requests and API calls in service worker
-  if (event.request.url.includes('/api/health') || 
+  // Skip non-GET requests and external resources
+  if (event.request.method !== 'GET' ||
       event.request.url.includes('/api/') ||
-      event.request.url.includes('csp.withgoogle.com')) {
+      event.request.url.includes('csp.withgoogle.com') ||
+      event.request.url.includes('firebase') ||
+      event.request.url.includes('google') ||
+      event.request.url.includes('vercel') ||
+      !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
+  // For Safari compatibility, handle navigation requests specially
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            return response;
+          }
+          // Fallback to index.html for SPA routing
+          return caches.match('/index.html');
+        })
+        .catch(() => {
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // For other requests, use network first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If network request succeeds, cache and return it
-        if (response.status === 200) {
+        if (response && response.status === 200) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME)
             .then((cache) => {
@@ -40,7 +62,6 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Only use cache as fallback if network fails
         return caches.match(event.request);
       })
   );

@@ -68,8 +68,26 @@
     
     <!-- Service Worker Registration with Update Handling -->
     <script>
+      // Safari-compatible service worker registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          // Detect Safari
+          const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+          
+          if (isSafari) {
+            console.log('Safari detected - disabling service worker to prevent white screen');
+            // For Safari, disable service worker completely to prevent caching issues
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                  registration.unregister();
+                }
+              });
+            }
+            return;
+          }
+          
+          // For non-Safari browsers, use normal service worker
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
               console.log('SW registered: ', registration);
@@ -79,13 +97,12 @@
                 registration.update();
               }, 30000);
               
-              // Handle service worker updates
+              // Listen for new service worker installations
               registration.addEventListener('updatefound', () => {
                 const newWorker = registration.installing;
                 newWorker.addEventListener('statechange', () => {
                   if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // New service worker installed, reload to get fresh content
-                    console.log('New service worker installed, reloading...');
+                    console.log('New service worker installed, reloading page...');
                     window.location.reload();
                   }
                 });
