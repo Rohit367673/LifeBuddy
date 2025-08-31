@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { FaEye, FaEyeSlash, FaGoogle } from 'react-icons/fa';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import DebugInfo from '../components/DebugInfo';
 
