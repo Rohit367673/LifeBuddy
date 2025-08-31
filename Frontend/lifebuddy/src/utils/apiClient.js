@@ -29,8 +29,9 @@ apiClient.interceptors.request.use(async (config) => {
     return config;
   } catch (error) {
     console.error('Failed to get backend URL:', error);
-    // Fallback to render
-    config.baseURL = 'https://lifebuddy.onrender.com';
+    // Prefer Railway as fallback, then Render
+    const railway = import.meta.env.VITE_RAILWAY_URL || 'https://lifebuddy-backend-production.up.railway.app';
+    config.baseURL = railway || 'https://lifebuddy.onrender.com';
     return config;
   }
 });

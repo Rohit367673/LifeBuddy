@@ -74,7 +74,7 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -84,10 +84,12 @@ app.use(cors({
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
   allowedHeaders: ['Authorization','Content-Type','X-Requested-With','Accept','Origin']
-}));
+};
 
-// Handle preflight
-app.options('*', cors());
+app.use(cors(corsOptions));
+
+// Handle preflight with same options
+app.options('*', cors(corsOptions));
 
 // Rate limiting - optimized for development
 const limiter = rateLimit({

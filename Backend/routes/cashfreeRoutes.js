@@ -266,30 +266,58 @@ router.post('/confirm', authenticateUser, async (req, res) => {
 // Cashfree webhook
 router.post('/webhook', async (req, res) => {
   try {
-    const signature = req.headers['x-cf-signature']
-      || req.headers['x-webhook-signature']
-      || req.headers['x-cashfree-signature'];
+    const signature = req.headers['x-cf-signature'];
     // Get raw body string (set by app-level express.raw for this route)
     const rawBody = Buffer.isBuffer(req.body)
       ? req.body.toString('utf8')
       : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
 
-    // Verify webhook signature using HMAC-SHA256 (base64)
-    // Cashfree uses the API Secret Key as the webhook signing secret
-    const secret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY || '';
-    const allowUnsigned = !secret && process.env.NODE_ENV !== 'production';
+    console.log('[Cashfree] Webhook received:', {
+      signature: signature ? 'present' : 'missing',
+      bodyLength: rawBody.length,
+      headers: Object.keys(req.headers).filter(h => h.includes('cf') || h.includes('signature'))
+    });
+
+    // Verify webhook signature using Cashfree's format
+    // Cashfree signature format: timestamp.signature
+    const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY || '';
+    const allowUnsigned = !webhookSecret && process.env.NODE_ENV !== 'production';
 
     if (!allowUnsigned) {
       if (!signature) {
+        console.error('[Cashfree] Webhook signature missing');
         return res.status(400).json({ error: 'Missing signature' });
       }
-      const expectedSig = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
-      const isVerified = expectedSig === signature;
+
+      // Parse Cashfree signature format: timestamp.signature
+      const parts = signature.split('.');
+      if (parts.length !== 2) {
+        console.error('[Cashfree] Invalid signature format:', signature);
+        return res.status(400).json({ error: 'Invalid signature format' });
+      }
+
+      const [timestamp, receivedSignature] = parts;
+      
+      // Create expected signature: HMAC-SHA256 of timestamp + rawBody
+      const payload = timestamp + rawBody;
+      const expectedSignature = crypto.createHmac('sha256', webhookSecret).update(payload).digest('hex');
+      
+      const isVerified = crypto.timingSafeEqual(
+        Buffer.from(receivedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
+      );
 
       if (!isVerified) {
-        console.error('Cashfree webhook signature verification failed');
+        console.error('[Cashfree] Webhook signature verification failed:', {
+          timestamp,
+          receivedSignature: receivedSignature.substring(0, 10) + '...',
+          expectedSignature: expectedSignature.substring(0, 10) + '...',
+          payloadLength: payload.length
+        });
         return res.status(400).json({ error: 'Invalid signature' });
       }
+      
+      console.log('[Cashfree] Webhook signature verified successfully');
     } else {
       console.warn('[Cashfree] No webhook secret available; skipping signature verification (dev only)');
     }

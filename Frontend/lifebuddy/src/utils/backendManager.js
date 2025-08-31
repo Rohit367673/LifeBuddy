@@ -1,7 +1,7 @@
 // Smart Backend URL Manager for Render/Railway switching
 const BACKEND_URLS = {
   local: 'http://localhost:5001',
-  railway: '',
+  railway: 'https://lifebuddy-backend-production.up.railway.app',
   render: 'https://lifebuddy.onrender.com'
 };
 
@@ -19,12 +19,12 @@ class BackendManager {
       railway: {
         url: import.meta.env.VITE_RAILWAY_URL || BACKEND_URLS.railway,
         name: 'Railway',
-        priority: 99  // Disabled - Railway not working
+        priority: isDevelopment ? 3 : 1  // Railway primary in production
       },
       render: {
         url: import.meta.env.VITE_RENDER_URL || BACKEND_URLS.render,
         name: 'Render',
-        priority: 1  // Render primary
+        priority: 2  // Render fallback
       }
     };
     
