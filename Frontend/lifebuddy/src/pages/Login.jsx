@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { FaEye, FaEyeSlash, FaGoogle } from 'react-icons/fa';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
-import DebugInfo from '../components/DebugInfo';
+// import DebugInfo from '../components/DebugInfo'; // Removed for production
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -233,9 +233,9 @@ const Login = () => {
               e.stopPropagation();
               console.log('🔥 BUTTON CLICK - Google login triggered!', { loading, authLoading, googleLoading });
               
-              // Clear any existing auth cookies first (centralized helper)
-              clearAuthCookies();
-              console.log('🧹 Cleared existing auth cookies');
+              // Clear any existing auth cookies first
+              // clearAuthCookies(); // Function not available, removing call
+              console.log('🧹 Preparing Google login...');
               
               if (loading || authLoading || googleLoading) {
                 console.log('⚠️ Button disabled, ignoring click');
@@ -276,8 +276,7 @@ const Login = () => {
         </div>
       </div>
       
-      {/* Debug component for troubleshooting */}
-      <DebugInfo />
+      {/* Debug component removed for production */}
     </div>
   );
 };
