@@ -453,25 +453,39 @@ export const AuthProvider = ({ children }) => {
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
       const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       
-      console.log('🔥 Browser detection:', { isSafari, isFirefox, isMobile });
+      console.log('🔥 Browser detection:', { isSafari, isFirefox, isMobile, isIOS });
       
-      // For Safari and mobile, prefer redirect method
-      if (isSafari || isFirefox || isMobile) {
-        console.log('🔥 Using redirect method for Safari/Firefox/Mobile');
+      // For mobile browsers, always use redirect method
+      if (isMobile || isIOS || isSafari) {
+        console.log('🔥 Using redirect method for mobile/Safari browsers');
         try {
+          // Clear any existing auth state before redirect
+          if (auth.currentUser) {
+            await signOut(auth);
+          }
+          
+          // Store loading state in sessionStorage to persist across redirect
+          sessionStorage.setItem('googleLoginInProgress', 'true');
+          
           await signInWithRedirect(auth, provider);
           console.log('🔥 Redirect initiated successfully');
           return;
         } catch (redirectError) {
           console.log('🔥 Redirect failed:', redirectError.code);
-          if (isSafari) {
-            throw new Error('Google login requires popup permissions. Please enable popups for this site in Safari settings.');
+          sessionStorage.removeItem('googleLoginInProgress');
+          
+          if (redirectError.code === 'auth/popup-blocked') {
+            throw new Error('Please allow redirects for Google login on mobile browsers.');
+          } else if (redirectError.code === 'auth/unauthorized-domain') {
+            throw new Error('This domain is not authorized for Google login. Please contact support.');
           }
+          throw redirectError;
         }
       }
       
-      // For Chrome and other browsers, try popup first
+      // For desktop browsers, try popup first with better error handling
       console.log('🔥 Attempting Google login with popup...');
       try {
         const result = await signInWithPopup(auth, provider);
@@ -482,14 +496,18 @@ export const AuthProvider = ({ children }) => {
       } catch (popupError) {
         console.log('🔥 Popup failed:', popupError.code);
         
-        // If popup was blocked, try redirect as fallback
-        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
-          console.log('🔥 Popup blocked, trying redirect fallback...');
+        // If popup was blocked or closed, try redirect as fallback
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request') {
+          console.log('🔥 Popup blocked/closed, trying redirect fallback...');
           try {
+            sessionStorage.setItem('googleLoginInProgress', 'true');
             await signInWithRedirect(auth, provider);
             return;
           } catch (redirectError) {
             console.log('🔥 Both popup and redirect failed');
+            sessionStorage.removeItem('googleLoginInProgress');
             throw redirectError;
           }
         }
@@ -859,6 +877,14 @@ export const AuthProvider = ({ children }) => {
               return;
             }
             
+            // Check if we're expecting a redirect result
+            const wasGoogleLoginInProgress = sessionStorage.getItem('googleLoginInProgress');
+            if (wasGoogleLoginInProgress) {
+              console.log('Google login redirect in progress, checking result...');
+              sessionStorage.removeItem('googleLoginInProgress');
+              setLoading(true); // Show loading during redirect processing
+            }
+            
             const result = await getRedirectResult(auth);
             if (result && result.user) {
               console.log('Redirect result received:', result.user.email);
@@ -891,10 +917,16 @@ export const AuthProvider = ({ children }) => {
               }
             } else {
               console.log('No redirect result found');
+              if (wasGoogleLoginInProgress) {
+                // If we were expecting a result but didn't get one, there might be an issue
+                console.log('Expected redirect result but none found');
+                toast.error('Google login was interrupted. Please try again.');
+              }
               setLoading(false);
             }
           } catch (error) {
             console.error('Error handling redirect result:', error.code, error.message);
+            sessionStorage.removeItem('googleLoginInProgress');
             setLoading(false);
             setUser(null);
             setToken(null);
@@ -905,6 +937,8 @@ export const AuthProvider = ({ children }) => {
               toast.error('Login cancelled by user');
             } else if (error.code === 'auth/network-request-failed') {
               toast.error('Network error. Please check your connection.');
+            } else if (error.code === 'auth/unauthorized-domain') {
+              toast.error('This domain is not authorized for Google login. Please contact support.');
             } else {
               toast.error('Google login failed. Please try again.');
             }
