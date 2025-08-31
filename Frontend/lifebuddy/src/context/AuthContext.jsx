@@ -456,65 +456,51 @@ export const AuthProvider = ({ children }) => {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       
       console.log('🔥 Browser detection:', { isSafari, isFirefox, isMobile, isIOS });
+      console.log('🔥 Current URL:', window.location.href);
+      console.log('🔥 Auth domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
       
-      // For mobile browsers, always use redirect method
-      if (isMobile || isIOS || isSafari) {
-        console.log('🔥 Using redirect method for mobile/Safari browsers');
-        try {
-          // Clear any existing auth state before redirect
-          if (auth.currentUser) {
-            await signOut(auth);
-          }
-          
-          // Store loading state in sessionStorage to persist across redirect
-          sessionStorage.setItem('googleLoginInProgress', 'true');
-          sessionStorage.setItem('googleLoginTimestamp', Date.now().toString());
-          
-          await signInWithRedirect(auth, provider);
-          console.log('🔥 Redirect initiated successfully');
-          // Don't set loading to false here - let redirect handle it
-          return;
-        } catch (redirectError) {
-          console.log('🔥 Redirect failed:', redirectError.code);
-          sessionStorage.removeItem('googleLoginInProgress');
-          sessionStorage.removeItem('googleLoginTimestamp');
-          setLoading(false);
-          
-          if (redirectError.code === 'auth/popup-blocked') {
-            throw new Error('Please allow redirects for Google login on mobile browsers.');
-          } else if (redirectError.code === 'auth/unauthorized-domain') {
-            throw new Error('This domain is not authorized for Google login. Please contact support.');
-          }
-          throw redirectError;
-        }
-      }
-      
-      // For desktop browsers, try popup first with better error handling
+      // Always try popup first for better user experience
       console.log('🔥 Attempting Google login with popup...');
       try {
         const result = await signInWithPopup(auth, provider);
         const firebaseUser = result.user;
+        console.log('🔥 Popup login successful:', firebaseUser.email);
         await handleSuccessfulGoogleLogin(firebaseUser);
         setLoading(false);
         return;
       } catch (popupError) {
-        console.log('🔥 Popup failed:', popupError.code);
+        console.log('🔥 Popup failed:', popupError.code, popupError.message);
         
-        // If popup was blocked or closed, try redirect as fallback
-        if (popupError.code === 'auth/popup-blocked' || 
+        // For mobile browsers or when popup fails, use redirect
+        if (isMobile || isIOS || isSafari || 
+            popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/cancelled-popup-request') {
-          console.log('🔥 Popup blocked/closed, trying redirect fallback...');
+          
+          console.log('🔥 Trying redirect method...');
           try {
+            // Clear any existing auth state before redirect
+            if (auth.currentUser) {
+              await signOut(auth);
+            }
+            
+            // Store loading state in sessionStorage to persist across redirect
             sessionStorage.setItem('googleLoginInProgress', 'true');
             sessionStorage.setItem('googleLoginTimestamp', Date.now().toString());
+            
             await signInWithRedirect(auth, provider);
+            console.log('🔥 Redirect initiated successfully');
+            // Don't set loading to false here - let redirect handle it
             return;
           } catch (redirectError) {
-            console.log('🔥 Both popup and redirect failed');
+            console.log('🔥 Redirect failed:', redirectError.code, redirectError.message);
             sessionStorage.removeItem('googleLoginInProgress');
             sessionStorage.removeItem('googleLoginTimestamp');
             setLoading(false);
+            
+            if (redirectError.code === 'auth/unauthorized-domain') {
+              throw new Error(`Domain ${window.location.hostname} is not authorized for Google login. Please add it to Firebase Console.`);
+            }
             throw redirectError;
           }
         }
@@ -527,6 +513,7 @@ export const AuthProvider = ({ children }) => {
       console.error('🔥 Google login error:', error);
       console.error('- Error code:', error.code);
       console.error('- Error message:', error.message);
+      console.error('- Full error:', error);
       
       // Provide browser-specific error messages
       let errorMessage = error.message || 'Failed to login with Google';
@@ -536,6 +523,8 @@ export const AuthProvider = ({ children }) => {
         errorMessage = 'Login cancelled. Please try again.';
       } else if (error.code === 'auth/network-request-failed') {
         errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = `Domain not authorized for Google login. Please contact support.`;
       }
       
       toast.error(errorMessage);

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { testFirebaseConfig, testGoogleProvider } from '../utils/testFirebase';
-import { clearAuthCookies } from '../utils/cookies';
+import { toast } from 'react-toastify';
+import { FaEye, FaEyeSlash, FaGoogle } from 'react-icons/fa';
+import { motion } from 'framer-motion';
+import DebugInfo from '../components/DebugInfo';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -272,8 +273,11 @@ const Login = () => {
           </button>
         </div>
       </div>
+      
+      {/* Debug component for troubleshooting */}
+      <DebugInfo />
     </div>
   );
 };
 
-export default Login; 
+export default Login;
