@@ -1,12 +1,10 @@
-const CACHE_NAME = 'lifebuddy-v1';
+const CACHE_NAME = `lifebuddy-v${Date.now()}`;
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/static/js/bundle.js',
-  '/static/css/main.css'
+  '/index.html'
 ];
 
-// Install event - cache resources
+// Install event - cache resources and skip waiting
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -15,9 +13,11 @@ self.addEventListener('install', (event) => {
         return cache.addAll(urlsToCache);
       })
   );
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
 });
 
-// Fetch event - serve from cache when possible
+// Fetch event - network first strategy to prevent white screen
 self.addEventListener('fetch', (event) => {
   // Skip health check requests and API calls in service worker
   if (event.request.url.includes('/api/health') || 
@@ -27,19 +27,26 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
+        // If network request succeeds, cache and return it
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseClone);
+            });
         }
-        return fetch(event.request);
-      }
-    )
+        return response;
+      })
+      .catch(() => {
+        // Only use cache as fallback if network fails
+        return caches.match(event.request);
+      })
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -51,6 +58,9 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
+    }).then(() => {
+      // Take control of all clients immediately
+      return self.clients.claim();
     })
   );
 });
