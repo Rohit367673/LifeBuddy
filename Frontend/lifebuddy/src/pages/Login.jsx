@@ -56,8 +56,9 @@ const Login = () => {
   // Test Firebase configuration on component mount
   useEffect(() => {
     console.log('🧪 Running Firebase tests...');
-    testFirebaseConfig();
-    testGoogleProvider();
+    // Remove test functions that don't exist
+    // testFirebaseConfig();
+    // testGoogleProvider();
   }, []);
 
   // Navigate to dashboard when user is authenticated
