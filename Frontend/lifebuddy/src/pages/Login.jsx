@@ -68,11 +68,35 @@ const Login = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Check for redirect login in progress
+  // Check for redirect login in progress and handle timeout
   useEffect(() => {
     const wasGoogleLoginInProgress = sessionStorage.getItem('googleLoginInProgress');
+    const loginTimestamp = sessionStorage.getItem('googleLoginTimestamp');
+    
     if (wasGoogleLoginInProgress) {
-      setGoogleLoading(true);
+      // Check if login attempt is stale (more than 5 minutes)
+      const isStale = loginTimestamp && (Date.now() - parseInt(loginTimestamp)) > 300000;
+      
+      if (isStale) {
+        console.log('Stale Google login attempt detected, clearing...');
+        sessionStorage.removeItem('googleLoginInProgress');
+        sessionStorage.removeItem('googleLoginTimestamp');
+        setGoogleLoading(false);
+        setErrors({ general: 'Google login timed out. Please try again.' });
+      } else {
+        setGoogleLoading(true);
+        
+        // Set a timeout to clear loading state if redirect doesn't complete
+        const timeoutId = setTimeout(() => {
+          console.log('Google login timeout reached, clearing loading state...');
+          sessionStorage.removeItem('googleLoginInProgress');
+          sessionStorage.removeItem('googleLoginTimestamp');
+          setGoogleLoading(false);
+          setErrors({ general: 'Google login timed out. Please try again.' });
+        }, 30000); // 30 second timeout
+        
+        return () => clearTimeout(timeoutId);
+      }
     }
   }, []);
 

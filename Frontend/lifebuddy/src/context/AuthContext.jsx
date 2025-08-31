@@ -468,13 +468,17 @@ export const AuthProvider = ({ children }) => {
           
           // Store loading state in sessionStorage to persist across redirect
           sessionStorage.setItem('googleLoginInProgress', 'true');
+          sessionStorage.setItem('googleLoginTimestamp', Date.now().toString());
           
           await signInWithRedirect(auth, provider);
           console.log('🔥 Redirect initiated successfully');
+          // Don't set loading to false here - let redirect handle it
           return;
         } catch (redirectError) {
           console.log('🔥 Redirect failed:', redirectError.code);
           sessionStorage.removeItem('googleLoginInProgress');
+          sessionStorage.removeItem('googleLoginTimestamp');
+          setLoading(false);
           
           if (redirectError.code === 'auth/popup-blocked') {
             throw new Error('Please allow redirects for Google login on mobile browsers.');
@@ -503,15 +507,19 @@ export const AuthProvider = ({ children }) => {
           console.log('🔥 Popup blocked/closed, trying redirect fallback...');
           try {
             sessionStorage.setItem('googleLoginInProgress', 'true');
+            sessionStorage.setItem('googleLoginTimestamp', Date.now().toString());
             await signInWithRedirect(auth, provider);
             return;
           } catch (redirectError) {
             console.log('🔥 Both popup and redirect failed');
             sessionStorage.removeItem('googleLoginInProgress');
+            sessionStorage.removeItem('googleLoginTimestamp');
+            setLoading(false);
             throw redirectError;
           }
         }
         
+        setLoading(false);
         throw popupError;
       }
 
@@ -879,9 +887,21 @@ export const AuthProvider = ({ children }) => {
             
             // Check if we're expecting a redirect result
             const wasGoogleLoginInProgress = sessionStorage.getItem('googleLoginInProgress');
+            const loginTimestamp = sessionStorage.getItem('googleLoginTimestamp');
+            
             if (wasGoogleLoginInProgress) {
               console.log('Google login redirect in progress, checking result...');
-              sessionStorage.removeItem('googleLoginInProgress');
+              
+              // Check if login attempt is too old (more than 5 minutes)
+              const isStale = loginTimestamp && (Date.now() - parseInt(loginTimestamp)) > 300000;
+              if (isStale) {
+                console.log('Google login attempt is stale, clearing...');
+                sessionStorage.removeItem('googleLoginInProgress');
+                sessionStorage.removeItem('googleLoginTimestamp');
+                setLoading(false);
+                return;
+              }
+              
               setLoading(true); // Show loading during redirect processing
             }
             
@@ -891,6 +911,10 @@ export const AuthProvider = ({ children }) => {
               console.log('User UID:', result.user.uid);
               console.log('User display name:', result.user.displayName);
               console.log('User photo URL:', result.user.photoURL);
+              
+              // Clear session storage
+              sessionStorage.removeItem('googleLoginInProgress');
+              sessionStorage.removeItem('googleLoginTimestamp');
               
               // Process the successful Google login
               const loginData = await handleSuccessfulGoogleLogin(result.user);
@@ -918,6 +942,10 @@ export const AuthProvider = ({ children }) => {
             } else {
               console.log('No redirect result found');
               if (wasGoogleLoginInProgress) {
+                // Clear session storage and reset loading
+                sessionStorage.removeItem('googleLoginInProgress');
+                sessionStorage.removeItem('googleLoginTimestamp');
+                
                 // If we were expecting a result but didn't get one, there might be an issue
                 console.log('Expected redirect result but none found');
                 toast.error('Google login was interrupted. Please try again.');
