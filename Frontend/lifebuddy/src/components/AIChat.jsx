@@ -44,8 +44,9 @@ export default function AIChat() {
     setInput('');
 
     try {
+      const apiUrl = await getApiUrl();
       const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
-      const resp = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
+      const resp = await fetch(`${apiUrl}/api/ai-chat/ask`, {
         method: 'POST', headers, body: JSON.stringify({ message: text })
       });
       const data = await resp.json().catch(() => ({}));
@@ -57,7 +58,8 @@ export default function AIChat() {
 
       // Fallback to /ask
       try {
-        const alt = await fetch(`${getApiUrl()}/api/ai-chat/ask`, {
+        const apiUrl = await getApiUrl();
+        const alt = await fetch(`${apiUrl}/api/ai-chat/ask`, {
           method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text })
         });
         const data = await alt.json().catch(() => ({}));
@@ -98,7 +100,8 @@ export default function AIChat() {
     // Try to clear backend chat history as well (best-effort, ignore errors)
     try {
       if (token) {
-        await fetch(`${getApiUrl()}/api/ai-chat/history`, {
+        const apiUrl = await getApiUrl();
+        await fetch(`${apiUrl}/api/ai-chat/history`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
