@@ -1,11 +1,11 @@
 {
-  "model": "meta-llama/llama-3.1-8b-instruct:free",
+  "model": "deepseek/deepseek-r1:free",
   "models": [
+    "deepseek/deepseek-r1:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "microsoft/phi-3.5-mini-instruct:free",
     "nousresearch/hermes-3-llama-3.1-8b:free",
-    "gryphe/mythomax-l2-13b:free",
-    "openai/gpt-oss-20b:free"
+    "gryphe/mythomax-l2-13b:free"
   ],
   "response": {
     "tone": "encouraging, expert but friendly",
