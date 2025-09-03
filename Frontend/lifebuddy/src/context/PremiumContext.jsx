@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 import { LockClosedIcon } from '@heroicons/react/24/outline';
+import { isAdmin, hasPremiumAccess, canAccessPremiumFeature, getUserAccessLevel } from '../utils/adminUtils';
 
 const PremiumContext = createContext();
 
@@ -127,6 +128,11 @@ export const PremiumProvider = ({ children }) => {
 
   // Check if user has a specific feature
   const hasFeature = (feature) => {
+    // Admin users have access to all features
+    if (isAdmin(user)) {
+      return true;
+    }
+    
     if (!subscription) return false;
     
     // Free users have limited access
@@ -144,17 +150,29 @@ export const PremiumProvider = ({ children }) => {
     return subscription.plan === 'monthly' || subscription.plan === 'yearly' || subscription.status === 'trial';
   };
 
-  // Derived flag for easy premium checks (monthly/yearly plan or active trial)
+  // Derived flag for easy premium checks (monthly/yearly plan or active trial or admin)
   const isPremium = !!(
-    subscription && (
-      subscription.plan === 'monthly' ||
-      subscription.plan === 'yearly' ||
-      subscription.status === 'trial'
+    isAdmin(user) || (
+      subscription && (
+        subscription.plan === 'monthly' ||
+        subscription.plan === 'yearly' ||
+        subscription.status === 'trial'
+      )
     )
   );
 
   // Check usage limits
   const checkUsageLimit = (limitType) => {
+    // Admin users have unlimited access
+    if (isAdmin(user)) {
+      return {
+        current: usage[limitType] || 0,
+        limit: Infinity,
+        percentage: 0,
+        isLimitReached: false
+      };
+    }
+
     const limits = {
       activeEvents: { free: 2, premium: Infinity },
       dailyTasks: { free: 10, premium: Infinity },
@@ -311,7 +329,12 @@ export const PremiumProvider = ({ children }) => {
     FeatureGate,
     fetchSubscriptionStatus,
     premiumBadge,
-    badgeGrantedAt
+    badgeGrantedAt,
+    // Admin utilities
+    isAdmin: () => isAdmin(user),
+    hasPremiumAccess: () => hasPremiumAccess(user, isPremium),
+    canAccessPremiumFeature: (feature) => canAccessPremiumFeature(user, isPremium, feature),
+    getUserAccessLevel: () => getUserAccessLevel(user, isPremium)
   };
 
   return (

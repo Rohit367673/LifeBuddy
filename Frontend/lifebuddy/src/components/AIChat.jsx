@@ -6,7 +6,7 @@ import { usePremium } from '../context/PremiumContext';
 
 export default function AIChat() {
   const { token, user } = useAuth();
-  const { subscription } = usePremium();
+  const { hasPremiumAccess } = usePremium();
   const [messages, setMessages] = useState(() => {
     try { return JSON.parse(localStorage.getItem('LB_CHAT_HISTORY') || '[]'); } catch (_) { return []; }
   });
@@ -23,7 +23,7 @@ export default function AIChat() {
   const dismissNotice = () => { try { localStorage.setItem('LB_CHAT_24H_NOTICE', 'dismissed'); } catch (_) {} setShowNotice(false); };
  
   const aiName = user?.aiAssistantName || 'LifeBuddy AI';
-  const isPremium = subscription?.plan && subscription.plan !== 'free' || subscription?.status === 'trial';
+  const isPremium = hasPremiumAccess();
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, sending]);
   useEffect(() => { try { localStorage.setItem('LB_CHAT_HISTORY', JSON.stringify(messages)); } catch (_) {} }, [messages]);

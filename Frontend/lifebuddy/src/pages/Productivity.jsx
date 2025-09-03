@@ -9,13 +9,7 @@ import { getApiUrl } from '../utils/config';
 
 export default function Productivity() {
   const { user, token } = useAuth();
-  const { isPremium, loading: premiumLoading } = usePremium();
-  const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || 'rohit367673@gmail.com';
-  const adminEmails = adminEmailsEnv
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
+  const { isPremium, loading: premiumLoading, hasPremiumAccess } = usePremium();
   const navigate = useNavigate();
   const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'lifebuddy_AI_bot';
 
@@ -189,8 +183,8 @@ export default function Productivity() {
           Let our AI create a personalized schedule for your tasks. We'll send the plan to your preferred messaging platform.
         </p>
       </header>
-      {/* Inline Upsell for all non-premium users */}
-      {!premiumLoading && !isPremium && (
+      {/* Inline Upsell for users without premium access (not premium and not admin) */}
+      {!premiumLoading && !hasPremiumAccess() && (
         <AISchedulingUpsell />
       )}
       {/* Main Form Section */}

@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { usePremium } from '../context/PremiumContext';
 import {
   HomeIcon,
   CalendarIcon,
@@ -28,7 +29,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Events', href: '/events', icon: CalendarIcon },
   { name: 'Daily Tools', href: '/daily-tools', icon: WrenchScrewdriverIcon },
-  { name: 'Productivity System', href: '/productivity', icon: SparklesIcon },
+  { name: 'Productivity System', href: '/productivity', icon: SparklesIcon, premium: true },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
@@ -52,6 +53,7 @@ const Sidebar = ({ open, onClose }) => {
   const location = useLocation();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
+  const { hasPremiumAccess } = usePremium();
 
   const isActive = (href) => {
     if (href === '/dashboard') {
@@ -112,37 +114,44 @@ const Sidebar = ({ open, onClose }) => {
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
                       <li>
                         <ul role="list" className="-mx-2 space-y-1">
-                          {navigation.map((item) => (
-                            <li key={item.name}>
-                              <Link
-                                to={item.href}
-                                className={`
-                                  group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors
-                                  ${isActive(item.href)
-                                    ? isDarkMode 
-                                      ? 'bg-blue-900/50 text-blue-400' 
-                                      : 'bg-blue-50 text-blue-600'
-                                    : isDarkMode
-                                      ? 'text-gray-300 hover:text-white hover:bg-gray-700'
-                                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                                  }
-                                `}
-                                onClick={onClose}
-                              >
-                                <item.icon
-                                  className={`h-6 w-6 shrink-0 ${
-                                    isActive(item.href) 
-                                      ? 'text-blue-600 dark:text-blue-400' 
+                          {navigation.map((item) => {
+                            const hasAccess = !item.premium || hasPremiumAccess();
+                            return (
+                              <li key={item.name}>
+                                <Link
+                                  to={item.href}
+                                  className={`
+                                    group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors relative
+                                    ${isActive(item.href)
+                                      ? isDarkMode 
+                                        ? 'bg-blue-900/50 text-blue-400' 
+                                        : 'bg-blue-50 text-blue-600'
                                       : isDarkMode
-                                        ? 'text-gray-400 group-hover:text-white'
-                                        : 'text-gray-400 group-hover:text-blue-600'
-                                  }`}
-                                  aria-hidden="true"
-                                />
-                                {item.name}
-                              </Link>
-                            </li>
-                          ))}
+                                        ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                                        : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                                    }
+                                    ${!hasAccess ? 'opacity-75' : ''}
+                                  `}
+                                  onClick={onClose}
+                                >
+                                  <item.icon
+                                    className={`h-6 w-6 shrink-0 ${
+                                      isActive(item.href) 
+                                        ? 'text-blue-600 dark:text-blue-400' 
+                                        : isDarkMode
+                                          ? 'text-gray-400 group-hover:text-white'
+                                          : 'text-gray-400 group-hover:text-blue-600'
+                                    }`}
+                                    aria-hidden="true"
+                                  />
+                                  {item.name}
+                                  {item.premium && !hasAccess && (
+                                    <StarIcon className="h-4 w-4 text-yellow-500 ml-auto" />
+                                  )}
+                                </Link>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </li>
                       
@@ -228,36 +237,43 @@ const Sidebar = ({ open, onClose }) => {
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
-                  {navigation.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        to={item.href}
-                        className={`
-                          group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors
-                          ${isActive(item.href)
-                            ? isDarkMode 
-                              ? 'bg-blue-900/50 text-blue-400' 
-                              : 'bg-blue-50 text-blue-600'
-                            : isDarkMode
-                              ? 'text-gray-300 hover:text-white hover:bg-gray-700'
-                              : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        <item.icon
-                          className={`h-6 w-6 shrink-0 ${
-                            isActive(item.href) 
-                              ? 'text-blue-600 dark:text-blue-400' 
+                  {navigation.map((item) => {
+                    const hasAccess = !item.premium || hasPremiumAccess();
+                    return (
+                      <li key={item.name}>
+                        <Link
+                          to={item.href}
+                          className={`
+                            group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors relative
+                            ${isActive(item.href)
+                              ? isDarkMode 
+                                ? 'bg-blue-900/50 text-blue-400' 
+                                : 'bg-blue-50 text-blue-600'
                               : isDarkMode
-                                ? 'text-gray-400 group-hover:text-white'
-                                : 'text-gray-400 group-hover:text-blue-600'
-                          }`}
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
+                                ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                                : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                            }
+                            ${!hasAccess ? 'opacity-75' : ''}
+                          `}
+                        >
+                          <item.icon
+                            className={`h-6 w-6 shrink-0 ${
+                              isActive(item.href) 
+                                ? 'text-blue-600 dark:text-blue-400' 
+                                : isDarkMode
+                                  ? 'text-gray-400 group-hover:text-white'
+                                  : 'text-gray-400 group-hover:text-blue-600'
+                            }`}
+                            aria-hidden="true"
+                          />
+                          {item.name}
+                          {item.premium && !hasAccess && (
+                            <StarIcon className="h-4 w-4 text-yellow-500 ml-auto" />
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </li>
               
