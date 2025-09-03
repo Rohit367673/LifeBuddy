@@ -125,7 +125,9 @@ async function generateMessageWithOpenRouter(prompt, maxTokens = 100, temperatur
       }
 
       const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content?.trim?.() || '';
+      const message = data?.choices?.[0]?.message;
+      // DeepSeek R1 puts response in 'reasoning' field, regular models use 'content'
+      const content = (message?.content?.trim?.() || message?.reasoning?.trim?.() || '');
       console.log(`[OpenRouter] Success with model: ${model} | chars: ${content.length}`);
       return content;
 
