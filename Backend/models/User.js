@@ -355,6 +355,24 @@ const userSchema = new mongoose.Schema({
     enum: ['whatsapp', 'telegram', 'email'],
     default: 'email'
   },
+  // Enhanced notification preferences for n8n integration
+  notificationPreferences: {
+    scheduleReminders: {
+      enabled: { type: Boolean, default: true },
+      platforms: [{ 
+        type: String, 
+        enum: ['email', 'whatsapp', 'telegram'],
+        default: ['email']
+      }],
+      time: { type: String, default: '09:00' },
+      timezone: { type: String, default: 'UTC' }
+    },
+    motivationalStyle: {
+      type: String,
+      enum: ['encouraging', 'direct', 'casual', 'professional'],
+      default: 'encouraging'
+    }
+  },
   telegramChatId: {
     type: String,
     default: null
@@ -364,6 +382,19 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: 50,
     default: ''
+  },
+  // WhatsApp phone number for notifications (international format)
+  whatsappNumber: {
+    type: String,
+    trim: true,
+    maxlength: 20,
+    default: '',
+    validate: {
+      validator: function(v) {
+        return !v || /^\+[1-9]\d{1,14}$/.test(v);
+      },
+      message: 'WhatsApp number must be in international format (+1234567890)'
+    }
   },
   // Personalized AI model (fine-tuned) per user
   fineTunedModel: {
