@@ -94,7 +94,8 @@ export default function Productivity() {
         contactInfo,
       };
 
-      const res = await fetch(`${getApiUrl()}/api/premium-tasks/setup`, {
+      const apiUrl = await getApiUrl();
+      const res = await fetch(`${apiUrl}/api/premium-tasks/setup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +120,8 @@ export default function Productivity() {
 
   const connectTelegram = async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/users/telegram/link-token`, {
+      const apiUrl = await getApiUrl();
+      const res = await fetch(`${apiUrl}/api/users/telegram/link-token`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error('Failed to get Telegram link token');
@@ -142,7 +144,8 @@ export default function Productivity() {
 
   const fetchTelegramChatId = async () => {
     try {
-      const res = await fetch(`${getApiUrl()}/api/users/profile`, {
+      const apiUrl = await getApiUrl();
+      const res = await fetch(`${apiUrl}/api/users/profile`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error('Failed to fetch profile');
