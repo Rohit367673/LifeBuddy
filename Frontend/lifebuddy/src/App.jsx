@@ -29,6 +29,7 @@ import AISchedulingUpsell from './components/AISchedulingUpsell';
 import AdManager from './components/AdManager';
 import PromoVideo from './components/PromoVideo';
 import BackendStatus from './components/BackendStatus';
+import DeviceConnection from './components/DeviceConnection';
 import { startHealthMonitoring } from './utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { daysSince } from './utils/dates';
@@ -96,6 +97,7 @@ function AppContent() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/connect-devices" element={<DeviceConnection />} />
           <Route path="/admin/coupons" element={<AdminCouponPanel />} />
         </Route>
         {/* Fallback */}
