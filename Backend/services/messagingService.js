@@ -12,17 +12,31 @@ const PLATFORMS = {
 // WhatsApp Business API Service
 class WhatsAppService {
   constructor() {
+    // Cloud API config
     this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     this.sandboxCode = process.env.WHATSAPP_SANDBOX_CODE || 'GBmQD7SB';
     this.baseUrl = 'https://graph.facebook.com/v18.0';
+
+    // Custom gateway config (e.g., WAHA or user bot)
+    this.customBaseUrl = process.env.CUSTOM_WHATSAPP_BASE_URL || '';
+    this.customEndpoint = process.env.CUSTOM_WHATSAPP_ENDPOINT || '/api/sendText';
+    this.customApiKey = process.env.CUSTOM_WHATSAPP_API_KEY || '';
+    this.customAuthHeader = process.env.CUSTOM_WHATSAPP_AUTH_HEADER || 'X-API-Key';
+    this.customSession = process.env.CUSTOM_WHATSAPP_SESSION || 'lifebuddy';
+    this.customMode = (process.env.CUSTOM_WHATSAPP_MODE || 'waha').toLowerCase(); // 'waha' | 'simple'
+    this.chatIdSuffix = process.env.CUSTOM_WHATSAPP_CHATID_SUFFIX || '@c.us';
   }
 
   async sendMessage(contactInfo, message) {
     try {
-      // For sandbox mode, we need to include the sandbox code
+      if (this.customBaseUrl) {
+        // Route through custom gateway
+        return await this.sendViaCustom(contactInfo, message);
+      }
+
+      // Default: WhatsApp Cloud API (with sandbox code if provided)
       const sandboxMessage = `${this.sandboxCode}\n\n${message}`;
-      
       const response = await fetch(`${this.baseUrl}/${this.phoneNumberId}/messages`, {
         method: 'POST',
         headers: {
@@ -33,24 +47,60 @@ class WhatsAppService {
           messaging_product: 'whatsapp',
           to: contactInfo,
           type: 'text',
-          text: {
-            body: sandboxMessage
-          }
+          text: { body: sandboxMessage }
         })
       });
 
       const result = await response.json();
-      
       if (result.error) {
         console.error('WhatsApp API error:', result.error);
         return { success: false, error: result.error };
       }
 
-      console.log(`✅ WhatsApp message sent to ${contactInfo}`);
+      console.log(`✅ WhatsApp (Cloud) message sent to ${contactInfo}`);
       return { success: true, messageId: result.messages?.[0]?.id };
     } catch (error) {
       console.error('WhatsApp service error:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  formatToChatId(phone) {
+    if (!phone) return '';
+    const digits = String(phone).replace(/[^0-9]/g, '');
+    return `${digits}${this.chatIdSuffix}`;
+  }
+
+  async sendViaCustom(contactInfo, message) {
+    try {
+      const url = `${this.customBaseUrl.replace(/\/$/, '')}${this.customEndpoint}`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.customApiKey) headers[this.customAuthHeader] = this.customApiKey;
+
+      let body;
+      if (this.customMode === 'waha') {
+        // WAHA-style API
+        body = {
+          session: this.customSession,
+          chatId: this.formatToChatId(contactInfo),
+          text: message
+        };
+      } else {
+        // Generic simple API: { to: '+911234...', text: '...' }
+        body = { to: contactInfo, text: message };
+      }
+
+      const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      const result = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        console.error('Custom WhatsApp gateway error:', result || resp.statusText);
+        return { success: false, error: result?.error || resp.statusText };
+      }
+      console.log(`✅ WhatsApp (Custom) message sent to ${contactInfo}`);
+      return { success: true, result };
+    } catch (err) {
+      console.error('Custom WhatsApp service error:', err);
+      return { success: false, error: err.message };
     }
   }
 

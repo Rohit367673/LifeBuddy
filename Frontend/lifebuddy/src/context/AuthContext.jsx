@@ -119,6 +119,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
+      // Persist token and user for reloads
+      try {
+        setAuthToken(data.token);
+        setUserData(data.user);
+      } catch (_) {}
       setToken(data.token);
       setUser(data.user);
       toast.success('Registration successful!');
@@ -204,6 +209,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
+      // Persist token and user for reloads
+      try {
+        setAuthToken(data.token);
+        setUserData(data.user);
+      } catch (_) {}
       setToken(data.token);
       setUser(data.user);
       toast.success('Login successful!');

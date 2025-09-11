@@ -1,0 +1,507 @@
+{
+  "meta": {
+    "instanceId": "a5c0b4b8b5f0b4b8b5f0b4b8b5f0b4b8"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:5001/api/device-connection/user/user123/devices",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "get-user-devices",
+      "name": "Get User Connected Devices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-devices",
+              "leftValue": "={{ $json.devices && $json.devices.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-devices",
+      "name": "Check If User Has Devices",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process connected devices and prepare notification data\nconst devices = $input.first().json.devices || [];\nconst notifications = [];\n\n// Daily content template\nconst dailyContent = `🌅 **Morning Routine (9:00 AM)**\n• Review daily goals and priorities\n• Check calendar and important tasks\n\n⚡ **Deep Work Session (10:00 AM - 12:00 PM)**\n• Focus on most important project\n• Eliminate distractions, use Pomodoro technique\n\n🍽️ **Lunch Break (12:00 PM - 1:30 PM)**\n• Healthy meal and short walk\n• Mental reset and recharge\n\n🎯 **Afternoon Tasks (1:30 PM - 5:00 PM)**\n• Handle emails and communications\n• Complete secondary priorities\n• Review progress and adjust plans\n\n🌆 **Evening Wind-down (6:00 PM onwards)**\n• Reflect on the day's achievements\n• Plan tomorrow's priorities\n• Personal time and relaxation`;\n\nconst scheduleId = `daily-schedule-${new Date().toISOString().split('T')[0]}`;\nconst title = 'Your Daily LifeBuddy Schedule';\nconst userName = 'Rohit';\n\n// Process each connected device\nfor (const device of devices) {\n  if (device.platform === 'telegram' && device.id) {\n    notifications.push({\n      platform: 'telegram',\n      chatId: device.id,\n      daily_content: dailyContent,\n      title: title,\n      scheduleId: scheduleId,\n      user_name: userName\n    });\n  }\n  \n  if (device.platform === 'whatsapp' && device.phoneNumber) {\n    notifications.push({\n      platform: 'whatsapp',\n      phoneNumber: device.phoneNumber,\n      daily_content: dailyContent,\n      title: title,\n      scheduleId: scheduleId,\n      user_name: userName\n    });\n  }\n}\n\n// Always send email notification\nnotifications.push({\n  platform: 'email',\n  email: 'rohit367673@gmail.com',\n  daily_content: dailyContent,\n  title: title,\n  scheduleId: scheduleId,\n  user_name: userName\n});\n\nreturn notifications.map(notification => ({ json: notification }));"
+      },
+      "id": "prepare-notifications",
+      "name": "Prepare Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-telegram",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "telegram",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-telegram",
+      "name": "Filter Telegram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-whatsapp",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "whatsapp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-whatsapp",
+      "name": "Filter WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-email",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "email",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-email",
+      "name": "Filter Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/telegram/send-reminder",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chatId",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "daily_content",
+              "value": "={{ $json.daily_content }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "scheduleId",
+              "value": "={{ $json.scheduleId }}"
+            },
+            {
+              "name": "user_name",
+              "value": "={{ $json.user_name }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send Telegram Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1340,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.phoneNumber }}@c.us"
+            },
+            {
+              "name": "text",
+              "value": "🚀 *{{ $json.title }}*\n\nGood morning, {{ $json.user_name }}! 🌅\n\n{{ $json.daily_content }}\n\n💪 **Today's Motivation:**\n\"Success is not final, failure is not fatal: it is the courage to continue that counts. Make today count with your LifeBuddy schedule!\"\n\n🔗 View Full Schedule: https://www.lifebuddy.space/schedule/{{ $json.scheduleId }}\n\nPowered by *LifeBuddy* - Your AI Productivity Partner 🤖"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-whatsapp",
+      "name": "Send WhatsApp Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/email/send-reminder",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $json.email }}"
+            },
+            {
+              "name": "daily_content",
+              "value": "={{ $json.daily_content }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "scheduleId",
+              "value": "={{ $json.scheduleId }}"
+            },
+            {
+              "name": "user_name",
+              "value": "={{ $json.user_name }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "📧 **Email Only Fallback**\n\n⚠️ No connected devices found for user.\nSending email reminder only.\n\n📅 **Date:** {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n📧 **Email:** rohit367673@gmail.com\n\n💡 **Tip:** User can connect devices at:\nhttps://www.lifebuddy.space/connect-devices\n\n---\n*LifeBuddy Notification System* 🤖",
+        "height": 80,
+        "width": 80
+      },
+      "id": "email-fallback-note",
+      "name": "Email Fallback Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        900,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/email/send-reminder",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "rohit367673@gmail.com"
+            },
+            {
+              "name": "daily_content",
+              "value": "🌅 **Morning Routine (9:00 AM)**\n• Review daily goals and priorities\n• Check calendar and important tasks\n\n⚡ **Deep Work Session (10:00 AM - 12:00 PM)**\n• Focus on most important project\n• Eliminate distractions, use Pomodoro technique\n\n🍽️ **Lunch Break (12:00 PM - 1:30 PM)**\n• Healthy meal and short walk\n• Mental reset and recharge\n\n🎯 **Afternoon Tasks (1:30 PM - 5:00 PM)**\n• Handle emails and communications\n• Complete secondary priorities\n• Review progress and adjust plans\n\n🌆 **Evening Wind-down (6:00 PM onwards)**\n• Reflect on the day's achievements\n• Plan tomorrow's priorities\n• Personal time and relaxation\n\n💡 **Connect your devices for multi-platform reminders:**\nhttps://www.lifebuddy.space/connect-devices"
+            },
+            {
+              "name": "title",
+              "value": "Your Daily LifeBuddy Schedule"
+            },
+            {
+              "name": "scheduleId",
+              "value": "daily-schedule-{{ $now.format('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "user_name",
+              "value": "Rohit"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "email-fallback",
+      "name": "Email Fallback Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1120,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get User Connected Devices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Connected Devices": {
+      "main": [
+        [
+          {
+            "node": "Check If User Has Devices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If User Has Devices": {
+      "main": [
+        [
+          {
+            "node": "Prepare Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Fallback Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Notifications": {
+      "main": [
+        [
+          {
+            "node": "Filter Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Telegram": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-09T12:12:47.000Z",
+  "versionId": "dynamic-devices-v1"
+}

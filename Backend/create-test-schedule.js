@@ -56,50 +56,58 @@ async function createTestSchedule() {
 
     const testSchedule = new Schedule({
       user: testUser._id,
+      user_email: testUser.email,
+      user_phone: testUser.phoneNumber || '',
+      user_telegram_id: testUser.telegramChatId || '',
       title: 'Daily Productivity Schedule',
-      description: 'AI-generated daily schedule for maximum productivity',
-      scheduleDate: scheduleDate,
-      duration: 1, // 1 day
-      reminderPlatforms: ['email', 'whatsapp', 'telegram'],
-      dailySchedules: [{
+      description: 'AI-generated schedule for maximum productivity',
+      schedule_date: new Date(new Date().setHours(0, 0, 0, 0)),
+      duration_days: 1,
+      reminder_platforms: ['email', 'whatsapp'],
+      daily_schedules: [{
         day: 1,
-        date: scheduleDate,
-        content: {
-          morning: [
-            { time: '06:00', task: 'Wake up and morning routine', duration: 30 },
-            { time: '06:30', task: 'Exercise and meditation', duration: 60 },
-            { time: '07:30', task: 'Healthy breakfast', duration: 30 }
-          ],
-          afternoon: [
-            { time: '12:00', task: 'Lunch break', duration: 60 },
-            { time: '13:00', task: 'Deep work session', duration: 120 },
-            { time: '15:00', task: 'Team meetings', duration: 90 }
-          ],
-          evening: [
-            { time: '18:00', task: 'Review daily progress', duration: 30 },
-            { time: '18:30', task: 'Personal development', duration: 60 },
-            { time: '19:30', task: 'Dinner and relaxation', duration: 90 }
-          ]
-        },
+        content: `🌅 **Morning Routine (9:00 AM)**
+• Review daily goals and priorities
+• Check calendar and important tasks
+
+⚡ **Deep Work Session 1 (10:00 AM - 12:00 PM)**  
+• Focus on most important project
+• Eliminate distractions, use Pomodoro technique
+
+🍽️ **Lunch Break (12:00 PM - 1:30 PM)**
+• Healthy meal and short walk
+• Mental reset and recharge
+
+⚡ **Deep Work Session 2 (1:30 PM - 3:30 PM)**
+• Continue important projects
+• Review progress and adjust priorities
+
+💬 **Communication Time (3:30 PM - 5:00 PM)**
+• Handle emails and messages
+• Team meetings and collaboration
+
+📋 **Daily Review (5:00 PM)**
+• Review accomplishments
+• Plan tomorrow's priorities
+• Celebrate progress made
+
+🔗 **View Full Schedule**: https://www.lifebuddy.space/schedule/{{scheduleId}}`,
+        tasks: [
+          'Morning Planning & Goal Setting',
+          'Deep Work Session 1', 
+          'Lunch Break',
+          'Deep Work Session 2',
+          'Communication & Meetings',
+          'Review & Planning'
+        ],
         completed: false
       }],
-      reminderStatus: {
-        email: { sent: false, sentAt: null },
-        whatsapp: { sent: false, sentAt: null },
-        telegram: { sent: false, sentAt: null }
-      },
-      aiMetadata: {
-        model: 'gpt-4',
-        prompt: 'Create a balanced daily schedule for maximum productivity',
-        generatedAt: new Date()
-      },
-      userPreferences: {
-        wakeUpTime: '06:00',
-        sleepTime: '22:00',
-        workStartTime: '09:00',
-        workEndTime: '17:00',
-        motivationalStyle: 'encouraging',
-        focusAreas: ['productivity', 'health', 'learning']
+      original_prompt: 'Create a balanced daily schedule for maximum productivity',
+      ai_model_used: 'openrouter',
+      preferences: {
+        reminder_time: '09:00',
+        timezone: 'UTC',
+        motivational_style: 'encouraging'
       }
     });
 

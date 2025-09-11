@@ -1,0 +1,193 @@
+{
+  "meta": {
+    "instanceId": "a5c0b4b8b5f0b4b8b5f0b4b8b5f0b4b8"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/email/send-reminder",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "rohit367673@gmail.com"
+            },
+            {
+              "name": "daily_content",
+              "value": "🌅 **Morning Routine (9:00 AM)**\n• Review daily goals and priorities\n• Check calendar and important tasks\n\n⚡ **Deep Work Session (10:00 AM - 12:00 PM)**\n• Focus on most important project\n• Eliminate distractions, use Pomodoro technique\n\n🍽️ **Lunch Break (12:00 PM - 1:30 PM)**\n• Healthy meal and short walk\n• Mental reset and recharge\n\n🎯 **Afternoon Tasks (1:30 PM - 5:00 PM)**\n• Handle emails and communications\n• Complete secondary priorities\n• Review progress and adjust plans\n\n🌆 **Evening Wind-down (6:00 PM onwards)**\n• Reflect on the day's achievements\n• Plan tomorrow's priorities\n• Personal time and relaxation"
+            },
+            {
+              "name": "title",
+              "value": "Your Daily LifeBuddy Schedule"
+            },
+            {
+              "name": "scheduleId",
+              "value": "daily-schedule-{{ $now.format('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "user_name",
+              "value": "Rohit"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "email-reminder",
+      "name": "Send Email Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-condition",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success",
+      "name": "Check Email Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "✅ **Daily Email Reminder Sent Successfully!**\n\n📧 **Recipient:** rohit367673@gmail.com\n📅 **Date:** {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n📝 **Subject:** {{ $('Send Email Reminder').item.json.subject }}\n🔗 **Schedule Link:** {{ $('Send Email Reminder').item.json.schedule_link }}\n\n🎯 **Status:** Email delivered successfully to your inbox!\n\n---\n*LifeBuddy Daily Reminder System* 🤖",
+        "height": 80,
+        "width": 80
+      },
+      "id": "success-note",
+      "name": "Success Log",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "❌ **Email Delivery Failed**\n\n📧 **Target:** rohit367673@gmail.com\n📅 **Date:** {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n⚠️ **Error:** {{ $('Send Email Reminder').item.json.error || 'Unknown error occurred' }}\n\n🔧 **Next Steps:**\n• Check backend logs\n• Verify email service status\n• Retry manually if needed\n\n---\n*LifeBuddy Error Tracking* 🚨",
+        "height": 80,
+        "width": 80
+      },
+      "id": "error-note",
+      "name": "Error Log",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        900,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Reminder": {
+      "main": [
+        [
+          {
+            "node": "Check Email Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Success": {
+      "main": [
+        [
+          {
+            "node": "Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-09T11:43:31.000Z",
+  "versionId": "email-only-v1"
+}

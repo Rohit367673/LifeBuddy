@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  waha:
+    image: devlikeapro/waha
+    container_name: lifebuddy-waha
+    ports:
+      - "3000:3000"
+    environment:
+      - WAHA_API_KEY=your-secret-key-321
+      - WAHA_PRINT_QR=true
+      - WAHA_LOG_LEVEL=info
+      - WAHA_SESSION_STORE_ENABLED=true
+    volumes:
+      - ./waha-sessions:/app/sessions
+    restart: unless-stopped
+    networks:
+      - waha-network
+
+networks:
+  waha-network:
+    driver: bridge

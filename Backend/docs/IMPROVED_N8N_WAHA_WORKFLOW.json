@@ -1,13 +1,15 @@
 {
-  "name": "LifeBuddy Schedule Reminder - Localhost Testing",
-  "active": true,
+  "meta": {
+    "instanceId": "53de6f74347b8cea93e8f89aeb7bd179cad26d01d6b3c3efb4a207e9539e8a07"
+  },
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 9
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
             }
           ]
         }
@@ -15,13 +17,15 @@
       "name": "Daily Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [280, 300],
-      "id": "84469f64-f847-41c0-9c47-8cf2e8e52d85"
+      "position": [
+        -1072,
+        384
+      ],
+      "id": "5465f0b2-10f3-4a89-afcc-23acf75252d1"
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "http://127.0.0.1:5001/api/n8n/schedules/today",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/schedules/today",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -46,18 +50,24 @@
       "name": "Get Today's Schedules",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 300],
-      "id": "e0d7598b-ad95-4d77-b183-dffab83542b2"
+      "position": [
+        -848,
+        384
+      ],
+      "id": "d1e17b58-3514-4607-87b3-bef3893d32be"
     },
     {
       "parameters": {
-        "jsCode": "// Check if we have schedules data\nconst inputData = $input.all();\nconst schedules = inputData[0]?.json;\n\nconsole.log('Received data:', JSON.stringify(schedules, null, 2));\n\n// Handle different response formats\nlet schedulesArray = [];\n\nif (Array.isArray(schedules)) {\n  schedulesArray = schedules;\n} else if (schedules && typeof schedules === 'object') {\n  // If it's an object, check for common array properties\n  if (schedules.data && Array.isArray(schedules.data)) {\n    schedulesArray = schedules.data;\n  } else if (schedules.schedules && Array.isArray(schedules.schedules)) {\n    schedulesArray = schedules.schedules;\n  } else {\n    // Single schedule object\n    schedulesArray = [schedules];\n  }\n}\n\nconsole.log('Processed schedules array:', schedulesArray.length, 'items');\n\n// Return the schedules for further processing\nreturn schedulesArray.map(schedule => ({ json: schedule }));"
+        "jsCode": "const inputData = $input.all();\nconst schedules = inputData[0]?.json;\n\nlet schedulesArray = [];\nif (Array.isArray(schedules)) {\n  schedulesArray = schedules;\n} else if (schedules && typeof schedules === 'object') {\n  if (schedules.data && Array.isArray(schedules.data)) {\n    schedulesArray = schedules.data;\n  } else if (schedules.schedules && Array.isArray(schedules.schedules)) {\n    schedulesArray = schedules.schedules;\n  } else {\n    schedulesArray = [schedules];\n  }\n}\n\nconsole.log('📋 Processing schedules:', schedulesArray.length);\nreturn schedulesArray.map(schedule => ({ json: schedule }));"
       },
       "name": "Process API Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300],
-      "id": "response-processor"
+      "position": [
+        -624,
+        384
+      ],
+      "id": "1826213c-4cd8-4356-a320-affe8db53653"
     },
     {
       "parameters": {
@@ -78,23 +88,30 @@
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "name": "Check If Schedules Exist",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [940, 300],
-      "id": "79735501-2ada-456e-a3a5-ccebc52c21d6"
+      "position": [
+        -400,
+        384
+      ],
+      "id": "fda34930-ad6a-4637-baa0-53cf9ba1ce2b"
     },
     {
       "parameters": {
-        "jsCode": "// Process each schedule and prepare reminder data\nconst schedules = $input.all();\nconst reminders = [];\n\nfor (const schedule of schedules) {\n  const scheduleData = schedule.json;\n  \n  console.log('Processing schedule:', JSON.stringify(scheduleData, null, 2));\n  \n  // Generate motivational message\n  const motivationalMessages = [\n    '🌟 Time to make today amazing! Your scheduled activity awaits.',\n    '💪 You\\'ve got this! Let\\'s tackle your planned task.',\n    '🎯 Focus on your goal - every step counts!',\n    '⭐ Today is the perfect day to achieve your dreams!',\n    '🚀 Ready to make progress? Your schedule is calling!'\n  ];\n  \n  const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];\n  \n  // Prepare reminder data for each platform\n  const platforms = scheduleData.reminder_platforms || scheduleData.reminderPlatforms || ['email'];\n  \n  platforms.forEach(platform => {\n    const reminderData = {\n      user_id: scheduleData.user_id || scheduleData.user,\n      schedule_id: scheduleData._id || scheduleData.id,\n      schedule_title: scheduleData.title || 'Daily Schedule',\n      schedule_description: scheduleData.description || 'Your scheduled activity',\n      schedule_time: scheduleData.schedule_time || scheduleData.scheduleDate || new Date().toISOString(),\n      platform: platform,\n      user_email: scheduleData.user_email || 'rohit367673@gmail.com',\n      user_phone: scheduleData.user_phone || scheduleData.whatsappNumber || '+918988140922',\n      user_telegram_id: scheduleData.user_telegram_id || scheduleData.telegramChatId || '123456789',\n      motivational_message: randomMessage,\n      full_message: `${randomMessage}\\n\\n📅 Schedule: ${scheduleData.title || 'Daily Schedule'}\\n⏰ Time: ${scheduleData.schedule_time || 'Today'}\\n📝 Details: ${scheduleData.description || 'Your scheduled activity'}\\n\\nHave a productive day! 🎉`\n    };\n    \n    console.log('Created reminder for platform:', platform, reminderData);\n    reminders.push(reminderData);\n  });\n}\n\nconsole.log('Total reminders created:', reminders.length);\nreturn reminders.map(reminder => ({ json: reminder }));"
+        "jsCode": "const schedules = $input.all();\nconst processedSchedules = [];\n\nfor (const item of schedules) {\n  const schedule = item.json;\n  \n  // Process each schedule for reminders\n  const processedSchedule = {\n    _id: schedule._id,\n    user_id: schedule.user_id,\n    user_email: schedule.user_email,\n    user_phone: schedule.user_phone,\n    user_telegram_id: schedule.user_telegram_id,\n    title: schedule.title,\n    daily_content: schedule.daily_content,\n    reminder_platforms: schedule.reminder_platforms || ['email'],\n    scheduleId: schedule._id,\n    user_name: schedule.user_name || 'there',\n    // Format phone number for WhatsApp (ensure it has country code)\n    whatsapp_chat_id: schedule.user_phone ? (schedule.user_phone.startsWith('+') ? schedule.user_phone.substring(1) : schedule.user_phone) + '@c.us' : null\n  };\n  \n  console.log('📱 Processing user:', processedSchedule.user_name, 'Platforms:', processedSchedule.reminder_platforms);\n  processedSchedules.push({ json: processedSchedule });\n}\n\nreturn processedSchedules;"
       },
       "name": "Process Schedules",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1160, 240],
-      "id": "26594c2e-2e47-41dd-be45-ec3cb57640bb"
+      "position": [
+        -192,
+        384
+      ],
+      "id": "88c81bfc-3a36-4bcb-9065-76a45a870cde"
     },
     {
       "parameters": {
@@ -102,26 +119,30 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.platform }}",
-              "rightValue": "email",
+              "leftValue": "={{ $json.reminder_platforms && $json.reminder_platforms.includes('email') }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
+                "type": "boolean",
                 "operation": "equals"
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "name": "Check Email Platform",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1380, 140],
-      "id": "97457aba-27e9-44a1-a05a-c25f297d2ca9"
+      "position": [
+        48,
+        224
+      ],
+      "id": "79e5bb66-2e00-4a20-b1e0-cfea7e30a214"
     },
     {
       "parameters": {
@@ -129,26 +150,30 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.platform }}",
-              "rightValue": "whatsapp",
+              "leftValue": "={{ $json.reminder_platforms && $json.reminder_platforms.includes('whatsapp') && $json.user_phone }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
+                "type": "boolean",
                 "operation": "equals"
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "name": "Check WhatsApp Platform",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1380, 300],
-      "id": "1e22bc3f-b2a9-48ae-8c6e-afddeae88a13"
+      "position": [
+        48,
+        384
+      ],
+      "id": "38c9c675-077b-42ee-a952-63264fcbf00e"
     },
     {
       "parameters": {
@@ -156,31 +181,35 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.platform }}",
-              "rightValue": "telegram",
+              "leftValue": "={{ $json.reminder_platforms && $json.reminder_platforms.includes('telegram') && $json.user_telegram_id }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
+                "type": "boolean",
                 "operation": "equals"
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "name": "Check Telegram Platform",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1380, 460],
-      "id": "ffeb0497-1069-4f93-9878-db69c3898325"
+      "position": [
+        48,
+        544
+      ],
+      "id": "a00beaa7-94ff-4bf6-a2e8-62f520c9e9c9"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:5001/api/n8n/email/send-reminder",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/email/send-reminder",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -195,8 +224,8 @@
           ]
         },
         "sendBody": true,
-        "bodyContentType": "json",
-        "jsonBody": "{\n  \"to\": \"{{ $json.user_email }}\",\n  \"subject\": \"📅 Your LifeBuddy Schedule: {{ $json.schedule_title }}\",\n  \"message\": \"{{ $json.full_message }}\",\n  \"scheduleId\": \"{{ $json.schedule_id }}\"\n}",
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"to\": $json.user_email,\n  \"daily_content\": $json.daily_content,\n  \"title\": $json.title,\n  \"scheduleId\": $json.scheduleId,\n  \"user_name\": $json.user_name\n} }}",
         "options": {
           "response": {
             "response": {
@@ -208,19 +237,22 @@
       "name": "Send Email Reminder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 80],
-      "id": "a34ce161-9a05-4d80-b41c-8bc036960099"
+      "position": [
+        256,
+        160
+      ],
+      "id": "01fb1eca-68ef-461c-a897-714321a94990"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:5001/api/n8n/whatsapp/send-reminder",
+        "url": "http://localhost:3000/api/sendText",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "x-api-key",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
+              "name": "X-API-Key",
+              "value": "your-secret-key-321"
             },
             {
               "name": "Content-Type",
@@ -229,8 +261,8 @@
           ]
         },
         "sendBody": true,
-        "bodyContentType": "json",
-        "jsonBody": "{\n  \"to\": \"{{ $json.user_phone }}\",\n  \"message\": \"{{ $json.full_message }}\",\n  \"scheduleId\": \"{{ $json.schedule_id }}\"\n}",
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"session\": \"lifebuddy\",\n  \"chatId\": $json.whatsapp_chat_id,\n  \"text\": \"🚀 *LifeBuddy Daily Schedule*\\n\\nGood morning, \" + $json.user_name + \"! 🌅\\n\\n*\" + $json.title + \"*\\n\\n\" + $json.daily_content + \"\\n\\n💪 *Today's Motivation:*\\n_\\\"Success is not final, failure is not fatal: it is the courage to continue that counts. Make today count with your LifeBuddy schedule!\\\"_\\n\\n🔗 View Full Schedule: https://www.lifebuddy.space/schedule/\" + $json._id + \"\\n\\nPowered by *LifeBuddy* - Your AI Productivity Partner 🤖\"\n} }}",
         "options": {
           "response": {
             "response": {
@@ -239,16 +271,19 @@
           }
         }
       },
-      "name": "Send WhatsApp Reminder",
+      "name": "Send WhatsApp via WAHA HTTP",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 240],
-      "id": "3f3f34c3-923f-4bdb-b46f-d4623ac80b79"
+      "position": [
+        256,
+        320
+      ],
+      "id": "0caee469-fed6-430e-9bb9-3b481c00d200"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:5001/api/n8n/telegram/send-reminder",
+        "url": "https://lifebuddy-backend-production.up.railway.app/api/n8n/telegram/send-reminder",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -263,8 +298,8 @@
           ]
         },
         "sendBody": true,
-        "bodyContentType": "json",
-        "jsonBody": "{\n  \"chatId\": \"{{ $json.user_telegram_id }}\",\n  \"message\": \"{{ $json.full_message }}\",\n  \"scheduleId\": \"{{ $json.schedule_id }}\"\n}",
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"chatId\": $json.user_telegram_id,\n  \"daily_content\": $json.daily_content,\n  \"title\": $json.title,\n  \"scheduleId\": $json.scheduleId,\n  \"user_name\": $json.user_name\n} }}",
         "options": {
           "response": {
             "response": {
@@ -276,52 +311,24 @@
       "name": "Send Telegram Reminder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 400],
-      "id": "dc241cea-78bb-4f46-b361-2f5504f6821f"
+      "position": [
+        256,
+        480
+      ],
+      "id": "7cdbdf87-0e8c-4a43-844d-1d8aa2c19c02"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://127.0.0.1:5001/api/n8n/schedules/mark-sent",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "bodyContentType": "json",
-        "jsonBody": "{\n  \"scheduleId\": \"{{ $json.schedule_id }}\",\n  \"platform\": \"{{ $json.platform }}\"\n}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        }
-      },
-      "name": "Mark Reminder Sent",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1820, 300],
-      "id": "update_reminder_sent"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Log completion\nconsole.log('Workflow completed successfully');\nreturn [{ json: { success: true, timestamp: new Date().toISOString() } }];"
+        "jsCode": "const results = $input.all();\nconst successCount = results.length;\n\nconsole.log('✅ LifeBuddy Daily Reminders Completed Successfully!');\nconsole.log('Messages sent:', successCount);\nconsole.log('Timestamp:', new Date().toISOString());\n\n// Log individual results\nresults.forEach((result, index) => {\n  console.log(`Message ${index + 1}:`, result.json);\n});\n\nreturn [{ json: { \n  status: 'completed',\n  messages_sent: successCount,\n  timestamp: new Date().toISOString(),\n  message: 'LifeBuddy daily reminders sent successfully',\n  details: results.map(r => r.json)\n}}];"
       },
       "name": "Log Completion",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2040, 300],
-      "id": "log-completion"
+      "position": [
+        480,
+        384
+      ],
+      "id": "2528f78e-c36f-4e06-83d6-2636c346fa9f"
     }
   ],
   "connections": {
@@ -405,7 +412,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Reminder",
+            "node": "Send WhatsApp via WAHA HTTP",
             "type": "main",
             "index": 0
           }
@@ -427,18 +434,18 @@
       "main": [
         [
           {
-            "node": "Mark Reminder Sent",
+            "node": "Log Completion",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send WhatsApp Reminder": {
+    "Send WhatsApp via WAHA HTTP": {
       "main": [
         [
           {
-            "node": "Mark Reminder Sent",
+            "node": "Log Completion",
             "type": "main",
             "index": 0
           }
@@ -446,17 +453,6 @@
       ]
     },
     "Send Telegram Reminder": {
-      "main": [
-        [
-          {
-            "node": "Mark Reminder Sent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mark Reminder Sent": {
       "main": [
         [
           {
@@ -468,18 +464,5 @@
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": {},
-  "tags": [
-    "lifebuddy",
-    "schedule",
-    "automation",
-    "reminders",
-    "localhost"
-  ],
-  "triggerCount": 1,
-  "updatedAt": "2025-09-09T03:38:00.000Z",
-  "versionId": "4"
+  "pinData": {}
 }

@@ -16,6 +16,8 @@ export default function Productivity() {
   // Step management
   const [currentStep, setCurrentStep] = useState(1);
   const [taskTitle, setTaskTitle] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [creationProgress, setCreationProgress] = useState('');
   const [formData, setFormData] = useState({
     startDate: '',
     endDate: '',
@@ -81,6 +83,11 @@ export default function Productivity() {
   };
 
   const handleSubmit = async () => {
+    if (isCreating) return;
+    
+    setIsCreating(true);
+    setCreationProgress('🤖 Initializing AI schedule generator...');
+    
     try {
       const contactInfo = buildContactInfo();
       const payload = {
@@ -93,6 +100,17 @@ export default function Productivity() {
         notificationPlatform: formData.notificationPlatform,
         contactInfo,
       };
+
+      setCreationProgress('🧠 AI is analyzing your requirements...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setCreationProgress('📅 Generating personalized daily tasks...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setCreationProgress('⚡ Optimizing schedule for maximum productivity...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCreationProgress('💾 Saving your AI-powered schedule...');
 
       const apiUrl = await getApiUrl();
       const res = await fetch(`${apiUrl}/api/premium-tasks/setup`, {
@@ -108,13 +126,25 @@ export default function Productivity() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || 'Failed to create schedule');
       }
+      
       const data = await res.json();
       console.log('Schedule created:', data);
-      alert('Schedule created successfully! We will send your plan to your selected platform.');
-      navigate('/my-schedule');
+      
+      setCreationProgress('✅ Schedule created successfully!');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCreationProgress(`📱 Sending your first task to ${formData.notificationPlatform}...`);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      alert('🎉 Your AI schedule is ready! Check your selected platform for today\'s task.');
+      navigate('/my-schedule?t=' + Date.now());
     } catch (error) {
       console.error('Error submitting form:', error);
+      setCreationProgress('');
       alert(error.message || 'Failed to create schedule. Please try again.');
+    } finally {
+      setIsCreating(false);
+      setCreationProgress('');
     }
   };
 
@@ -492,10 +522,17 @@ export default function Productivity() {
                     </button>
                     <button
                       onClick={handleSubmit}
-                      disabled={!canSubmit()}
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                      disabled={!canSubmit() || isCreating}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:cursor-not-allowed flex items-center justify-center gap-3"
                     >
-                      Create Schedule
+                      {isCreating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Creating...</span>
+                        </>
+                      ) : (
+                        'Create Schedule'
+                      )}
                     </button>
                   </div>
                   <div className="sm:hidden fixed bottom-0 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur border-t border-slate-200 flex gap-3">
@@ -507,10 +544,17 @@ export default function Productivity() {
                     </button>
                     <button
                       onClick={handleSubmit}
-                      disabled={!canSubmit()}
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:cursor-not-allowed"
+                      disabled={!canSubmit() || isCreating}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      Create Schedule
+                      {isCreating ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Creating...</span>
+                        </>
+                      ) : (
+                        'Create Schedule'
+                      )}
                     </button>
                   </div>
                 </div>
@@ -573,6 +617,22 @@ export default function Productivity() {
           </div>
         </div>
       </section>
+
+      {/* Loading Overlay */}
+      {isCreating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+            <div className="mb-6">
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-500 mx-auto mb-4"></div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Creating Your AI Schedule</h3>
+              <p className="text-slate-600">{creationProgress}</p>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-1000 animate-pulse" style={{ width: '75%' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}

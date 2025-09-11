@@ -64,6 +64,7 @@ const pricingRoutes = require('./routes/pricingRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
 const n8nRoutes = require('./routes/n8nRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
+const deviceConnectionRoutes = require('./routes/deviceConnection');
 const Activity = require('./models/Activity');
 const ReferralCode = require('./models/ReferralCode');
 const ReferralHit = require('./models/ReferralHit');
@@ -113,7 +114,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
-  allowedHeaders: ['Authorization','Content-Type','X-Requested-With','Accept','Origin']
+  allowedHeaders: ['Authorization','Content-Type','X-Requested-With','Accept','Origin','Cache-Control','Pragma','Expires','If-Modified-Since','If-None-Match']
 };
 
 app.use(cors(corsOptions));
@@ -145,6 +146,10 @@ app.use((req, res, next) => {
 // Performance monitoring middleware
 const performanceMonitor = require('./scripts/monitorPerformance');
 app.use(performanceMonitor.trackRequest.bind(performanceMonitor));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging
 app.use(morgan('combined', {
@@ -277,6 +282,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/lifebuddy
   // n8n and schedule routes (must be before catch-all)
   app.use('/api/n8n', n8nRoutes);
   app.use('/api/schedule', scheduleRoutes);
+  app.use('/api/device-connection', deviceConnectionRoutes);
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {
