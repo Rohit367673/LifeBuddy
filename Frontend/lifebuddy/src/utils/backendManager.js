@@ -31,12 +31,33 @@ class BackendManager {
     this.currentBackend = null;
     this.fallbackHistory = [];
     this.healthCheckInterval = null;
+    // Try to restore persisted backend selection
+    try {
+      const savedUrl = typeof window !== 'undefined' ? window.localStorage.getItem('LB_BACKEND_URL') : null;
+      const savedName = typeof window !== 'undefined' ? window.localStorage.getItem('LB_BACKEND_NAME') : null;
+      if (savedUrl && savedName) {
+        this.currentBackend = { url: savedUrl, name: savedName, isHealthy: false };
+      }
+    } catch (_) {}
   }
 
   // Get the best available backend
   async getBestBackend() {
     if (this.currentBackend && this.currentBackend.isHealthy) {
       return this.currentBackend;
+    }
+
+    // First, try previously persisted backend if present
+    if (this.currentBackend && this.currentBackend.url) {
+      try {
+        const ok = await this.healthCheck(this.currentBackend.url);
+        if (ok) {
+          this.currentBackend.isHealthy = true;
+          this.persistCurrentBackend();
+          console.log(`✅ Using persisted backend: ${this.currentBackend.name || this.currentBackend.url}`);
+          return this.currentBackend;
+        }
+      } catch (_) {}
     }
 
     // Try backends in priority order
@@ -47,6 +68,7 @@ class BackendManager {
         const isHealthy = await this.healthCheck(backend.url);
         if (isHealthy) {
           this.currentBackend = { ...backend, isHealthy: true };
+          this.persistCurrentBackend();
           console.log(`✅ Backend switched to: ${backend.name} (${backend.url})`);
           return this.currentBackend;
         }
@@ -113,6 +135,8 @@ class BackendManager {
         if (!isHealthy) {
           console.log(`🔄 Backend ${this.currentBackend.name} became unhealthy, switching...`);
           this.currentBackend.isHealthy = false;
+          // Clear persisted selection so we can switch cleanly
+          this.clearPersistedBackend();
           this.fallbackHistory.push({
             timestamp: new Date().toISOString(),
             backend: this.currentBackend.name,
@@ -137,6 +161,26 @@ class BackendManager {
       this.healthCheckInterval = null;
       console.log('🛑 Health monitoring stopped');
     }
+  }
+
+  // Persist the current backend choice across reloads
+  persistCurrentBackend() {
+    try {
+      if (typeof window !== 'undefined' && this.currentBackend) {
+        window.localStorage.setItem('LB_BACKEND_URL', this.currentBackend.url);
+        window.localStorage.setItem('LB_BACKEND_NAME', this.currentBackend.name || '');
+      }
+    } catch (_) {}
+  }
+
+  // Clear persisted backend selection
+  clearPersistedBackend() {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('LB_BACKEND_URL');
+        window.localStorage.removeItem('LB_BACKEND_NAME');
+      }
+    } catch (_) {}
   }
 
   // Force switch to specific backend

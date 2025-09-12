@@ -74,6 +74,134 @@ export default function AIChat() {
     }
   };
 
+  // ==========================================
+  // Pretty formatting for AI responses
+  // - Handles Topic: ..., numbered/dash bullets, headings ###, and code fences
+  // ==========================================
+  const extractAiFormatting = (text = '') => {
+    const out = { topic: '', bullets: [], paragraphs: [], teaser: '' };
+    if (!text || typeof text !== 'string') return out;
+    let t = text
+      .replace(/\*\*/g, '')
+      .replace(/\s+\n/g, '\n')
+      // normalize bullet characters to dashes for easier parsing
+      .replace(/^\s*[•–—]\s+/gm, '- ')
+      .trim();
+    const topicMatch = t.match(/(?:Today[’']s\s+topic|Topic)\s*:\s*(.+?)(?:\n|\.|$)/i);
+    if (topicMatch) out.topic = topicMatch[1].replace(/\s*🚀$/, '').trim();
+    const itemRegex = /(\d{1,2})\.\s+([^]+?)(?=(?:\s+\d{1,2}\.\s+)|$)/g;
+    const bullets = [];
+    let m;
+    while ((m = itemRegex.exec(t)) !== null) bullets.push(m[2].trim());
+    if (!bullets.length) {
+      // try dash bullets
+      const lines = t.split(/\r?\n/).map(s=>s.trim());
+      const dashed = lines.filter(l => /^[-*•]\s+/.test(l)).map(l => l.replace(/^[-*•]\s+/, ''));
+      if (dashed.length) bullets.push(...dashed);
+    }
+    out.bullets = bullets;
+    const teaserMatch = t.match(/(Mini[- ]?project[^:]*:|Teaser:|By the end[^:]*:?)\s*([^]+?)(?:$|\n)/i);
+    if (teaserMatch) out.teaser = teaserMatch[2].trim();
+    const stripped = t.replace(itemRegex, '').replace(/(?:Today[’']s\s+topic|Topic)\s*:.+?(?:\n|\.|$)/i, '').trim();
+    if (stripped) {
+      out.paragraphs = stripped.split(/\n+|(?<=[.!?])\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
+    }
+    return out;
+  };
+
+  const renderInlineBlocks = (raw = '') => {
+    const lines = String(raw || '').split(/\r?\n/);
+    const nodes = [];
+    let key = 0, para = [], listType = null, listItems = [];
+    const renderInlineCodeSegments = (s = '') => {
+      const parts = String(s).split(/`([^`]+)`/g);
+      return (
+        <>
+          {parts.map((part, i) => (
+            i % 2 === 1
+              ? <code key={i} className="px-1 py-0.5 rounded bg-slate-100 text-slate-800">{part}</code>
+              : <span key={i}>{part}</span>
+          ))}
+        </>
+      );
+    };
+    const flushPara = () => { if (para.length) { nodes.push(<p key={`p-${key++}`} className="mt-1 break-words">{renderInlineCodeSegments(para.join(' '))}</p>); para = []; } };
+    const flushList = () => {
+      if (!listItems.length) return;
+      if (listType === 'ul') nodes.push(<ul key={`ul-${key++}`} className="list-disc pl-5 space-y-1 text-slate-700 break-words">{listItems.map((it,i)=>(<li key={i} className="leading-relaxed">{renderInlineCodeSegments(it)}</li>))}</ul>);
+      if (listType === 'ol') nodes.push(<ol key={`ol-${key++}`} className="list-decimal pl-5 space-y-1 text-slate-700 break-words">{listItems.map((it,i)=>(<li key={i} className="leading-relaxed">{renderInlineCodeSegments(it)}</li>))}</ol>);
+      listType = null; listItems = [];
+    };
+    for (const l of lines) {
+      const line = l.trim();
+      if (!line) { flushPara(); flushList(); continue; }
+      const h3 = line.match(/^###\s+(.+)/); const h4 = line.match(/^####\s+(.+)/);
+      const ul = line.match(/^[-*•]\s+(.+)/); const ol = line.match(/^(\d{1,2})\.\s+(.+)/);
+      const isCodeLike = /<\/?[a-zA-Z][^>]*>/.test(line) || /^(const|let|var|function|class)\b/.test(line);
+      if (isCodeLike) { flushPara(); flushList(); nodes.push(<pre key={`code-${key++}`} className="mt-2 rounded-lg bg-slate-900 text-slate-100 p-3 overflow-auto text-xs max-w-full"><code>{line}</code></pre>); continue; }
+      if (h3) { flushPara(); flushList(); nodes.push(<div key={`h3-${key++}`} className="font-semibold text-slate-900 mt-2">{h3[1]}</div>); continue; }
+      if (h4) { flushPara(); flushList(); nodes.push(<div key={`h4-${key++}`} className="font-semibold text-slate-800 mt-1">{h4[1]}</div>); continue; }
+      if (ul) { flushPara(); if (listType && listType !== 'ul') flushList(); listType = 'ul'; listItems.push(ul[1]); continue; }
+      if (ol) { flushPara(); if (listType && listType !== 'ol') flushList(); listType = 'ol'; listItems.push(ol[2]); continue; }
+      if (listType) flushList();
+      para.push(line);
+    }
+    flushPara(); flushList();
+    return nodes;
+  };
+
+  const renderTextWithCode = (raw = '') => {
+    const text = String(raw || '');
+    const parts = [];
+    const re = /```(\w+)?\n([\s\S]*?)```/g;
+    let last = 0; let m;
+    while ((m = re.exec(text)) !== null) {
+      const before = text.slice(last, m.index).trim();
+      if (before) parts.push(...renderInlineBlocks(before));
+      const code = m[2];
+      parts.push(<pre key={`c-${m.index}`} className="mt-2 rounded-lg bg-slate-900 text-slate-100 p-3 overflow-auto text-xs max-w-full"><code>{code}</code></pre>);
+      last = re.lastIndex;
+    }
+    const after = text.slice(last).trim();
+    if (after) parts.push(...renderInlineBlocks(after));
+    return <>{parts}</>;
+  };
+
+  const AiFormattedBlock = ({ text }) => {
+    const { topic, bullets, teaser, paragraphs } = extractAiFormatting(text);
+    return (
+      <div className="space-y-3 break-words">
+        {topic && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">Topic</span>
+            <span className="font-semibold text-slate-900">{topic}</span>
+          </div>
+        )}
+        {bullets.length > 0 && (
+          <ul className="list-disc pl-5 space-y-2 text-slate-700 break-words">
+            {bullets.map((b,i) => {
+              const [head, ...rest] = b.split(':');
+              const body = rest.join(':').trim();
+              return (
+                <li key={i} className="leading-relaxed">
+                  <div className="font-medium text-slate-900">{head}{body ? ':' : ''}</div>
+                  {body && (<div className="text-sm break-words">{renderTextWithCode(body)}</div>)}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {teaser && (<div className="text-sm bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-3 text-slate-700 break-words">{teaser}</div>)}
+        {paragraphs.length > 0 && (
+          <div className="space-y-2 text-slate-700 text-sm break-words">{paragraphs.map((p,i)=>(<div key={i}>{renderTextWithCode(p)}</div>))}</div>
+        )}
+        {!topic && bullets.length === 0 && paragraphs.length === 0 && (
+          <div className="text-slate-700 text-sm whitespace-pre-wrap break-words">{renderTextWithCode(text)}</div>
+        )}
+      </div>
+    );
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     const text = input.trim();
@@ -242,7 +370,9 @@ export default function AIChat() {
                     <span className="text-xs font-medium text-slate-600">{aiName}</span>
                   </div>
                 )}
-                <div className="whitespace-pre-wrap text-[15px] leading-7 font-medium">{m.content}</div>
+                <div className="text-[15px] leading-7">
+                  {m.role === 'assistant' ? <AiFormattedBlock text={m.content} /> : <div className="whitespace-pre-wrap font-medium">{m.content}</div>}
+                </div>
                 <div className={`mt-3 text-[11px] ${m.role === 'user' ? 'text-white/70' : 'text-slate-500'}`}>
                   {new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>

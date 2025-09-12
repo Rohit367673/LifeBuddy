@@ -5,6 +5,13 @@ const subtaskSchema = new mongoose.Schema({
   subtask: { type: String, required: true },
   status: { type: String, enum: ['pending', 'completed', 'skipped'], default: 'pending' },
   motivationTip: { type: String },
+  // Rich learning fields
+  dayTitle: { type: String },
+  keyPoints: [{ type: String }],
+  example: { type: String },
+  tips: { type: String },
+  duration: { type: String },
+  motivation: { type: String },
   resources: [{ type: String }], // Learning resources and links
   exercises: [{ type: String }], // Practical exercises and tasks
   notes: { type: String }, // Additional learning notes

@@ -65,6 +65,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'WhatsApp Simulator' });
 });
 
+// WAHA diagnostics compatibility
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', service: 'WhatsApp Simulator (api alias)' });
+});
+
+// List sessions (very simple mock)
+app.get('/api/sessions', (req, res) => {
+  const list = Object.entries(sessions).map(([name, s]) => ({ name, status: s.status || 'READY' }));
+  res.json(list);
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 WhatsApp Simulator running on http://localhost:${PORT}`);
   console.log('📱 This simulates WAHA for testing purposes');

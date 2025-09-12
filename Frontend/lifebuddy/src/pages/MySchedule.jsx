@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
-import { CheckCircleIcon, ClockIcon, CalendarIcon, SparklesIcon, XCircleIcon, BellIcon, PlayCircleIcon, LinkIcon } from '@heroicons/react/24/outline';
-import { Sidebar } from '../components/figma/Sidebar';
+import { CheckCircleIcon, ClockIcon, CalendarIcon, SparklesIcon, XCircleIcon, BellIcon, PlayCircleIcon, LinkIcon, ChatBubbleOvalLeftIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import { getApiUrl } from '../utils/config';
 
 export default function MySchedule() {
@@ -12,7 +11,20 @@ export default function MySchedule() {
   const [message, setMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [notificationPlatform, setNotificationPlatform] = useState('');
+  const [showFullOverview, setShowFullOverview] = useState(false);
+  const [videoBlacklist, setVideoBlacklist] = useState({});
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [quizAnswer, setQuizAnswer] = useState('');
+  const [quizChecked, setQuizChecked] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // overview | concepts | example | videos | sources | practice
+  // Lesson AI Chat state
+  const [chatInput, setChatInput] = useState('');
+  const [chatMsgs, setChatMsgs] = useState([]); // {role:'user'|'ai', text}
+  const [chatLoading, setChatLoading] = useState(false);
+  // Deep dive states
+  const [deepDiveText, setDeepDiveText] = useState('');
+  const [deepDiveSections, setDeepDiveSections] = useState([]); // {title, content}
+  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
 
   // On mount: try to restore cached schedule immediately for better UX
   useEffect(() => {
@@ -133,6 +145,16 @@ export default function MySchedule() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Clean noisy day titles coming from LLM (e.g., "**Day Title**: ...", emojis, extra punctuation)
+  const cleanTitle = (s) => {
+    if (!s || typeof s !== 'string') return '';
+    return s
+      .replace(/\*\*?Day Title\*\*?:?/i, '') // **Day Title**:
+      .replace(/✨|🔥|💡|🎯|⭐|🌟|💎|🏆|🎉|🚀/g, '') // common emojis
+      .replace(/^\s*[:\-–—]\s*/, '')
+      .trim();
   };
 
   const markTaskComplete = async (status) => {
@@ -285,10 +307,413 @@ export default function MySchedule() {
     }
   };
 
-  const parsedResources = Array.isArray(todayTask?.resources)
-    ? todayTask.resources.map(parseResourceItem).filter(Boolean)
+  // --- Smart fallback content generation so page never looks empty ---
+  const getTopicFromTitle = (t) => {
+    if (!t) return '';
+    // Try to extract phrase after 'Introduction to'
+    const m = t.match(/Introduction to\s+(.+)/i);
+    if (m) return m[1].replace(/\*|\*/g, '').trim();
+    return t.replace(/\*|\*/g, '').trim();
+  };
+
+  const buildFallback = (task) => {
+    if (!task) return null;
+    const topic = getTopicFromTitle(task.dayTitle || task.subtask || task.title || 'the topic');
+    const summary = `In this lesson, you'll get a clear, hands-on introduction to ${topic}. We'll cover what it is, why it matters, and how to start using it today with simple, practical steps.`;
+    const keyPoints = [
+      `What ${topic} is and when to use it`,
+      `Why ${topic} is useful in real projects`,
+      `Core concepts you must know to get started`,
+      `A simple example of ${topic} in action`,
+      `Next steps and practice ideas to build confidence`
+    ];
+    const example = `Imagine you're working on a small project and want to apply ${topic}. You'll learn the minimal setup and a real-world mini example that you can replicate in under 20 minutes.`;
+    const exercises = [
+      `Set up a basic environment for ${topic} on your machine (or in a sandbox).`,
+      `Recreate the example from the lesson and tweak one parameter to see what changes.`,
+      `Write down 3 use-cases where ${topic} can improve your workflow.`
+    ];
+    const resources = [
+      `[Official docs for ${topic}](https://www.google.com/search?q=${encodeURIComponent(topic + ' official docs')})`,
+      `[Beginner tutorial on ${topic}](https://www.google.com/search?q=${encodeURIComponent('beginner tutorial ' + topic)})`,
+      `[Use-cases of ${topic}](https://www.google.com/search?q=${encodeURIComponent(topic + ' use cases')})`
+    ];
+    const motivation = task.motivation || `Mastering ${topic} helps you move faster with fewer mistakes, and gives you a clear edge in everyday work.`;
+    return { summary, keyPoints, example, exercises, resources, motivation };
+  };
+
+  const displayTask = (() => {
+    if (!todayTask) return null;
+    const fallback = buildFallback(todayTask);
+    return {
+      ...todayTask,
+      keyPoints: Array.isArray(todayTask.keyPoints) && todayTask.keyPoints.length > 0 ? todayTask.keyPoints : fallback.keyPoints,
+      example: todayTask.example || fallback.example,
+      exercises: Array.isArray(todayTask.exercises) && todayTask.exercises.length > 0 ? todayTask.exercises : fallback.exercises,
+      resources: Array.isArray(todayTask.resources) && todayTask.resources.length > 0 ? todayTask.resources : fallback.resources,
+      motivation: todayTask.motivation || todayTask.motivationTip || fallback.motivation,
+      summary: (todayTask.notes || '') || (todayTask.example || '') || fallback.summary
+    };
+  })();
+
+  // Parse markdown into sections on headings '### '
+  const parseMarkdownSections = (text = '') => {
+    try {
+      const lines = String(text || '').split(/\r?\n/);
+      const sections = [];
+      let current = { title: 'Overview', content: [] };
+      for (const line of lines) {
+        const h3 = line.match(/^###\s+(.+)/);
+        if (h3) {
+          if (current.content.length) sections.push({ ...current, content: current.content.join('\n') });
+          current = { title: h3[1].trim(), content: [] };
+        } else {
+          current.content.push(line);
+        }
+      }
+      if (current.content.length) sections.push({ ...current, content: current.content.join('\n') });
+      return sections.filter(s => s.content.trim().length > 0);
+    } catch (_) {
+      return [];
+    }
+  };
+
+  const buildSectionsFromKeyPoints = (topic, points = []) => {
+    const items = Array.isArray(points) ? points : [];
+    if (items.length === 0) return [];
+    return items.slice(0, 6).map((kp, i) => ({
+      title: `${i + 1}. ${kp.replace(/[:\-–—].*$/, '').trim()}`,
+      content: `What it means: ${kp}\n\nWhy it matters: Understanding "${kp}" builds intuition for ${topic}.\n\nHow to use: Try applying this concept in today's example or practice tasks.\n\nPitfall: Avoid memorizing definitions—build intuition by implementing a tiny demo.`,
+    }));
+  };
+
+  // Fetch deep dive content via backend AI (with graceful fallback)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!displayTask) return;
+        const topic = getTopicFromTitle(displayTask?.dayTitle || displayTask?.subtask || displayTask?.title || 'the topic');
+        const cacheKey = `LB_DEEPDIVE_${(topic || '').toLowerCase().slice(0,80)}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          setDeepDiveText(cached);
+          setDeepDiveSections(parseMarkdownSections(cached));
+          return;
+        }
+        setDeepDiveLoading(true);
+        let text = '';
+        try {
+          const apiBase = await getApiUrl();
+          const res = await fetch(`${apiBase}/api/ai-chat/education`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              topic: `Explain ${topic} in depth for a beginner. Break into sub-topics with clear headings (### Heading). Include short examples, analogies, and common pitfalls.`,
+              difficulty: 'beginner'
+            })
+          });
+          const data = await res.json();
+          if (res.ok && data?.response) {
+            text = String(data.response);
+          }
+        } catch (_) {
+          // ignore, use fallback below
+        }
+        if (!text || text.trim().length === 0) {
+          const topic = getTopicFromTitle(displayTask?.dayTitle || displayTask?.subtask || displayTask?.title || 'the topic');
+          const sections = buildSectionsFromKeyPoints(topic, displayTask?.keyPoints || []);
+          const joinText = ['## Deep Dive', ...sections.map(s => `### ${s.title}\n${s.content}`)].join('\n\n');
+          setDeepDiveText(joinText);
+          setDeepDiveSections(sections);
+          return;
+        }
+        setDeepDiveText(text);
+        setDeepDiveSections(parseMarkdownSections(text));
+        try { sessionStorage.setItem(cacheKey, text); } catch (_) {}
+      } finally {
+        setDeepDiveLoading(false);
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayTask?.dayTitle, displayTask?.subtask]);
+
+  // Lesson Chat: ask backend with contextualized question
+  const askLessonAI = async (msg) => {
+    const query = (msg || chatInput || '').trim();
+    if (!query) return;
+    setChatInput('');
+    setChatMsgs(prev => [...prev, { role: 'user', text: query }]);
+    setChatLoading(true);
+    try {
+      const apiBase = await getApiUrl();
+      const context = `Context: Day ${todayTask?.dayNumber} - ${displayTask?.dayTitle || displayTask?.subtask}. Key points: ${(displayTask?.keyPoints || []).join('; ')}. Example: ${displayTask?.example || ''}`;
+      const res = await fetch(`${apiBase}/api/ai-chat/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: `${query}\n\n${context}` })
+      });
+      const data = await res.json();
+      const aiText = data?.response || data?.message || 'Sorry, I could not get an answer right now.';
+      setChatMsgs(prev => [...prev, { role: 'ai', text: aiText }]);
+    } catch (e) {
+      setChatMsgs(prev => [...prev, { role: 'ai', text: 'Sorry, something went wrong. Please try again.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // =====================
+  // AI text formatting helpers
+  // =====================
+  const extractAiFormatting = (text = '') => {
+    const out = { topic: '', bullets: [], teaser: '', paragraphs: [] };
+    if (!text || typeof text !== 'string') return out;
+    let t = text
+      .replace(/\*\*/g, '')
+      .replace(/\s+\n/g, '\n')
+      // normalize bullet characters to dashes for easier parsing
+      .replace(/^\s*[•–—]\s+/gm, '- ')
+      .trim();
+    const topicMatch = t.match(/(?:Today[’']s\s+topic|Topic)\s*:\s*(.+?)(?:\n|\.|$)/i);
+    if (topicMatch) {
+      out.topic = topicMatch[1].replace(/\s*🚀$/, '').trim();
+    }
+    const items = [];
+    const itemRegex = /(\d{1,2})\.\s+([^]+?)(?=(?:\s+\d{1,2}\.\s+)|$)/g;
+    let m;
+    while ((m = itemRegex.exec(t)) !== null) {
+      items.push(m[2].trim().replace(/\s+\.$/, ''));
+    }
+    if (items.length) out.bullets = items;
+    // Also support dashed/• bullets
+    if (!out.bullets.length) {
+      const dashLines = t.split(/\r?\n/).map(s => s.trim()).filter(l => /^[-*•]\s+/.test(l));
+      if (dashLines.length) out.bullets = dashLines.map(l => l.replace(/^[-*•]\s+/, ''));
+    }
+    const teaserMatch = t.match(/(Mini[- ]?project[^:]*:|Teaser:|By the end[^:]*:?)\s*([^]+?)(?:$|\n)/i);
+    if (teaserMatch) out.teaser = teaserMatch[2].trim();
+    const stripped = t
+      .replace(itemRegex, '')
+      .replace(/(?:Today[’']s\s+topic|Topic)\s*:.+?(?:\n|\.|$)/i, '')
+      .trim();
+    if (stripped) {
+      out.paragraphs = stripped
+        .split(/\n+|(?<=[.!?])\s+(?=[A-Z])/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+    return out;
+  };
+
+  // Convert plain text (no code fences) into headings, lists, and paragraphs
+  const renderInlineBlocks = (raw = '') => {
+    const lines = String(raw || '').split(/\r?\n/);
+    const nodes = [];
+    let key = 0;
+    let para = [];
+    let listType = null; // 'ul' | 'ol'
+    let listItems = [];
+
+    const renderInlineCodeSegments = (s = '') => {
+      const parts = String(s).split(/`([^`]+)`/g);
+      return (
+        <>
+          {parts.map((part, i) => (
+            i % 2 === 1
+              ? <code key={i} className="px-1 py-0.5 rounded bg-slate-100 text-slate-800">{part}</code>
+              : <span key={i}>{part}</span>
+          ))}
+        </>
+      );
+    };
+
+    const flushPara = () => {
+      if (para.length) {
+        nodes.push(<p key={`p-${key++}`} className="mt-1">{renderInlineCodeSegments(para.join(' '))}</p>);
+        para = [];
+      }
+    };
+    const flushList = () => {
+      if (listItems.length) {
+        if (listType === 'ul') {
+          nodes.push(
+            <ul key={`ul-${key++}`} className="list-disc pl-5 space-y-1 text-slate-700">
+              {listItems.map((it, i) => (<li key={i} className="leading-relaxed">{renderInlineCodeSegments(it)}</li>))}
+            </ul>
+          );
+        } else if (listType === 'ol') {
+          nodes.push(
+            <ol key={`ol-${key++}`} className="list-decimal pl-5 space-y-1 text-slate-700">
+              {listItems.map((it, i) => (<li key={i} className="leading-relaxed">{renderInlineCodeSegments(it)}</li>))}
+            </ol>
+          );
+        }
+      }
+      listType = null;
+      listItems = [];
+    };
+
+    for (const lineRaw of lines) {
+      const line = lineRaw.trim();
+      if (!line) { flushPara(); flushList(); continue; }
+      const h3 = line.match(/^###\s+(.+)/);
+      const h4 = line.match(/^####\s+(.+)/);
+      const ul = line.match(/^[-*•]\s+(.+)/);
+      const ol = line.match(/^(\d{1,2})\.\s+(.+)/);
+      // If code-like HTML/JSX or JS line, render as code block
+      const isCodeLike = /<\/?[a-zA-Z][^>]*>/.test(line) || /^(const|let|var|function|class)\b/.test(line);
+      if (isCodeLike) { flushPara(); flushList(); nodes.push(
+        <pre key={`code-${key++}`} className="mt-2 rounded-lg bg-slate-900 text-slate-100 p-3 overflow-auto overflow-x-auto text-xs w-full max-w-full"><code>{line}</code></pre>
+      ); continue; }
+      if (h3) { flushPara(); flushList(); nodes.push(<div key={`h3-${key++}`} className="font-semibold text-slate-900 mt-2">{h3[1]}</div>); continue; }
+      if (h4) { flushPara(); flushList(); nodes.push(<div key={`h4-${key++}`} className="font-semibold text-slate-800 mt-1">{h4[1]}</div>); continue; }
+      if (ul) { flushPara(); if (listType && listType !== 'ul') flushList(); listType = 'ul'; listItems.push(ul[1]); continue; }
+      if (ol) { flushPara(); if (listType && listType !== 'ol') flushList(); listType = 'ol'; listItems.push(ol[2]); continue; }
+      // normal text
+      if (listType) { flushList(); }
+      para.push(line);
+    }
+    flushPara(); flushList();
+    return nodes;
+  };
+
+  // Render triple backtick code fences and delegate non-code parts to renderInlineBlocks
+  const renderTextWithCode = (raw = '') => {
+    const text = String(raw || '');
+    const parts = [];
+    const re = /```(\w+)?\n([\s\S]*?)```/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const before = text.slice(last, m.index).trim();
+      if (before) {
+        parts.push(...renderInlineBlocks(before));
+      }
+      const code = m[2];
+      parts.push(
+        <pre key={`c-${m.index}`} className="mt-2 rounded-lg bg-slate-900 text-slate-100 p-3 overflow-auto overflow-x-auto text-xs w-full max-w-full">
+          <code>{code}</code>
+        </pre>
+      );
+      last = re.lastIndex;
+    }
+    const after = text.slice(last).trim();
+    if (after) parts.push(...renderInlineBlocks(after));
+    return <>{parts}</>;
+  };
+
+  const AiFormattedBlock = ({ text, compact = false }) => {
+    const { topic, bullets, teaser, paragraphs } = extractAiFormatting(text);
+    const parseHighlights = (bodyText = '') => {
+      const out = {};
+      const src = String(bodyText || '');
+      const pick = (label) => {
+        const re = new RegExp(`${label}\\s*:\\s*([^]+?)(?=(?:\\n[A-Z][A-Za-z ]{1,18}\\s*:)|$)`, 'i');
+        const m = src.match(re);
+        return m ? m[1].trim() : '';
+      };
+      out.what = pick('What it means');
+      out.why = pick('Why it matters');
+      out.how = pick('How to use');
+      out.pitfall = pick('Pitfall|Common mistake');
+      out.example = pick('Example');
+      out.analogy = pick('Analogy');
+      return out;
+    };
+    return (
+      <div className={compact ? '' : 'space-y-3 break-words'}>
+        {topic && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">Topic</span>
+            <span className="font-semibold text-slate-900">{topic}</span>
+          </div>
+        )}
+        {bullets.length > 0 && (
+          <ul className="list-disc pl-5 space-y-2 text-slate-700 break-words">
+            {bullets.map((b,i) => {
+              const [head, ...restParts] = b.split(':');
+              const body = restParts.join(':').trim();
+              const hi = parseHighlights(body);
+              return (
+                <li key={i} className="leading-relaxed">
+                  <div className="font-medium text-slate-900">{head}{body ? ':' : ''}</div>
+                  {body && !hi.what && !hi.why && !hi.how && !hi.pitfall && !hi.example && !hi.analogy && (
+                    <div className="text-sm break-words">{renderTextWithCode(body)}</div>
+                  )}
+                  {(hi.what || hi.why || hi.how || hi.pitfall || hi.example || hi.analogy) && (
+                    <div className="mt-2 space-y-2 text-sm break-words">
+                      {hi.what && (<div className="flex gap-2"><span>🧩</span><div className="flex-1">{renderTextWithCode(hi.what)}</div></div>)}
+                      {hi.why && (<div className="flex gap-2"><span>💡</span><div className="flex-1">{renderTextWithCode(hi.why)}</div></div>)}
+                      {hi.how && (<div className="flex gap-2"><span>🛠️</span><div className="flex-1">{renderTextWithCode(hi.how)}</div></div>)}
+                      {hi.example && (<div className="flex gap-2"><span>🧪</span><div className="flex-1">{renderTextWithCode(hi.example)}</div></div>)}
+                      {hi.analogy && (<div className="flex gap-2"><span>🔗</span><div className="flex-1">{renderTextWithCode(hi.analogy)}</div></div>)}
+                      {hi.pitfall && (<div className="flex gap-2"><span>⚠️</span><div className="flex-1">{renderTextWithCode(hi.pitfall)}</div></div>)}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {teaser && (
+          <div className="text-sm bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-3 text-slate-700 break-words">{teaser}</div>
+        )}
+        {paragraphs.length > 0 && (
+          <div className="space-y-2 text-slate-700 text-sm break-words">
+            {paragraphs.map((p,i)=>(
+              <div key={i}>{renderTextWithCode(p)}</div>
+            ))}
+          </div>
+        )}
+        {!topic && bullets.length === 0 && paragraphs.length === 0 && (
+          <div className="text-slate-700 text-sm whitespace-pre-wrap break-words">{renderTextWithCode(text)}</div>
+        )}
+      </div>
+    );
+  };
+
+  const parsedResources = Array.isArray(displayTask?.resources)
+    ? displayTask.resources.map(parseResourceItem).filter(Boolean)
     : [];
   const videoResources = parsedResources.filter(r => r.isYouTube);
+  const visibleVideoResources = videoResources.filter(v => !videoBlacklist[v.videoId]);
+  const overviewParts = [];
+  const prettyTitle = cleanTitle(displayTask?.dayTitle || displayTask?.subtask || 'Today\'s Lesson');
+  if (prettyTitle) overviewParts.push(`"${prettyTitle}"`);
+  if (displayTask?.summary) overviewParts.push(displayTask.summary);
+  const overviewTextRaw = overviewParts.join('\n\n').trim();
+  const isOverviewLong = overviewTextRaw.length > 700;
+  const overviewTextShort = isOverviewLong ? (overviewTextRaw.slice(0, 700) + '…') : overviewTextRaw;
+
+  // Reading time estimate (200 wpm)
+  const wordCount = (text) => (text || '').split(/\s+/).filter(Boolean).length;
+  const totalWords = wordCount(overviewTextRaw) + wordCount((displayTask?.keyPoints || []).join(' ')) + wordCount(displayTask?.example);
+  const readMinutes = Math.max(1, Math.ceil(totalWords / 200));
+
+  // Extract simple definitions from key points like "Term (definition)" or "Term: definition"
+  const extractDefinition = (pt) => {
+    if (!pt || typeof pt !== 'string') return null;
+    // Pattern 1: Term (definition)
+    const paren = pt.match(/^\s*([^:()\-–—]+?)\s*\(([^)]+)\)\s*$/);
+    if (paren) return { term: paren[1].trim(), def: paren[2].trim() };
+    // Pattern 2: Term: definition
+    const colon = pt.match(/^\s*([^:]+?):\s*(.+)$/);
+    if (colon) return { term: colon[1].trim(), def: colon[2].trim() };
+    // Pattern 3: Term - definition
+    const dash = pt.match(/^\s*([^\-–—]+?)\s*[\-–—]\s*(.+)$/);
+    if (dash) return { term: dash[1].trim(), def: dash[2].trim() };
+    return null;
+  };
+  const definitions = Array.isArray(displayTask?.keyPoints)
+    ? displayTask.keyPoints.map(extractDefinition).filter(Boolean).slice(0, 6)
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden">
@@ -327,28 +752,21 @@ export default function MySchedule() {
               <CalendarIcon className="w-6 h-6 text-white" />
             </motion.div>
           </motion.div>
+
+          {/* Removed misplaced Lesson Outline from top bar */}
         </div>
       </motion.div>
 
       {/* Main Layout */}
       <motion.div 
-                    className="w-full p-6"
+        className="w-full p-6"
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
       >
         <div className="grid grid-cols-12 gap-8 min-h-[calc(100vh-140px)]">
-          {/* Sidebar - 30% width */}
-          <motion.div 
-            className="col-span-4"
-            initial={{ x: -100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-          >
-            <Sidebar />
-          </motion.div>
-
-          {/* Main Content Area - 70% width */}
+          {/* Main Content Area */
+          }
           <motion.div 
             className="col-span-8"
             initial={{ x: 100, opacity: 0 }}
@@ -464,42 +882,117 @@ export default function MySchedule() {
                         </div>
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-slate-800 mb-2">
-                          {todayTask.subtask}
+                        <h3 className="text-2xl font-bold text-slate-900 mb-1">
+                          {prettyTitle}
                         </h3>
+                        <p className="text-xs text-slate-500 mb-3">Day {todayTask.dayNumber}{todayTask.totalDays ? ` of ${todayTask.totalDays}` : ''} • ~{readMinutes} min read</p>
                         {notificationPlatform === 'telegram' ? (
                           <div className="text-slate-600 mb-4 font-semibold">Full schedule sent to your Telegram!</div>
                         ) : (
                           <>
-                            <p className="text-slate-600 mb-4">{todayTask.motivationTip || todayTask.motivation}</p>
-                            {/* Perplexity-style Research Summary */}
-                            {Array.isArray(todayTask.keyPoints) && todayTask.keyPoints.length > 0 && (
+                            {/* Tab Bar */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                              <div className="flex flex-wrap gap-2">
+                              {[
+                                { id: 'overview', label: 'Overview' },
+                                { id: 'concepts', label: 'Concepts' },
+                                ...(definitions.length > 0 ? [{ id: 'concepts', label: 'Concepts' }] : []),
+                                ...((deepDiveText || (displayTask?.keyPoints || []).length > 0) ? [{ id: 'deep', label: 'Deep Dive' }] : []),
+                                ...(todayTask.example ? [{ id: 'example', label: 'Example' }] : []),
+                                ...(visibleVideoResources.length > 0 ? [{ id: 'videos', label: 'Videos' }] : []),
+                                ...(parsedResources.length > 0 ? [{ id: 'sources', label: 'Sources' }] : []),
+                                ...(Array.isArray(todayTask.exercises) && todayTask.exercises.length > 0 ? [{ id: 'practice', label: 'Practice' }] : []),
+                                [{ id: 'chat', label: 'Ask AI' }][0],
+                              ].filter((v,i,self)=> i === self.findIndex(s=>s.id===v.id)).map(tab => (
+                                <button
+                                  key={tab.id}
+                                  onClick={() => setActiveTab(tab.id)}
+                                  className={`px-3 py-1 text-sm rounded-full border ${activeTab===tab.id? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent' : 'bg-white/70 text-slate-700 border-slate-200 hover:border-slate-300'}`}
+                                >
+                                  {tab.label}
+                                </button>
+                              ))}
+                              </div>
+                              <button
+                                onClick={() => setActiveTab('chat')}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 shadow"
+                              >
+                                <ChatBubbleOvalLeftIcon className="w-4 h-4" /> Ask AI
+                              </button>
+                            </div>
+
+                            {/* Research Summary / Motivation */}
+                            {activeTab === 'overview' && todayTask.motivationTip && !overviewTextRaw && (
+                              <p className="text-slate-600 mb-4">{todayTask.motivationTip}</p>
+                            )}
+
+                            {/* Example / Analogy */}
+                            {(activeTab === 'overview') && (
                               <div className="mb-6">
-                                <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">🔎 Research Summary</h4>
-                                <ul className="space-y-2 text-slate-700">
-                                  {todayTask.keyPoints.slice(0, 5).map((pt, idx) => (
-                                    <li key={idx} className="bg-white/50 p-2 rounded">{pt}</li>
-                                  ))}
-                                </ul>
-                                {parsedResources.length > 0 && (
+                                <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">💬 AI Lesson Summary</h4>
+                                <div className="text-slate-700 bg-white/60 p-4 rounded-xl leading-relaxed">
+                                  <AiFormattedBlock text={(overviewTextRaw && overviewTextRaw.length > 0) ? (showFullOverview ? overviewTextRaw : overviewTextShort) : (displayTask?.summary || displayTask?.motivation || '')} compact={true} />
+                                  {isOverviewLong && (
+                                    <button className="ml-2 text-purple-600 font-semibold hover:underline" onClick={() => setShowFullOverview(v => !v)}>
+                                      {showFullOverview ? 'Show less' : 'Read more'}
+                                    </button>
+                                  )}
+                                </div>
+                                {/* Quick takeaways chips */}
+                                {Array.isArray(displayTask.keyPoints) && displayTask.keyPoints.length > 0 && (
                                   <div className="mt-3 flex flex-wrap gap-2">
-                                    {parsedResources.map((r, i) => (
-                                      <a key={i} href={r.url} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
-                                        [{i + 1}] {r.domain}
-                                      </a>
+                                    {displayTask.keyPoints.slice(0, 4).map((kp, i) => (
+                                      <span key={i} className="text-xs px-2 py-1 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 text-slate-700 border border-purple-200">{kp}</span>
                                     ))}
+                                  </div>
+                                )}
+                                {/* Duration/Motivation chips */}
+                                {(todayTask?.duration || todayTask?.motivation || todayTask?.motivationTip) && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {todayTask?.duration && (
+                                      <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">🕐 Duration: {todayTask.duration}</span>
+                                    )}
+                                    {(todayTask?.motivation || todayTask?.motivationTip) && (
+                                      <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">🧠 Motivation: {todayTask.motivation || todayTask.motivationTip}</span>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Primary resource CTA */}
+                                {parsedResources.length > 0 && (
+                                  <div className="mt-4">
+                                    <a href={parsedResources[0].url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm shadow hover:from-blue-700 hover:to-cyan-600">
+                                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14L21 3M21 3H14M21 3V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                      Start here: {parsedResources[0].domain}
+                                    </a>
                                   </div>
                                 )}
                               </div>
                             )}
-                            {/* Videos Section */}
-                            {videoResources.length > 0 && (
+                            {/* Concepts */}
+                            {activeTab === 'concepts' && definitions.length > 0 && (
+                              <div className="mb-6">
+                                <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">🔎 Key Concepts & Definitions</h4>
+                                <ul className="space-y-2 text-slate-700">
+                                  {definitions.map((d, i) => (
+                                    <li key={i} className="bg-white/60 p-3 rounded-lg"><span className="font-semibold text-slate-900">{d.term}:</span> {d.def}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Videos Section (hide if broken) */}
+                            {activeTab === 'videos' && visibleVideoResources.length > 0 && (
                               <div className="mb-6">
                                 <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">🎥 Videos</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  {videoResources.map((v, i) => (
+                                  {visibleVideoResources.map((v, i) => (
                                     <a key={i} href={v.url} target="_blank" rel="noreferrer" className="group relative rounded-xl overflow-hidden bg-black">
-                                      <img src={`https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`} alt={v.title || 'YouTube Video'} className="w-full aspect-video object-cover opacity-90 group-hover:opacity-100 transition" />
+                                      <img
+                                        src={`https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`}
+                                        alt={v.title || 'YouTube Video'}
+                                        className="w-full aspect-video object-cover opacity-90 group-hover:opacity-100 transition"
+                                        onError={() => setVideoBlacklist(prev => ({ ...prev, [v.videoId]: true }))}
+                                      />
                                       <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="bg-white/90 rounded-full p-3 shadow-lg group-hover:scale-110 transition">
                                           <PlayCircleIcon className="w-8 h-8 text-red-600" />
@@ -514,7 +1007,7 @@ export default function MySchedule() {
                               </div>
                             )}
                             {/* Sources Section */}
-                            {parsedResources.length > 0 && (
+                            {activeTab === 'sources' && parsedResources.length > 0 && (
                               <div className="mb-4">
                                 <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">📚 Sources</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -531,30 +1024,54 @@ export default function MySchedule() {
                                 </div>
                               </div>
                             )}
-                            {/* Exercises Section */}
-                            {todayTask.exercises && todayTask.exercises.length > 0 && (
-                              <div className="mb-4">
-                                <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                                  💪 Practical Exercises
-                                </h4>
-                                <div className="space-y-1">
-                                  {todayTask.exercises.map((exercise, index) => (
-                                    <div key={index} className="text-sm text-slate-600 bg-white/50 p-2 rounded">
-                                      {exercise}
-                                    </div>
-                                  ))}
+
+                            {/* Ask AI - full width tab */}
+                            {activeTab === 'chat' && (
+                              <div className="mb-6">
+                                <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">🤖 Ask AI about today</h4>
+                                <div className="bg-white/70 rounded-2xl border border-white/20 p-4 overflow-hidden">
+                                  <div className="max-h-[520px] min-h-[260px] overflow-auto overflow-x-hidden space-y-3 mb-3 pr-1">
+                                    {chatMsgs.length === 0 && (
+                                      <div className="text-xs text-slate-500">Try: "What is today’s topic in simple words?"</div>
+                                    )}
+                                    {chatMsgs.map((m, i) => (
+                                      <div key={i} className={`text-sm rounded-lg p-3 break-words min-w-0 ${m.role==='user' ? 'bg-purple-50 text-slate-800 ml-12' : 'bg-slate-50 border border-slate-200 text-slate-800 mr-12'}`}>
+                                        {m.role === 'ai' ? (<AiFormattedBlock text={m.text} />) : m.text}
+                                      </div>
+                                    ))}
+                                    {chatLoading && <div className="text-xs text-slate-500">AI is typing…</div>}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      value={chatInput}
+                                      onChange={(e)=>setChatInput(e.target.value)}
+                                      onKeyDown={(e)=>{ if(e.key==='Enter'){ askLessonAI(); } }}
+                                      placeholder="Ask about today’s lesson…"
+                                      className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white/80"
+                                    />
+                                    <button onClick={()=>askLessonAI()} disabled={chatLoading || !chatInput.trim()} className={`px-3 py-2 rounded-lg text-white text-sm flex items-center gap-1 ${chatLoading ? 'bg-slate-400' : 'bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600'}`}>
+                                      <PaperAirplaneIcon className="w-4 h-4" />
+                                      Send
+                                    </button>
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {['What is today’s topic?','Explain with a simple analogy','What should I learn next?'].map((p, i)=> (
+                                      <button key={i} onClick={()=>askLessonAI(p)} className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">{p}</button>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             )}
-                            {/* Deep Dive Section */}
-                            {todayTask.notes && (
+
+                            {/* Practice Section */}
+                            {activeTab === 'practice' && Array.isArray(displayTask.exercises) && displayTask.exercises.length > 0 && (
                               <div className="mb-4">
-                                <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                                  🧠 Deep Dive
-                                </h4>
-                                <div className="text-sm text-slate-600 bg-white/50 p-3 rounded">
-                                  {todayTask.notes}
-                                </div>
+                                <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2">💪 Practice</h4>
+                                <ul className="space-y-2">
+                                  {displayTask.exercises.map((ex, i) => (
+                                    <li key={i} className="bg-white/60 p-3 rounded-lg text-sm text-slate-700">{ex}</li>
+                                  ))}
+                                </ul>
                               </div>
                             )}
                           </>
@@ -628,6 +1145,86 @@ export default function MySchedule() {
               )}
             </motion.div>
           </motion.div>
+          {/* Lesson Outline - now properly placed in grid next to main content */}
+          <motion.aside 
+            className="col-span-4"
+            initial={{ x: -100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+          >
+            <div className="space-y-6 sticky top-28">
+              <div className="p-6 bg-white/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl">
+                <h3 className="text-lg font-semibold text-slate-800 mb-1">Lesson Outline</h3>
+                <p className="text-xs text-slate-500 mb-4">Day {todayTask?.dayNumber}{todayTask?.totalDays ? ` of ${todayTask.totalDays}` : ''} • ~{readMinutes} min read</p>
+                <ul className="space-y-2 text-sm text-slate-700">
+                  {overviewTextRaw && (<li className="flex items-start gap-2"><span>🧩</span><span>Overview</span></li>)}
+                  {Array.isArray(displayTask?.keyPoints) && displayTask.keyPoints.length > 0 && (
+                    <li className="flex items-start gap-2"><span>🔎</span><span>Key Concepts</span></li>
+                  )}
+                  {(deepDiveText || (displayTask?.keyPoints || []).length > 0) && (<li className="flex items-start gap-2"><span>📘</span><span>Deep Dive</span></li>)}
+                  {definitions.length > 0 && (<li className="flex items-start gap-2"><span>📖</span><span>Definitions</span></li>)}
+                  {displayTask?.example && (<li className="flex items-start gap-2"><span>📝</span><span>Example</span></li>)}
+                  {visibleVideoResources.length > 0 && (<li className="flex items-start gap-2"><span>🎥</span><span>Videos</span></li>)}
+                  {parsedResources.length > 0 && (<li className="flex items-start gap-2"><span>📚</span><span>Sources</span></li>)}
+                  {Array.isArray(displayTask?.exercises) && displayTask.exercises.length > 0 && (<li className="flex items-start gap-2"><span>💪</span><span>Practice</span></li>)}
+                  {todayTask?.quiz && (<li className="flex items-start gap-2"><span>🧩</span><span>Quiz</span></li>)}
+                </ul>
+                {Array.isArray(displayTask?.keyPoints) && displayTask.keyPoints.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-slate-800 mb-2">What you'll learn</h4>
+                    <ul className="list-disc list-inside text-xs text-slate-600 space-y-1">
+                      {displayTask.keyPoints.slice(0, 6).map((pt, i) => (
+                        <li key={i}>{pt}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {definitions.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-slate-800 mb-2">Key Definitions</h4>
+                    <ul className="text-xs text-slate-600 space-y-1">
+                      {definitions.map((d, i) => (
+                        <li key={i}><span className="font-semibold text-slate-800">{d.term}:</span> {d.def}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {displayTask?.motivation && (
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl shadow">
+                  <div className="text-xs uppercase tracking-wide text-purple-600 font-bold mb-1">Motivation</div>
+                  <div className="text-sm text-slate-700">{displayTask.motivation}</div>
+                </div>
+              )}
+              {/* Removed small sidebar chat; moved to full-width tab */}
+              {/* Quick Quiz */}
+              {todayTask?.quiz?.question && Array.isArray(todayTask?.quiz?.options) && todayTask.quiz.options.length > 0 && (
+                <div className="p-6 bg-white/70 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl">
+                  <h3 className="text-lg font-semibold text-slate-800 mb-2">Quick Quiz</h3>
+                  <p className="text-sm text-slate-700 mb-3">{todayTask.quiz.question}</p>
+                  <div className="space-y-2 mb-3">
+                    {todayTask.quiz.options.map((opt, i) => (
+                      <label key={i} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="radio" name="quiz" value={opt} checked={quizAnswer === opt} onChange={(e) => { setQuizAnswer(e.target.value); setQuizChecked(false); }} />
+                        {opt}
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold"
+                    onClick={() => setQuizChecked(true)}
+                  >
+                    Check Answer
+                  </button>
+                  {quizChecked && (
+                    <div className={`mt-3 text-sm font-semibold ${quizAnswer === todayTask.quiz.correctAnswer ? 'text-green-600' : 'text-red-600'}`}>
+                      {quizAnswer === todayTask.quiz.correctAnswer ? '✅ Correct!' : `❌ Incorrect. Correct answer: ${todayTask.quiz.correctAnswer}`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.aside>
         </div>
       </motion.div>
       {/* End Schedule Confirmation Dialog */}

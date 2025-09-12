@@ -2,6 +2,10 @@ const nodemailer = require('nodemailer');
 const fetch = require('node-fetch');
 const { splitContentIntoMessages } = require('./openRouterService');
 
+// Helper: build link to full schedule in the frontend
+const FRONTEND_BASE = (process.env.FRONTEND_URL || process.env.OPENROUTER_REFERRER || '').replace(/\/$/, '') || 'https://lifebuddy.app';
+const buildScheduleUrl = (dayNumber) => `${FRONTEND_BASE}/my-schedule?day=${encodeURIComponent(dayNumber)}&t=${Date.now()}`;
+
 // Messaging platform types
 const PLATFORMS = {
   WHATSAPP: 'whatsapp',
@@ -36,6 +40,17 @@ class WhatsAppService {
       }
 
       // Default: WhatsApp Cloud API (with sandbox code if provided)
+      // If a template is configured, attempt template send first (bypasses 24h session restriction)
+      const useTemplate = String(process.env.WHATSAPP_USE_TEMPLATE || '').toLowerCase() === 'true' || !!process.env.WHATSAPP_TEMPLATE_NAME;
+      if (useTemplate && process.env.WHATSAPP_TEMPLATE_NAME) {
+        const templateResult = await this.sendTemplateMessage(contactInfo, message);
+        if (templateResult?.success) {
+          return templateResult;
+        }
+        // fall through to text send if template fails
+        try { console.warn('WhatsApp template failed, falling back to text message'); } catch (_) {}
+      }
+
       const sandboxMessage = `${this.sandboxCode}\n\n${message}`;
       const response = await fetch(`${this.baseUrl}/${this.phoneNumberId}/messages`, {
         method: 'POST',
@@ -62,6 +77,60 @@ class WhatsAppService {
     } catch (error) {
       console.error('WhatsApp service error:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  async sendTemplateMessage(contactInfo, message) {
+    try {
+      const templateName = process.env.WHATSAPP_TEMPLATE_NAME;
+      const languageCode = process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en_US';
+      if (!templateName) return { success: false, error: 'Template name not set' };
+      const components = [];
+      // if body supports a parameter, pass trimmed message
+      components.push({
+        type: 'body',
+        parameters: [
+          { type: 'text', text: String(message).slice(0, 1024) }
+        ]
+      });
+      // optional button URL with schedule link
+      const scheduleUrl = `${FRONTEND_BASE}/my-schedule`;
+      if (process.env.WHATSAPP_TEMPLATE_INCLUDE_URL === 'true') {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [ { type: 'text', text: scheduleUrl } ]
+        });
+      }
+      const payload = {
+        messaging_product: 'whatsapp',
+        to: contactInfo,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components
+        }
+      };
+      const resp = await fetch(`${this.baseUrl}/${this.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        console.error('WhatsApp template error:', result.error || result);
+        return { success: false, error: result?.error?.message || 'Template send failed' };
+      }
+      console.log(`✅ WhatsApp (Template) message sent to ${contactInfo}`);
+      return { success: true, messageId: result.messages?.[0]?.id, template: templateName };
+    } catch (e) {
+      console.error('WhatsApp template service error:', e);
+      return { success: false, error: e.message };
     }
   }
 
@@ -110,7 +179,7 @@ class WhatsAppService {
       const result = await this.sendMessage(contactInfo, message);
       results.push(result);
       // Add delay between messages to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
     return results;
   }
@@ -161,7 +230,7 @@ class TelegramService {
       const result = await this.sendMessage(chatId, message);
       results.push(result);
       // Add delay between messages to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     return results;
   }
@@ -198,6 +267,7 @@ class EmailService {
   }
 
   formatEmailMessage(content) {
+    const scheduleUrl = `${FRONTEND_BASE}/my-schedule`;
     return `
       <!DOCTYPE html>
       <html>
@@ -212,6 +282,8 @@ class EmailService {
           .motivation { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px; margin-top: 20px; text-align: center; }
           .resource { background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 10px 0; }
           .code { background: #f5f5f5; padding: 10px; border-radius: 5px; font-family: monospace; }
+          .cta { margin-top: 16px; text-align: center; }
+          .cta a { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff !important; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: bold; }
         </style>
       </head>
       <body>
@@ -222,6 +294,9 @@ class EmailService {
           </div>
           <div class="content">
             ${content.replace(/\n/g, '<br>')}
+            <div class="cta">
+              <a href="${scheduleUrl}" target="_blank" rel="noopener">Open full schedule</a>
+            </div>
           </div>
           <div class="motivation">
             <h3>💪 Stay Motivated!</h3>
@@ -261,7 +336,7 @@ class MessagingService {
       // For Telegram, send the full structured daily plan, not just a short summary
       if (platform === PLATFORMS.TELEGRAM && schedule) {
         fullContent =
-          `\u2728 <b>Day ${dayNumber}: ${task.title}</b>\n` +
+          `✨ <b>Day ${dayNumber}: ${task.title}</b>\n` +
           (schedule.dayTitle ? `\n<b>Day Title:</b> ${schedule.dayTitle}` : '') +
           (schedule.keyPoints && schedule.keyPoints.length ? `\n<b>Key Points:</b>\n- ${schedule.keyPoints.join('\n- ')}` : '') +
           (schedule.example ? `\n<b>Example/Analogy:</b> ${schedule.example}` : '') +
@@ -273,6 +348,13 @@ class MessagingService {
 
       // Split content for multi-message platforms
       const messages = splitContentIntoMessages(fullContent, task.title, dayNumber);
+      // Append CTA link for platforms that send multiple messages
+      const scheduleUrl = buildScheduleUrl(dayNumber);
+      if (platform === PLATFORMS.TELEGRAM) {
+        messages.push(`\n<b>🔗 View full schedule:</b> <a href="${scheduleUrl}">${scheduleUrl}</a>`);
+      } else if (platform === PLATFORMS.WHATSAPP) {
+        messages.push(`\n🔗 View full schedule: ${scheduleUrl}`);
+      }
       
       const platformService = this.platforms[platform];
       
@@ -289,7 +371,7 @@ class MessagingService {
           platform 
         };
       } else {
-        // Send single comprehensive message for email
+        // Send single comprehensive message for email (CTA button added inside the template)
         const result = await platformService.sendMessage(contactInfo, fullContent);
         return { ...result, platform };
       }

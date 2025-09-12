@@ -91,14 +91,20 @@ router.post('/setup', authenticateUser, requirePremium, async (req, res) => {
       });
     }
 
+    // Normalize dates to day boundaries to avoid timezone/time-of-day issues
+    const sd = new Date(startDate);
+    sd.setHours(0, 0, 0, 0);
+    const ed = new Date(endDate);
+    ed.setHours(23, 59, 59, 999);
+
     // Save to DB
     const premiumTask = new PremiumTask({
       user: req.user._id,
       title,
       description,
       requirements,
-      startDate,
-      endDate,
+      startDate: sd,
+      endDate: ed,
       generatedSchedule: schedule,
       consentGiven: true,
       currentDay: 1,
@@ -241,19 +247,42 @@ router.post('/:id/event', authenticateUser, requirePremium, async (req, res) => 
 // Get today's scheduled subtask and motivation tip
 router.get('/today', authenticateUser, requirePremium, async (req, res) => {
   try {
-    // Find the most recent active premium task for the user
-    const task = await PremiumTask.findOne({
+    // Use inclusive day bounds to avoid timezone/time-of-day issues
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Find the most recent active premium task overlapping today
+    let task = await PremiumTask.findOne({
       user: req.user._id,
-      startDate: { $lte: new Date() },
-      endDate: { $gte: new Date() }
+      startDate: { $lte: endOfToday },
+      endDate: { $gte: startOfToday }
     }).sort({ createdAt: -1 });
 
+    // Fallback: pick the most recent task and compute today's index if date window mismatch
     if (!task) {
-      return res.status(404).json({ message: 'No active premium task found for today.' });
+      const latest = await PremiumTask.findOne({ user: req.user._id }).sort({ createdAt: -1 });
+      if (!latest) {
+        return res.status(404).json({ message: 'No active premium task found for today.' });
+      }
+      const s0 = new Date(latest.startDate);
+      s0.setHours(0, 0, 0, 0);
+      const dayIndex = Math.floor((startOfToday.getTime() - s0.getTime()) / (24 * 60 * 60 * 1000));
+      if (dayIndex < 0 || dayIndex >= (latest.generatedSchedule?.length || 0)) {
+        return res.status(404).json({ message: 'No scheduled subtask for today.' });
+      }
+      task = latest;
+      task.currentDay = dayIndex + 1; // virtual current day for response
     }
 
-    // Find today's subtask based on current day
-    const todaySubtask = task.generatedSchedule.find(s => s.day === task.currentDay);
+    // Prefer exact date match from generated schedule, fallback to currentDay
+    let todaySubtask = task.generatedSchedule.find(s => {
+      const d = new Date(s.date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === startOfToday.getTime();
+    }) || task.generatedSchedule.find(s => s.day === task.currentDay);
 
     if (!todaySubtask) {
       return res.status(404).json({ message: 'No scheduled subtask for today.' });
@@ -269,10 +298,18 @@ router.get('/today', authenticateUser, requirePremium, async (req, res) => {
       subtask: todaySubtask.subtask,
       status: todaySubtask.status,
       motivationTip: todaySubtask.motivationTip,
+      // Extra learning fields for richer UI
+      keyPoints: todaySubtask.keyPoints || [],
+      example: todaySubtask.example || '',
+      dayTitle: todaySubtask.dayTitle || '',
+      duration: todaySubtask.duration || '',
+      motivation: todaySubtask.motivation || '',
+      quiz: todaySubtask.quiz || null,
       resources: todaySubtask.resources || [],
       exercises: todaySubtask.exercises || [],
       notes: todaySubtask.notes || '',
       dayNumber: task.currentDay,
+      totalDays: Array.isArray(task.generatedSchedule) ? task.generatedSchedule.length : undefined,
       streak: task.stats.currentStreak,
       bestStreak: task.stats.bestStreak,
       completed: task.stats.completed,

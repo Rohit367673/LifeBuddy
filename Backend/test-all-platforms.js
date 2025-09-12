@@ -4,7 +4,7 @@ const axios = require('axios');
 
 // Test configuration
 const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzN2ZjOTU4OC01YWNlLTRkNjUtOTYzZS0wZTBiNzFkMjA3ZTMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MzM2NjEzfQ.Ieb9czhWybhL8s1EGa1sTG5VrJF9CbiuSSewspG7ywI';
-const BASE_URL = 'https://lifebuddy-backend-production.up.railway.app';
+const BASE_URL = process.env.BACKEND_BASE_URL || 'https://lifebuddy-backend-production.up.railway.app';
 
 const testData = {
   email: 'rohit367673@gmail.com',
@@ -45,7 +45,7 @@ async function testEmail() {
         'x-api-key': API_KEY,
         'Content-Type': 'application/json'
       },
-      timeout: 10000
+      timeout: 15000
     });
 
     console.log('✅ Email Test Result:', response.data);
@@ -70,7 +70,7 @@ async function testTelegram() {
         'x-api-key': API_KEY,
         'Content-Type': 'application/json'
       },
-      timeout: 10000
+      timeout: 35000
     });
 
     console.log('✅ Telegram Test Result:', response.data);
@@ -95,7 +95,7 @@ async function testWhatsApp() {
         'x-api-key': API_KEY,
         'Content-Type': 'application/json'
       },
-      timeout: 10000
+      timeout: 45000
     });
 
     console.log('✅ WhatsApp Test Result:', response.data);
