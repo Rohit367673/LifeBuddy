@@ -3,7 +3,7 @@ const app = express();
 app.use(express.json());
 
 // Simple WhatsApp simulation server for testing
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Store for simulating WhatsApp sessions
 let sessions = {};
@@ -76,7 +76,7 @@ app.get('/api/sessions', (req, res) => {
   res.json(list);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 WhatsApp Simulator running on http://localhost:${PORT}`);
   console.log('📱 This simulates WAHA for testing purposes');
   console.log('💡 Use this while Docker/WAHA is being set up');
